@@ -76,20 +76,32 @@ Copy a skill folder into your personal skills directory to make it available in
 every project, or into `.claude/skills/` inside a project to share it with the
 repo.
 
-macOS / Linux:
+macOS / Linux — all skills:
 
 ```bash
 git clone https://github.com/zedxter/skills.git
 mkdir -p ~/.claude/skills
-cp -r skills/skills/youtube-search skills/skills/youtube-transcript ~/.claude/skills/
+for skill in skills/skills/*/; do cp -R "${skill%/}" ~/.claude/skills/; done
 ```
 
-Windows (PowerShell):
+or a single skill:
+
+```bash
+cp -R skills/skills/youtube-transcript ~/.claude/skills/
+```
+
+> **Warning:** the source path must **not** end with a trailing slash. On
+> macOS `cp -R skills/skills/youtube-transcript/ ~/.claude/skills/` copies the
+> folder's *contents* (`SKILL.md`, `scripts/`) straight into `~/.claude/skills/`
+> instead of creating `~/.claude/skills/youtube-transcript/`, and the skill is
+> not found. The loop above strips the slash for that reason.
+
+Windows (PowerShell) — all skills:
 
 ```powershell
 git clone https://github.com/zedxter/skills.git
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\skills" | Out-Null
-Copy-Item -Recurse skills\skills\youtube-search, skills\skills\youtube-transcript "$env:USERPROFILE\.claude\skills\"
+Get-ChildItem skills\skills -Directory | Copy-Item -Recurse -Destination "$env:USERPROFILE\.claude\skills\"
 ```
 
 Claude Code picks up new skills on the next session start; `/skills` lists them.
