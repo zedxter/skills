@@ -184,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    p.add_argument("video", help="YouTube URL or 11-character video id")
+    p.add_argument("video", help="YouTube URL or 11-character video id (ids starting with '-' are accepted too)")
     p.add_argument(
         "-l",
         "--lang",
@@ -224,7 +224,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--proxy", help="HTTP(S) proxy URL, useful when YouTube blocks your IP"
     )
-    args = p.parse_args(argv)
+    # A bare video id can start with "-" (e.g. -PTlnwUCwuU), which argparse would
+    # read as an option. Rewrite such an argument into a full URL first.
+    raw = list(sys.argv[1:] if argv is None else argv)
+    for i, a in enumerate(raw):
+        if a.startswith("-") and VIDEO_ID_RE.match(a) and a not in p._option_string_actions:
+            raw[i] = f"https://www.youtube.com/watch?v={a}"
+    args = p.parse_args(raw)
 
     for stream in (sys.stdout, sys.stderr):  # Windows consoles default to a legacy code page
         try:

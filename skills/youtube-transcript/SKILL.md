@@ -37,6 +37,10 @@ The script lives at `scripts/transcript.py` relative to this skill. Run it with
 uv run scripts/transcript.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
 
+**Always pass the full URL, quoted**, not a bare id: ids can start with `-`
+(e.g. `-PTlnwUCwuU`), which shells and argument parsers treat as an option. The
+script tolerates such ids, but the URL form is unambiguous everywhere.
+
 Without `uv`:
 
 ```bash
@@ -73,14 +77,25 @@ paragraphs, prefixed by a two-line header with the video id and the language use
    Use a path that works on the current OS (the working directory, or the
    agent's scratch/temp directory) — do not hard-code `/tmp` on Windows.
 2. **Pick the format for the task.**
-   - Summary, notes, Q&A → `text` (default).
-   - "Where does he talk about X?", chapter markers, quoting with time → `timestamps`.
+   - Short video (<20 min), full summary or notes → `text` (default).
+   - **Long video (>20 min), or any targeted question** → `timestamps`. One
+     caption per line with `[hh:mm:ss]` makes the file greppable: search for
+     the keywords of the user's question, read only the lines around the hits,
+     and quote with exact times. This is far cheaper than reading the whole
+     transcript and works for "where does she talk about X", chapter markers
+     and fact-checking.
    - Subtitle file for the user → `srt`.
    - Programmatic processing → `json`.
 3. **Mind the size.** A 10-minute talk is ~1,500 words; a 2-hour podcast is
-   ~20,000 words. For long videos read the file in chunks with your file-reading
-   tool (offset/limit), summarise chunk by chunk, then merge — do not paste the
-   whole file into the reply.
+   ~20,000 words. For long videos: save as `timestamps`, grep for the topics you
+   need (your search tool, or `grep -i` / `Select-String` on Windows), then read
+   only those regions with your file-reading tool (offset/limit). For a full
+   summary of a long video, read it in chunks, summarise each, then merge —
+   never paste the whole file into the reply.
+   ```bash
+   uv run scripts/transcript.py "<url>" -f timestamps -o transcript.txt
+   grep -n -i "pricing\|price\|cost" transcript.txt
+   ```
 4. **Translate yourself, never with `--translate`.** Always fetch the
    original-language captions and do the translation in your own reply. If the
    user wants the transcript in another language (e.g. an English video, text
@@ -125,8 +140,10 @@ Offer it as an option and let the user decide before proceeding.
 ## Finding the video first
 
 If the user has no link yet ("summarise the latest talk about X"), use the
-`youtube-search` skill from the same collection to find candidates with date,
-views and duration, then come back here with the chosen URL.
+`youtube-search` skill from the same collection — general web search is poor at
+finding YouTube videos. It returns candidates with date, views and duration;
+pick one, then come back here with its URL. Without that skill, `yt-dlp` can
+search too: `uv run --with yt-dlp yt-dlp "ytsearch5:<query>" --flat-playlist --print "%(id)s %(title)s"`.
 
 ## Limitations
 
