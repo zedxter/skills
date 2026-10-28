@@ -2,7 +2,7 @@
 name: youtube-transcript
 description: Fetch the transcript (subtitles/captions) of a YouTube video as plain text, timestamped lines, SRT or JSON using the free, key-less youtube-transcript-api library. Use whenever the user shares a YouTube link or video id and wants the transcript, a summary, notes, key takeaways, quotes, a translation, or any analysis of what is said in the video.
 license: MIT
-compatibility: Python 3.12+ with uv (preferred) or pip. Needs network access to youtube.com; requests from cloud/datacenter IPs are frequently blocked by YouTube (use --proxy).
+compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. Needs network access to youtube.com; requests from cloud/datacenter IPs are frequently blocked by YouTube (use --proxy).
 metadata:
   author: zedxter
   version: "1.0.0"
@@ -68,18 +68,19 @@ paragraphs, prefixed by a two-line header with the video id and the language use
 1. **Fetch once, save to a file.** Transcripts of long videos are large; keep
    them out of the conversation and read selectively:
    ```bash
-   uv run scripts/transcript.py <url> -o /tmp/transcript.txt
-   wc -w /tmp/transcript.txt
+   uv run scripts/transcript.py <url> -o transcript.txt
    ```
+   Use a path that works on the current OS (the working directory, or the
+   agent's scratch/temp directory) — do not hard-code `/tmp` on Windows.
 2. **Pick the format for the task.**
    - Summary, notes, Q&A → `text` (default).
    - "Where does he talk about X?", chapter markers, quoting with time → `timestamps`.
    - Subtitle file for the user → `srt`.
    - Programmatic processing → `json`.
 3. **Mind the size.** A 10-minute talk is ~1,500 words; a 2-hour podcast is
-   ~20,000 words. For long videos read the file in chunks (`sed -n`, `head`),
-   summarise chunk by chunk, then merge — do not paste the whole file into the
-   reply.
+   ~20,000 words. For long videos read the file in chunks with your file-reading
+   tool (offset/limit), summarise chunk by chunk, then merge — do not paste the
+   whole file into the reply.
 4. **Translate yourself, never with `--translate`.** Always fetch the
    original-language captions and do the translation in your own reply. If the
    user wants the transcript in another language (e.g. an English video, text
@@ -120,6 +121,12 @@ and transcribe it with Whisper (`openai-whisper`, `faster-whisper`, or the
 OpenAI/Groq audio API). This is **outside this skill** — it needs a large model
 download or a paid API, takes minutes for long videos and requires `ffmpeg`.
 Offer it as an option and let the user decide before proceeding.
+
+## Finding the video first
+
+If the user has no link yet ("summarise the latest talk about X"), use the
+`youtube-search` skill from the same collection to find candidates with date,
+views and duration, then come back here with the chosen URL.
 
 ## Limitations
 

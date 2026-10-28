@@ -226,6 +226,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
 
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles default to a legacy code page
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     try:
         video_id = extract_video_id(args.video)
     except ValueError as e:
