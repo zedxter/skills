@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. Needs network access to youtube.com; requests from cloud/datacenter IPs are frequently blocked by YouTube (use --proxy).
 metadata:
   author: zedxter
-  version: "1.0.0"
+  version: "1.1.0"
   source: https://github.com/zedxter/skills
 ---
 
@@ -38,8 +38,17 @@ uv run scripts/transcript.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
 
 **Always pass the full URL, quoted**, not a bare id: ids can start with `-`
-(e.g. `-PTlnwUCwuU`), which shells and argument parsers treat as an option. The
-script tolerates such ids, but the URL form is unambiguous everywhere.
+(e.g. `-PTlnwUCwuU`), which shells and argument parsers treat as an option. If
+you only have the id, put `--` before it so it cannot be read as a flag:
+
+```bash
+uv run scripts/transcript.py "https://www.youtube.com/watch?v=-PTlnwUCwuU"   # preferred
+uv run scripts/transcript.py -f timestamps -- -PTlnwUCwuU                      # also safe
+```
+
+Options go *before* `--`; everything after it is taken literally. The script
+also rewrites a bare `-PTlnwUCwuU` into a URL by itself, but the two forms above
+are unambiguous for every shell and wrapper.
 
 Without `uv`:
 
@@ -52,7 +61,12 @@ Default behaviour: prefer Russian, then English captions (`--lang ru en`); if
 neither exists, fall back to any available transcript (manual before auto) and
 print a `note:` on stderr. Never pass `--translate` — fetch the original and
 translate in your reply (see workflow step 4). Output is plain text joined into ~60-second
-paragraphs, prefixed by a two-line header with the video id and the language used.
+paragraphs, prefixed by a two-line header with the video id and the language used:
+
+```
+# video: 9m-nmKNKD1U
+# language: English (en, auto-generated)
+```
 
 ## Options
 
@@ -61,7 +75,7 @@ paragraphs, prefixed by a two-line header with the video id and the language use
 | `-l, --lang ru en …` | Preferred caption languages, in order. Falls back to anything available. |
 | `-t, --translate LANG` | **Do not use.** Asks YouTube to machine-translate the captions; YouTube blocks this endpoint far more aggressively than plain caption fetches, so it fails with exit 4 where a normal fetch succeeds. Kept only for manual experiments. |
 | `-f, --format text\|timestamps\|srt\|json` | `text` (paragraphs, default), `timestamps` (`[mm:ss] line`), `srt` (subtitle file), `json` (raw snippets with start/duration). |
-| `--paragraph-seconds N` | Target paragraph length for `text` format (default 60). |
+| `--paragraph-seconds N` | Target paragraph length for `text` format (default 60). A paragraph ends at the first sentence end after N seconds; if none shows up (auto captions have no punctuation) it is cut at the next caption after 2×N. |
 | `--no-header` | Omit the `# video / # language` header. |
 | `--list` | Show available transcripts (language, manual/auto, translatable) and exit. |
 | `-o, --out FILE` | Write to a file instead of stdout. |
