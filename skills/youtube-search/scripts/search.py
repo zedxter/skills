@@ -113,26 +113,42 @@ def iso_date(ts: int | None) -> str | None:
 # Granularity of YouTube's relative dates ("8 years ago" -> "year"), keyed by the
 # timestamp yt-dlp derives from them. Filled by the hook installed below.
 _DATE_PRECISION: dict[int, str] = {}
+# Unit spellings YouTube uses in relative times, long and abbreviated ("1y ago",
+# "2mo ago", "3w ago", "4h ago"). Mirrors yt-dlp's _RELATIVE_TIME_UNIT_MAP.
+_RELATIVE_UNITS: dict[str, str] = {
+    "year": "year", "yr": "year", "y": "year",
+    "month": "month", "mo": "month",
+    "week": "day", "wk": "day", "w": "day",
+    "day": "day", "d": "day",
+    "hour": "day", "hr": "day", "h": "day",
+    "minute": "day", "min": "day",
+    "second": "day", "sec": "day", "s": "day",
+}
 _RELATIVE_UNIT_RE = re.compile(
-    r"(\d+)\s*(year|yr|month|mo|week|wk|day|hour|hr|minute|min|second|sec)s?\b", re.I
+    r"(\d+)\s*(%s)s?\b" % "|".join(sorted(_RELATIVE_UNITS, key=len, reverse=True)),
+    re.I,
 )
 
 
 def relative_precision(text: str) -> str | None:
     """Map YouTube's relative time text to the precision it actually conveys.
 
-    "8 years ago" -> "year", "3 months ago" -> "month", "2 weeks ago" / "5 days
-    ago" / "3 hours ago" -> "day". None when the text is not a relative time.
+    Years and months are only known to the year/month; anything finer keeps the
+    full date. YouTube uses both long and abbreviated units:
+
+    >>> [relative_precision(t) for t in ("8 years ago", "1y ago", "Streamed 2y ago", "1 yr ago")]
+    ['year', 'year', 'year', 'year']
+    >>> [relative_precision(t) for t in ("3 months ago", "2mo ago", "11 mo ago")]
+    ['month', 'month', 'month']
+    >>> [relative_precision(t) for t in ("3w ago", "2 weeks ago", "5 days ago", "6d ago")]
+    ['day', 'day', 'day', 'day']
+    >>> [relative_precision(t) for t in ("4h ago", "7 min ago", "30s ago", "12 minutes ago")]
+    ['day', 'day', 'day', 'day']
+    >>> [relative_precision(t) for t in ("Premieres Oct 30, 2026", "", "today")]
+    [None, None, None]
     """
     m = _RELATIVE_UNIT_RE.search(text or "")
-    if not m:
-        return None
-    unit = m.group(2).lower()
-    if unit in ("year", "yr"):
-        return "year"
-    if unit in ("month", "mo"):
-        return "month"
-    return "day"
+    return _RELATIVE_UNITS[m.group(2).lower()] if m else None
 
 
 def approx_date(ts: int | None, precision: str | None) -> str | None:
@@ -261,6 +277,27 @@ def normalize(entry: dict[str, Any]) -> dict[str, Any]:
         "live": entry.get("live_status") in ("is_live", "is_upcoming"),
         "timestamp": ts,
     }
+
+
+def dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop repeated videos, keeping the first occurrence of each id.
+
+    YouTube's search pages repeat videos across the over-fetched pool
+    (`--sort date` fetches up to 3x `-n`), so one id can appear twice.
+
+    >>> [e["id"] for e in dedupe([{"id": "a"}, {"id": "b"}, {"id": "a"}, {"id": None}, {"id": None}])]
+    ['a', 'b', None, None]
+    """
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for it in items:
+        vid = it.get("id")
+        if vid:
+            if vid in seen:
+                continue
+            seen.add(vid)
+        out.append(it)
+    return out
 
 
 def published_date(item: dict[str, Any]) -> dt.date | None:
@@ -409,7 +446,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"error: network failure while contacting YouTube: {e}\n")
         return EXIT_NETWORK
 
-    entries = [normalize(e) for e in (info.get("entries") or []) if e]
+    entries = dedupe([normalize(e) for e in (info.get("entries") or []) if e])
     if args.kind in (None, "video") and not args.channel:
         entries = [e for e in entries if e["kind"] == "video"]
 
