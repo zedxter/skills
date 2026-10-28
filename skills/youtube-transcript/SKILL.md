@@ -2,7 +2,7 @@
 name: youtube-transcript
 description: Fetch the transcript (subtitles/captions) of a YouTube video as plain text, timestamped lines, SRT or JSON using the free, key-less youtube-transcript-api library. Use whenever the user shares a YouTube link or video id and wants the transcript, a summary, notes, key takeaways, quotes, a translation, or any analysis of what is said in the video.
 license: MIT
-compatibility: Python 3.9+ with uv (preferred) or pip. Needs network access to youtube.com; requests from cloud/datacenter IPs are frequently blocked by YouTube (use --proxy).
+compatibility: Python 3.12+ with uv (preferred) or pip. Needs network access to youtube.com; requests from cloud/datacenter IPs are frequently blocked by YouTube (use --proxy).
 metadata:
   author: zedxter
   version: "1.0.0"

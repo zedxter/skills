@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.12"
 # dependencies = ["youtube-transcript-api>=1.0"]
 # ///
 """Fetch a YouTube video's transcript (subtitles) and print it as text, JSON or SRT.
@@ -19,13 +19,11 @@ Exit codes:
     · 7 other YouTube error
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import re
 import sys
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 from urllib.parse import parse_qs, urlparse
 
 try:
@@ -112,15 +110,15 @@ def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def to_paragraphs(snippets: Iterable, every_seconds: float) -> List[str]:
+def to_paragraphs(snippets: Iterable, every_seconds: float) -> list[str]:
     """Join caption fragments into paragraphs of roughly `every_seconds` length.
 
     A paragraph ends at the first sentence boundary after `every_seconds`, or
     unconditionally after 3x that (auto-captions often have no punctuation).
     """
-    paragraphs: List[str] = []
-    current: List[str] = []
-    para_start: Optional[float] = None
+    paragraphs: list[str] = []
+    current: list[str] = []
+    para_start: float | None = None
     for sn in snippets:
         text = clean_text(sn.text)
         if not text:
@@ -182,7 +180,7 @@ def render(transcript, fmt: str, paragraph_seconds: float, with_header: bool) ->
     raise ValueError(fmt)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

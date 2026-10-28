@@ -13,7 +13,7 @@ collection costs almost nothing in context until a skill is actually needed.
 
 | Skill | What it does |
 |-------|--------------|
-| [`youtube-transcript`](skills/youtube-transcript) | Fetches a YouTube video's transcript (captions) as text, timestamps, SRT or JSON via the free, key-less `youtube-transcript-api`. Triggers on YouTube links when the user wants a transcript, summary, notes or translation. Requires Python 3.9+ and `uv` or `pip`. |
+| [`youtube-transcript`](skills/youtube-transcript) | Fetches a YouTube video's transcript (captions) as text, timestamps, SRT or JSON via the free, key-less `youtube-transcript-api`. Triggers on YouTube links when the user wants a transcript, summary, notes or translation. Requires Python 3.12+ and `uv` or `pip`. |
 
 ## Installation
 
