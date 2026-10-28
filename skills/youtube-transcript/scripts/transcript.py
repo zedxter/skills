@@ -110,11 +110,17 @@ def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# Auto-generated captions have no punctuation, so a paragraph that has run this
+# many times `every_seconds` without a sentence end is cut at the next fragment.
+HARD_SPLIT_FACTOR = 2
+
+
 def to_paragraphs(snippets: Iterable, every_seconds: float) -> list[str]:
     """Join caption fragments into paragraphs of roughly `every_seconds` length.
 
-    A paragraph ends at the first sentence boundary after `every_seconds`, or
-    unconditionally after 3x that (auto-captions often have no punctuation).
+    A paragraph ends at the first sentence boundary after `every_seconds`
+    (manual captions), or unconditionally at the first fragment boundary after
+    HARD_SPLIT_FACTOR x that when no sentence end shows up (auto captions).
     """
     paragraphs: list[str] = []
     current: list[str] = []
@@ -128,7 +134,7 @@ def to_paragraphs(snippets: Iterable, every_seconds: float) -> list[str]:
         current.append(text)
         elapsed = sn.start - para_start
         if (elapsed >= every_seconds and re.search(r"[.!?…]$", text)) or (
-            elapsed >= every_seconds * 3
+            elapsed >= every_seconds * HARD_SPLIT_FACTOR
         ):
             paragraphs.append(" ".join(current))
             current, para_start = [], None
@@ -137,14 +143,26 @@ def to_paragraphs(snippets: Iterable, every_seconds: float) -> list[str]:
     return paragraphs
 
 
+# Trailing "(auto-generated)" (and its localisations: "automatisch erstellt",
+# "создано автоматически", …) that YouTube appends to generated caption names.
+_AUTO_SUFFIX_RE = re.compile(r"\s*\([^()]*(?:auto|автомат)[^()]*\)\s*$", re.I)
+
+
+def language_name(language: str, is_generated: bool) -> str:
+    """YouTube's name for generated captions already says "(auto-generated)";
+    drop it, since the kind is printed separately."""
+    return _AUTO_SUFFIX_RE.sub("", language).strip() if is_generated else language
+
+
 def render(transcript, fmt: str, paragraph_seconds: float, with_header: bool) -> str:
     snippets = list(transcript.snippets)
     header = ""
     if with_header and fmt in ("text", "timestamps"):
         kind = "auto-generated" if transcript.is_generated else "manual"
+        name = language_name(transcript.language, transcript.is_generated)
         header = (
             f"# video: {transcript.video_id}\n"
-            f"# language: {transcript.language} ({transcript.language_code}, {kind})\n\n"
+            f"# language: {name} ({transcript.language_code}, {kind})\n\n"
         )
     if fmt == "text":
         return header + "\n\n".join(to_paragraphs(snippets, paragraph_seconds)) + "\n"
@@ -212,7 +230,8 @@ def main(argv: list[str] | None = None) -> int:
         "--paragraph-seconds",
         type=float,
         default=60,
-        help="target paragraph length in seconds for text format (default: 60)",
+        help="target paragraph length in seconds for text format (default: 60); "
+        f"a paragraph is cut at a sentence end after N seconds, or at any fragment after {HARD_SPLIT_FACTOR}N",
     )
     p.add_argument(
         "--no-header", action="store_true", help="omit the video/language header"
@@ -225,9 +244,12 @@ def main(argv: list[str] | None = None) -> int:
         "--proxy", help="HTTP(S) proxy URL, useful when YouTube blocks your IP"
     )
     # A bare video id can start with "-" (e.g. -PTlnwUCwuU), which argparse would
-    # read as an option. Rewrite such an argument into a full URL first.
+    # read as an option. Rewrite such an argument into a full URL first; after a
+    # literal "--" argparse already treats everything as positional.
     raw = list(sys.argv[1:] if argv is None else argv)
     for i, a in enumerate(raw):
+        if a == "--":
+            break
         if a.startswith("-") and VIDEO_ID_RE.match(a) and a not in p._option_string_actions:
             raw[i] = f"https://www.youtube.com/watch?v={a}"
     args = p.parse_args(raw)
@@ -257,7 +279,8 @@ def main(argv: list[str] | None = None) -> int:
             for tr in transcripts:
                 kind = "auto" if tr.is_generated else "manual"
                 translatable = "translatable" if tr.is_translatable else ""
-                print(f"{tr.language_code:8} {tr.language:30} {kind:7} {translatable}")
+                name = language_name(tr.language, tr.is_generated)
+                print(f"{tr.language_code:8} {name:30} {kind:7} {translatable}")
             return EXIT_OK
         try:
             transcript = transcripts.find_transcript(args.lang)
