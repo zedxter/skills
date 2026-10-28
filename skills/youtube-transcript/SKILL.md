@@ -46,7 +46,8 @@ python3 scripts/transcript.py dQw4w9WgXcQ
 
 Default behaviour: prefer Russian, then English captions (`--lang ru en`); if
 neither exists, fall back to any available transcript (manual before auto) and
-print a `note:` on stderr. Output is plain text joined into ~60-second
+print a `note:` on stderr. Never pass `--translate` — fetch the original and
+translate in your reply (see workflow step 4). Output is plain text joined into ~60-second
 paragraphs, prefixed by a two-line header with the video id and the language used.
 
 ## Options
@@ -54,7 +55,7 @@ paragraphs, prefixed by a two-line header with the video id and the language use
 | Flag | Meaning |
 |------|---------|
 | `-l, --lang ru en …` | Preferred caption languages, in order. Falls back to anything available. |
-| `-t, --translate LANG` | Translate the chosen transcript into `LANG` via YouTube (e.g. `-t ru`). |
+| `-t, --translate LANG` | **Do not use.** Asks YouTube to machine-translate the captions; YouTube blocks this endpoint far more aggressively than plain caption fetches, so it fails with exit 4 where a normal fetch succeeds. Kept only for manual experiments. |
 | `-f, --format text\|timestamps\|srt\|json` | `text` (paragraphs, default), `timestamps` (`[mm:ss] line`), `srt` (subtitle file), `json` (raw snippets with start/duration). |
 | `--paragraph-seconds N` | Target paragraph length for `text` format (default 60). |
 | `--no-header` | Omit the `# video / # language` header. |
@@ -79,11 +80,14 @@ paragraphs, prefixed by a two-line header with the video id and the language use
    ~20,000 words. For long videos read the file in chunks (`sed -n`, `head`),
    summarise chunk by chunk, then merge — do not paste the whole file into the
    reply.
-4. **Respect the language.** Reply in the user's language, not the caption
-   language. Prefer original-language captions over `--translate` when you can
-   read the original: YouTube's machine translation loses nuance. Use
-   `--translate` when the user explicitly wants the transcript itself in another
-   language.
+4. **Translate yourself, never with `--translate`.** Always fetch the
+   original-language captions and do the translation in your own reply. If the
+   user wants the transcript in another language (e.g. an English video, text
+   in Russian), fetch the English captions to a file, then translate the file
+   chunk by chunk — do not call the script with `-t`. Reasons: YouTube blocks
+   the translation endpoint even when ordinary fetches work, and its machine
+   translation is worse than yours. Reply in the user's language regardless of
+   the caption language.
 5. **Auto-captions are noisy.** No punctuation, wrong homophones, mangled
    names and numbers. The header says `auto-generated` when that is the case —
    mention it when quoting precisely, and sanity-check names/figures.
@@ -99,7 +103,7 @@ code rather than guessing:
 |------|---------|------------|
 | 2 | Bad input (not a YouTube URL/id) or missing dependency | Ask for a correct link; or install `youtube-transcript-api` / use `uv run`. |
 | 3 | No transcript: captions disabled, none in any language, or not translatable | Run `--list` to show what exists. If nothing exists, tell the user the video has no captions. Offer the Whisper fallback (below). |
-| 4 | Blocked by YouTube (`RequestBlocked` / `IpBlocked`) | Typical on cloud/datacenter IPs or after many rapid requests. Wait a minute and retry once; then suggest `--proxy` with a residential proxy or running from the user's own machine. Do not hammer with retries — it extends the block. |
+| 4 | Blocked by YouTube (`RequestBlocked` / `IpBlocked`) | If you used `--translate`, drop it and fetch the original captions instead — that is the usual cause. Otherwise typical on cloud/datacenter IPs or after many rapid requests: wait a minute and retry once; then suggest `--proxy` with a residential proxy or running from the user's own machine. Do not hammer with retries — it extends the block. |
 | 5 | Video unavailable: private, deleted, region-locked, age-restricted | Nothing to fetch; report it. Age-restricted videos require a signed-in session, which this tool does not support. |
 | 6 | Network failure | Check connectivity and retry. |
 | 7 | Other YouTube error (unparsable page, consent cookie, etc.) | Usually transient or a YouTube-side change; retry, then report with the message. Upgrading `youtube-transcript-api` often fixes parser breakage. |

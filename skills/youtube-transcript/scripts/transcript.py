@@ -197,7 +197,9 @@ def main(argv: list[str] | None = None) -> int:
         "-t",
         "--translate",
         metavar="LANG",
-        help="translate the transcript into this language code (e.g. ru, en)",
+        help="ask YouTube to translate the transcript into this language code. "
+        "NOT RECOMMENDED: YouTube blocks the translation endpoint much more often "
+        "than plain caption fetches; fetch the original and translate it yourself.",
     )
     p.add_argument(
         "-f",
