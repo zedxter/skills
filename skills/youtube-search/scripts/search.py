@@ -110,6 +110,75 @@ def iso_date(ts: int | None) -> str | None:
     return dt.datetime.fromtimestamp(ts, dt.UTC).date().isoformat() if ts else None
 
 
+# Granularity of YouTube's relative dates ("8 years ago" -> "year"), keyed by the
+# timestamp yt-dlp derives from them. Filled by the hook installed below.
+_DATE_PRECISION: dict[int, str] = {}
+_RELATIVE_UNIT_RE = re.compile(
+    r"(\d+)\s*(year|yr|month|mo|week|wk|day|hour|hr|minute|min|second|sec)s?\b", re.I
+)
+
+
+def relative_precision(text: str) -> str | None:
+    """Map YouTube's relative time text to the precision it actually conveys.
+
+    "8 years ago" -> "year", "3 months ago" -> "month", "2 weeks ago" / "5 days
+    ago" / "3 hours ago" -> "day". None when the text is not a relative time.
+    """
+    m = _RELATIVE_UNIT_RE.search(text or "")
+    if not m:
+        return None
+    unit = m.group(2).lower()
+    if unit in ("year", "yr"):
+        return "year"
+    if unit in ("month", "mo"):
+        return "month"
+    return "day"
+
+
+def approx_date(ts: int | None, precision: str | None) -> str | None:
+    """Render a timestamp with no more precision than the source string had.
+
+    year -> "2018", month -> "2026-08", anything else -> "2026-10-20".
+    """
+    if not ts:
+        return None
+    d = dt.datetime.fromtimestamp(ts, dt.UTC).date()
+    if precision == "year":
+        return f"{d.year:04d}"
+    if precision == "month":
+        return f"{d.year:04d}-{d.month:02d}"
+    return d.isoformat()
+
+
+def install_date_precision_hook() -> None:
+    """Record the unit of each "N <unit> ago" string yt-dlp turns into a timestamp.
+
+    yt-dlp's flat search entries only carry the derived timestamp (today minus N
+    years, rounded to a day), which looks far more precise than "8 years ago".
+    Wrapping the parser is the only place the original text is visible. If the
+    private method disappears in a future yt-dlp, dates fall back to full
+    YYYY-MM-DD, as before.
+    """
+    try:
+        from yt_dlp.extractor.youtube import YoutubeBaseInfoExtractor as cls
+    except ImportError:
+        return
+    orig = getattr(cls, "_parse_time_text", None)
+    if orig is None or getattr(orig, "_records_precision", False):
+        return
+
+    def hooked(self, text, *args, **kwargs):
+        ts = orig(self, text, *args, **kwargs)
+        if ts is not None and text:
+            precision = relative_precision(text)
+            if precision:
+                _DATE_PRECISION[int(ts)] = precision
+        return ts
+
+    hooked._records_precision = True  # type: ignore[attr-defined]
+    cls._parse_time_text = hooked
+
+
 def parse_date(value: str) -> dt.date:
     try:
         return dt.date.fromisoformat(value)
@@ -172,9 +241,11 @@ def normalize(entry: dict[str, Any]) -> dict[str, Any]:
         url = f"https://www.youtube.com/watch?v={vid}"
     ts = entry.get("timestamp") or entry.get("release_timestamp")
     exact = entry.get("upload_date")  # YYYYMMDD, only in --details mode
-    published = (
-        f"{exact[:4]}-{exact[4:6]}-{exact[6:]}" if exact else iso_date(ts)
-    )
+    if exact:
+        published, precision = f"{exact[:4]}-{exact[4:6]}-{exact[6:]}", "day"
+    else:
+        precision = _DATE_PRECISION.get(ts, "day") if ts else None
+        published = approx_date(ts, precision)
     return {
         "kind": kind,
         "id": vid,
@@ -186,9 +257,18 @@ def normalize(entry: dict[str, Any]) -> dict[str, Any]:
         "view_count": entry.get("view_count"),
         "published": published,
         "published_exact": bool(exact),
+        "published_precision": precision,
         "live": entry.get("live_status") in ("is_live", "is_upcoming"),
         "timestamp": ts,
     }
+
+
+def published_date(item: dict[str, Any]) -> dt.date | None:
+    """Best available publish date for filtering (exact if known, else yt-dlp's estimate)."""
+    if item["published_exact"] and item["published"]:
+        return dt.date.fromisoformat(item["published"])
+    ts = item.get("timestamp")
+    return dt.datetime.fromtimestamp(ts, dt.UTC).date() if ts else None
 
 
 def enrich(item: dict[str, Any], proxy: str | None) -> dict[str, Any]:
@@ -209,6 +289,7 @@ def enrich(item: dict[str, Any], proxy: str | None) -> dict[str, Any]:
     if exact:
         item["published"] = f"{exact[:4]}-{exact[4:6]}-{exact[6:]}"
         item["published_exact"] = True
+        item["published_precision"] = "day"
     for k in ("duration", "view_count", "like_count", "comment_count", "channel", "channel_url", "channel_follower_count", "categories", "tags", "chapters"):
         if info.get(k) is not None:
             item[k] = info[k]
@@ -303,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
         if sp:
             url += f"&sp={quote_plus(sp)}"
 
+    install_date_precision_hook()
     try:
         with yt_dlp.YoutubeDL(ydl_opts(pool, args.proxy)) as y:
             info = y.extract_info(url, download=False)
@@ -336,8 +418,10 @@ def main(argv: list[str] | None = None) -> int:
             return True
         if args.min_views is not None and (it["view_count"] or 0) < args.min_views:
             return False
-        if args.after and (it["published"] is None or dt.date.fromisoformat(it["published"]) < args.after):
-            return False
+        if args.after:
+            d = published_date(it)
+            if d is None or d < args.after:
+                return False
         d = it["duration"]
         if args.min_minutes is not None and (d is None or d < args.min_minutes * 60):
             return False
