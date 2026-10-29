@@ -21,6 +21,7 @@ everywhere.
 | [`youtube-transcript`](skills/youtube-transcript) | Fetches a YouTube video's transcript (captions) as text, timestamps, SRT or JSON via the free, key-less `youtube-transcript-api`. Triggers on YouTube links when the user wants a transcript, summary, notes or translation. |
 | [`web-extract`](skills/web-extract) | Fetches a web page or PDF from the user's own machine with a browser-grade TLS fingerprint (`curl_cffi`) and returns its **main content as Markdown, text or JSON** (title, author, date, links, JSON-LD/OpenGraph/tables) via `trafilatura` and `pypdf`; renders JavaScript pages in a **local headless Chromium** (optional Playwright) with click/type/scroll actions and screenshots, tracks changes between fetches, and falls back to the newest **Wayback Machine** snapshot when the page is blocked, gone or unreachable. A free local stand-in for paid scraping APIs. Triggers when the user shares a URL to read, summarise or quote, or when the built-in fetch tool got 403, "Just a moment" or an empty page. |
 | [`web-crawl`](skills/web-crawl) | Crawls a site breadth-first from the user's machine and collects every page's **main content into one Markdown file**, a folder of pages with `index.json`, or JSON/JSONL; `--map` lists the URLs. Bounded by depth, page count and time, include/exclude patterns, same site only, robots.txt honoured, sitemap.xml as seed; each page goes through `web-extract` (PDF text, optional headless rendering). Free stand-in for Firecrawl crawl/map. Triggers when the user wants a whole documentation site, blog or section read, summarised or turned into notes, or asks which pages a site has. |
+| [`web-scrape`](skills/web-scrape) | Scrapes **structured records** into JSON, JSONL, CSV or a Markdown table: one record per repeating element (CSS/XPath `--item`), fields by selector with `@attr` and `\|number`/`\|date`/`\|list` modifiers, or records from schema.org JSON-LD and HTML tables; walks next-page links, opens each record's detail page for more fields, and `--probe` shows a page's repeating blocks. Fetching via `web-extract` (bot-wall detection, optional headless rendering). Free stand-in for Apify actors and Firecrawl extract. Triggers when the user wants a list, catalogue, table or search-result page turned into rows. |
 
 They chain naturally: search → pick a video by date/views/length → transcript →
 summary; the links in a video's `--details` description go to `web-extract`;
@@ -143,8 +144,8 @@ skills/
 test/                   # pytest suites for the scripts (uv run --with pytest python -m pytest test)
 ```
 
-`web-crawl` imports `web-extract`'s script at run time, so install both (the
-install commands above copy every skill).
+`web-crawl` and `web-scrape` import `web-extract`'s script at run time, so
+install them together (the install commands above copy every skill).
 
 `SKILL.md` follows the [Agent Skills specification](https://agentskills.io/specification):
 `name` matches the folder name, `description` says both what the skill does and
