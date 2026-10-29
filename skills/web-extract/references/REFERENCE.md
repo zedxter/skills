@@ -158,18 +158,25 @@ body under `cf-mitigated: challenge`. Results depend on IP reputation.
   appended; `--headful` keeps the stock `User-Agent` because a person is
   browsing. No stealth patches, no fingerprint spoofing: a wall that blocks
   headless Chromium stays blocked (exit 4 as usual).
-- `--headful` waits while `classify()` still sees a challenge (or
-  `challenge_suspected`) on the current DOM, polling every second for up to
+- `--headful` waits while `classify()` still sees something a human can pass
+  on the current DOM (a bot wall, exit-4 kind, a 401 login, or
+  `challenge_suspected`; not 404/5xx), polling every second for up to
   max(`--timeout`, 120) s, then reads whatever is there (`human_timeout` if
   the wall never went away). It is a human-in-the-loop, not a solver.
 - `--profile DIR` uses `launch_persistent_context`: cookies, local storage and
-  logins persist in plain files under DIR. The `User-Agent` cannot be changed
-  on a persistent context, so headless runs with a profile use the stock
-  headless UA. Chromium holds a lock on the profile: one run at a time.
+  logins persist in plain files under DIR. Headless runs with a profile carry
+  the project token in the `User-Agent` like any headless render. Chromium
+  holds a lock on the profile: one run at a time. Add `--no-wayback`: a
+  failing logged-in URL would otherwise be looked up on archive.org.
+- `--proxy user:pass@host` credentials are passed to Chromium as separate
+  proxy username/password. A failed `type` action is reported with the typed
+  text replaced by its length.
+- A non-HTML main response (JSON, plain text) under `--render always` is
+  returned as the server's bytes, not Chromium's viewer page.
 - Errors are mapped like curl's: `net::ERR_NAME_NOT_RESOLVED` → 6 `dns`,
   `ERR_CERT_*`/`ERR_SSL_*` → 6 `tls`, `ERR_CONNECTION_*` and friends → 6
   `connection`, Playwright timeouts → 6 `timeout`, `ERR_TOO_MANY_REDIRECTS` →
-  6 `redirects`, `ERR_ABORTED` (a download) → 5, missing browser or system
+  6 `redirects`, `ERR_ABORTED` or Playwright's `Download is starting` (a download) → 5, missing browser or system
   libraries → 2 with the install command, anything else → 7. The same
   private-host redirect rule as the HTTP path applies (exit 4
   `redirect_to_private`, body discarded).
@@ -191,6 +198,9 @@ body under `cf-mitigated: challenge`. Results depend on IP reputation.
   `nothing_extracted`; password-protected or corrupt files are exit 5 with a
   `--raw -o FILE` hint; an empty password is tried first. `--raw` bypasses
   pypdf and passes the bytes through as before.
+- A PDF larger than the 10 MB body cap arrives cut, and pypdf needs the
+  trailer at the end of the file: exit 5 `too_large`, no parse attempt
+  (`--raw -o` would save the same truncated copy; use a download tool).
 - Known limits: reading order is the PDF's internal order (multi-column
   layouts may interleave), ligatures and hyphenation follow the font, no OCR,
   no form fields. The Wayback fallback filters `mimetype:text/html`, so an
@@ -225,6 +235,8 @@ same byte-level parsing the extractor uses, and placed in `structured`:
   `source`, `final_url`, full `content` before any `--max-chars` cut) under
   `$WEB_EXTRACT_CACHE/track`, else `$XDG_CACHE_HOME`/`~/.cache/web-extract/track`
   (`%LOCALAPPDATA%\web-extract\track` on Windows). Nothing leaves the machine.
+  The track store holds the full extracted text of every tracked URL
+  (logged-in pages included), so the directory is created 0700 and files 0600.
 - `change.status`: `new` (no stored copy), `same` (identical `content`),
   `changed` (unified diff, one line of context, `added`/`removed` counts,
   truncated at 20 000 chars with `diff_truncated`). `previous` is the stored
