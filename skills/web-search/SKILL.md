@@ -44,8 +44,8 @@ uv run scripts/search.py "query" -f json -o results.json
 uv run scripts/search.py "query" --searx https://searx.local         # your own SearXNG
 ```
 
-Without `uv`: `python -m pip install ddgs` (and `web-extract`'s dependencies
-for `--read`), then `python scripts/search.py …`.
+Without `uv`: `python -m pip install ddgs curl_cffi` (and `web-extract`'s
+dependencies for `--read`), then `python scripts/search.py …`.
 
 Markdown output:
 
@@ -60,7 +60,7 @@ Markdown output:
 2. **…**
 ```
 
-With `--read`, each read result adds `> read: live, 1 240 words` and the
+With `--read`, each read result adds `> read: live, 1240 words` and the
 page's content (capped at `--read-chars`, default 3000) indented under it, or
 `> read failed: <kind> — <message>`.
 
@@ -68,25 +68,27 @@ page's content (capped at `--read-chars`, default 3000) indented under it, or
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `QUERY …` | — | Search terms; quotes, `-word`, `site:` and other operators pass through to the engine. |
+| `QUERY …` | — | Search terms; quotes, `-word`, `site:` and other operators pass through to the engine. Quote the whole query as one argument (or put `--` before it) when it contains `-word` operators, so they are not read as flags. |
 | `-n N` | `10` | Results (1–50). Backends return 10–30 per page; more may yield fewer than asked. |
-| `--news` | off | News index: adds `date` and `source`. |
+| `--news` | off | News index: adds `date` and `source`. ddgs serves news only from `duckduckgo`, `bing`, `yahoo` (or `auto`); other `--backend` values exit 2. |
 | `--time d\|w\|m\|y` | none | Only the last day/week/month/year (`day`/`week`/… also accepted). |
-| `--region XX-xx` | `wt-wt` | Region/language, e.g. `us-en`, `de-de`, `ru-ru`, `fr-fr`. Affects ranking and language. |
+| `--region XX-xx` | `us-en` | Region/language (`country-lang`), e.g. `us-en`, `de-de`, `ru-ru`, `fr-fr`; anything else exits 2. Affects ranking and language. `wt-wt` (worldwide) only suits `--backend duckduckgo`. With `--searx`, the language part is sent only when `--region` is given. |
 | `--site HOST` | — | Restrict to a host (repeatable, subdomains included). Added as `site:` and enforced on the results. |
 | `--exclude-site HOST` | — | Drop a host (repeatable). |
-| `--backend` | `auto` | `duckduckgo`, `bing`, `brave`, `google`, `yahoo`, `wikipedia`, `yandex`, `mojeek`, `grokipedia`; `auto` lets ddgs rotate. Pick one when `auto` is rate-limited or when a specific index is wanted. |
+| `--backend` | `auto` | `duckduckgo`, `bing`, `brave`, `google`, `yahoo`, `wikipedia`, `yandex`, `mojeek`, `grokipedia`; `auto` lets ddgs rotate; when a text search finds nothing (not on rate limits or timeouts), bing and then duckduckgo are asked directly, and the note and `engine` read `ddgs/auto→bing`. Pick one when `auto` is rate-limited or when a specific index is wanted. With `--news`: `duckduckgo`, `bing`, `yahoo` only. |
 | `--searx URL` | — | Use a SearXNG instance's JSON API (`format=json` must be enabled there). `--time`, `--news`, `--safesearch`, `--region` language are mapped. |
 | `--safesearch off\|moderate\|on` | `moderate` | |
-| `--read N` | `0` | Fetch the first N results with `web-extract` (4 in parallel; Wayback fallback on, Jina off) and attach `content` + `read` status. |
+| `--read N` | `0` | Fetch the first N results with `web-extract` (4 in parallel; Wayback fallback on, Jina off) and attach `content` + `read` status. Results on private/local hosts (localhost, LAN IPs, `*.local`, dotless names) are never fetched: `read.error.kind` = `private_host`. |
 | `--read-chars C` | `3000` | Content cap per read result (≥100). Use `web-extract -o` on a result URL for the full page. |
 | `--render off\|auto\|always` | `auto` | `web-extract` rendering mode for `--read` (Playwright needed for actual rendering). |
 | `-f markdown\|text\|json\|jsonl` | `markdown` | `json`: `{query, engine, count, results[]}`; `jsonl`: one result per line; `text`: markdown layout with plain-text read content. |
 | `-o FILE` | stdout | Write to a file. |
-| `--timeout S` | `15` | Per request. `--proxy URL` for the engine and the reads. `-q` hides the `note:` lines. |
+| `--timeout S` | `15` | Per request. `--proxy URL` for the engine and the reads. `-q` hides the `note:` lines and per-page `--read` errors (still in `read.error`). |
 
-Result object: `title`, `url` (cleaned), `snippet`, `host`; news adds `date`
-(`YYYY-MM-DD` when parseable) and `source`; `--read` adds `content` and
+Result object: `title`, `url` (cleaned), `snippet`, `host` (control
+characters stripped from text fields); news adds `date` (`YYYY-MM-DD` when
+parseable) and `source` (the publisher from ddgs; with `--searx`, which has no
+publisher field, the result's host); `--read` adds `content` and
 `read` = `{ok, source, words, truncated, title, date, warnings}` or
 `{ok: false, error}`.
 
@@ -96,8 +98,8 @@ Result object: `title`, `url` (cleaned), `snippet`, `host`; news adds `date`
 |------|---------|------------|
 | 0 | Results returned (note on stderr says how many and from which engine). | Use them; cite `url` and `title`. |
 | 1 | No results after filters. | Broaden the query, drop `--time`/`--site`, try `--backend bing` or `brave`, or `--region`. Once or twice, not in a loop. |
-| 2 | Bad arguments; `ddgs` missing; `--read` without `web-extract`; bad `--searx` URL; SearXNG without JSON format. | Fix it; `pip install ddgs`; install `web-extract` next to this skill. |
-| 4 | The search backend rate-limited or blocked the request (anonymous search frontends do this after bursts). | **Do not retry immediately.** Wait a minute, use another `--backend`, or the user's `--searx`. Tell the user. |
+| 2 | Bad arguments (incl. a malformed `--region`, `--news` with a non-news `--backend`); `ddgs` or `curl_cffi` missing; `--read` without `web-extract`; bad `--searx` URL; SearXNG answering without JSON. | Fix it; `pip install ddgs curl_cffi`; install `web-extract` next to this skill; enable `formats: [html, json]` on the SearXNG instance. |
+| 4 | The search backend rate-limited or blocked the request (anonymous search frontends do this after bursts); SearXNG answering HTTP 403/429 (rate limit, bot protection, or JSON format disabled). | **Do not retry immediately.** Wait a minute, use another `--backend`, or the user's `--searx`. Tell the user. |
 | 6 | Network: timeout, DNS, unreachable SearXNG. | Check connectivity; `--timeout 30`. |
 | 7 | Unexpected engine error. | Report it; try another `--backend`. |
 

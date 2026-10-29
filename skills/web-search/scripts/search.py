@@ -23,6 +23,7 @@ Exit codes: 0 results · 1 no results · 2 bad input / missing dependency
 
 import argparse
 import importlib.util
+import io
 import json
 import os
 import re
@@ -37,25 +38,51 @@ EXIT_OK, EXIT_EMPTY, EXIT_BAD_INPUT, EXIT_HTTP, EXIT_BLOCKED, EXIT_NOT_HTML, EXI
 TRACKING_PARAMS = re.compile(r"^(?:utm_\w+|fbclid|gclid|yclid|mc_[ce]id|ref_src|igshid|_ga|ved|usg|sa|ei)$", re.I)
 TIME_MAP = {"d": "d", "day": "d", "w": "w", "week": "w", "m": "m", "month": "m", "y": "y", "year": "y"}
 BACKENDS = ["auto", "duckduckgo", "bing", "brave", "google", "yahoo", "wikipedia", "yandex", "mojeek", "grokipedia"]
+NEWS_BACKENDS = ("auto", "duckduckgo", "bing", "yahoo")  # ddgs's news category; others silently fall back to auto
+REGION_DEFAULT = "us-en"
+AUTO_FALLBACK_TEXT = ("bing", "duckduckgo")  # tried in order when ddgs "auto" finds nothing (text search only)  # ddgs's own default; "wt-wt" breaks the wikipedia/google/bing legs of ddgs 9
+CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 READ_CHARS_DEFAULT = 3000
 
 
 def clean_url(url: str) -> str:
     """Drop fragments and tracking parameters; keep everything else as the engine gave it.
+    Unparseable URLs come back empty (and are dropped by normalise()).
 
     >>> clean_url("https://a.example/p?utm_source=x&id=2#frag")
     'https://a.example/p?id=2'
+    >>> clean_url("http://[::1/x")
+    ''
     """
     try:
         p = urlsplit(url.strip())
+        p.hostname  # noqa: B018 — raises ValueError on a malformed netloc / port
+        p.port  # noqa: B018
     except ValueError:
-        return url
+        return ""
     query = "&".join(kv for kv in p.query.split("&") if kv and not TRACKING_PARAMS.match(kv.split("=", 1)[0]))
     return urlunsplit((p.scheme, p.netloc, p.path, query, ""))
 
 
 def host_of(url: str) -> str:
-    return (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    """
+    >>> host_of("https://WWW.Example.com/x"), host_of("http://[::1/x")
+    ('example.com', '')
+    """
+    try:
+        return (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    except ValueError:
+        return ""
+
+
+def clean_text(value: Any) -> str | None:
+    """Drop C0/C1 control characters (terminal escapes) and collapse whitespace.
+
+    >>> clean_text("Admin \\x1b[31mRED\\x1b[0m  console\\n"), clean_text("  ")
+    ('Admin [31mRED[0m console', None)
+    """
+    s = " ".join(CONTROL_CHARS.sub("", str(value or "")).split())
+    return s or None
 
 
 def build_query(args: argparse.Namespace) -> str:
@@ -73,19 +100,19 @@ def normalise(items: list[dict[str, Any]], news: bool) -> list[dict[str, Any]]:
     seen: set[str] = set()
     for it in items:
         url = clean_url(str(it.get("href") or it.get("url") or ""))
-        if not url.startswith(("http://", "https://")):
+        if not url.startswith(("http://", "https://")) or not host_of(url):
             continue
         key = url.lower().rstrip("/")
         if key in seen:
             continue
         seen.add(key)
-        rec: dict[str, Any] = {"title": " ".join(str(it.get("title") or "").split()) or None, "url": url,
-                               "snippet": " ".join(str(it.get("body") or it.get("content") or it.get("snippet") or "").split()) or None,
+        rec: dict[str, Any] = {"title": clean_text(it.get("title")), "url": url,
+                               "snippet": clean_text(it.get("body") or it.get("content") or it.get("snippet")),
                                "host": host_of(url)}
         if news:
-            date = str(it.get("date") or it.get("publishedDate") or "")
+            date = clean_text(it.get("date") or it.get("publishedDate")) or ""
             rec["date"] = date[:10] if re.match(r"\d{4}-\d{2}-\d{2}", date) else (date or None)
-            rec["source"] = it.get("source") or None
+            rec["source"] = clean_text(it.get("source"))
         out.append(rec)
     return out
 
@@ -98,14 +125,35 @@ def ddgs_engine(query: str, args: argparse.Namespace) -> list[dict[str, Any]]:
         from ddgs import exceptions as dx
     except ImportError as e:
         raise RuntimeError(f"missing dependency ddgs ({e}); pip install ddgs, or run with uv run") from e
-    kwargs: dict[str, Any] = {"region": args.region, "safesearch": args.safesearch, "max_results": args.max_results}
+    kwargs: dict[str, Any] = {"region": args.region or REGION_DEFAULT, "safesearch": args.safesearch, "max_results": args.max_results}
     if args.time:
         kwargs["timelimit"] = TIME_MAP[args.time]
     if args.backend != "auto":
         kwargs["backend"] = args.backend
     d = DDGS(proxy=args.proxy, timeout=args.timeout)
     try:
-        return d.news(query, **kwargs) if args.news else d.text(query, **kwargs)
+        found = d.news(query, **kwargs) if args.news else d.text(query, **kwargs)
+    except dx.DDGSException as e:
+        found = _map_ddgs_error(e, dx)  # raises EngineBlocked/EngineNetwork; [] only for "No results"
+    if found or args.backend != "auto" or args.news:
+        return found
+    # ddgs "auto" samples a few providers and can land only on ones with nothing (e.g. wikipedia):
+    # on a genuine "no results" ask the two big general indexes directly before giving up.
+    for backend in AUTO_FALLBACK_TEXT:
+        try:
+            found = d.text(query, **{**kwargs, "backend": backend})
+        except dx.DDGSException:
+            continue
+        if found:
+            args.backend_used = backend
+            return found
+    return []
+
+
+def _map_ddgs_error(e: Exception, dx: Any) -> list[dict[str, Any]]:
+    """Translate a ddgs exception into EngineBlocked/EngineNetwork, [] for "no results", or re-raise."""
+    try:
+        raise e
     except dx.RatelimitException as e:
         raise EngineBlocked(f"search backend rate-limited: {str(e).splitlines()[0][:200]}") from e
     except dx.TimeoutException as e:
@@ -123,14 +171,17 @@ def ddgs_engine(query: str, args: argparse.Namespace) -> list[dict[str, Any]]:
 
 def searx_engine(query: str, args: argparse.Namespace) -> list[dict[str, Any]]:
     """SearXNG JSON API on the user's own instance (format=json must be enabled there)."""
-    from curl_cffi import requests
+    try:
+        from curl_cffi import requests
+    except ImportError as e:
+        raise RuntimeError(f"missing dependency curl_cffi ({e}); pip install curl_cffi, or run with uv run") from e
     params = {"q": query, "format": "json", "pageno": 1, "safesearch": {"off": 0, "moderate": 1, "on": 2}[args.safesearch]}
     if args.time:
         params["time_range"] = {"d": "day", "w": "week", "m": "month", "y": "year"}[TIME_MAP[args.time]]
     if args.news:
         params["categories"] = "news"
-    lang = args.region.split("-")[-1] if args.region != "wt-wt" else None
-    if lang and len(lang) == 2:
+    lang = args.region.split("-")[-1].lower() if args.region else None  # only when --region was given
+    if lang and lang != "wt":
         params["language"] = lang
     base = args.searx.rstrip("/")
     try:
@@ -138,15 +189,17 @@ def searx_engine(query: str, args: argparse.Namespace) -> list[dict[str, Any]]:
     except Exception as e:
         raise EngineNetwork(f"SearXNG unreachable: {str(e).splitlines()[0][:200]}") from e
     if r.status_code == 429 or r.status_code == 403:
-        raise EngineBlocked(f"SearXNG answered HTTP {r.status_code} (rate limit or JSON format disabled)")
+        raise EngineBlocked(f"SearXNG answered HTTP {r.status_code} (rate limit, bot protection, or JSON format disabled)")
     if r.status_code != 200:
         raise RuntimeError(f"SearXNG answered HTTP {r.status_code}")
     try:
         data = r.json()
     except ValueError as e:
-        raise RuntimeError("SearXNG returned no JSON (enable `formats: [html, json]` in its settings)") from e
-    return [{"title": x.get("title"), "href": x.get("url"), "body": x.get("content"), "date": x.get("publishedDate"), "source": x.get("engine")}
-            for x in data.get("results", [])][: args.max_results]
+        raise SearxConfigError("SearXNG returned no JSON (enable `formats: [html, json]` in its settings)") from e
+    # SearXNG exposes no publisher field: news `source` is the result's host, like ddgs's publisher name
+    return [{"title": x.get("title"), "href": x.get("url"), "body": x.get("content"), "date": x.get("publishedDate"),
+             "source": host_of(str(x.get("url") or "")) or None}
+            for x in data.get("results", []) if isinstance(x, dict)][: args.max_results]
 
 
 class EngineBlocked(RuntimeError):
@@ -154,6 +207,10 @@ class EngineBlocked(RuntimeError):
 
 
 class EngineNetwork(RuntimeError):
+    pass
+
+
+class SearxConfigError(RuntimeError):
     pass
 
 
@@ -180,13 +237,19 @@ def read_results(results: list[dict[str, Any]], args: argparse.Namespace, wx: An
     """Fetch the first --read results through web-extract and attach `content` (capped) + `read` status."""
     ns = argparse.Namespace(format="text" if args.format == "text" else "markdown", out=None, links=False, raw=False, no_header=True,
                             max_chars=0, comments=False, recall=False, precision=False, timeout=args.timeout, impersonate="chrome",
-                            proxy=args.proxy, wayback=False, no_wayback=False, jina=False, quiet=True, render=args.render, headful=False,
+                            proxy=args.proxy, wayback=False, no_wayback=False, jina=False, quiet=args.quiet, render=args.render, headful=False,
                             profile=None, actions=None, action_steps=[], render_wait=0.0, screenshot=None, structured=False, track=False)
     wx.QUIET = True
     session = wx.make_session(ns)
     todo = results[: args.read]
 
     def one(r: dict[str, Any]) -> None:
+        # result URLs come from a third party: never let them point --read at the user's own network
+        if wx.is_private_host(urlsplit(r["url"]).hostname or ""):
+            r["content"] = None
+            r["read"] = {"ok": False, "error": {"code": 2, "kind": "private_host", "status": None, "vendor": None,
+                                                    "message": "result points at a private/local host; not fetched"}}
+            return
         res = wx.process(session, r["url"], ns)
         if res["ok"]:
             content = res["content"] or ""
@@ -198,8 +261,15 @@ def read_results(results: list[dict[str, Any]], args: argparse.Namespace, wx: An
             r["content"] = None
             r["read"] = {"ok": False, "error": res["error"]}
 
-    with ThreadPoolExecutor(max_workers=min(4, max(1, len(todo)))) as pool:
-        list(pool.map(one, todo))
+    # web-extract prints an `error:` line per failed page; the failure is already in `read.error`, so -q silences it
+    saved_stderr = sys.stderr
+    if args.quiet:
+        sys.stderr = io.StringIO()
+    try:
+        with ThreadPoolExecutor(max_workers=min(4, max(1, len(todo)))) as pool:
+            list(pool.map(one, todo))
+    finally:
+        sys.stderr = saved_stderr
 
 
 # --------------------------------------------------------------------- output
@@ -237,7 +307,8 @@ def main(argv: list[str] | None = None, engine: Callable[[str, argparse.Namespac
     p.add_argument("-n", "--max-results", type=int, default=10, help="results to return (default 10, max 50)")
     p.add_argument("--news", action="store_true", help="news search (adds date and source)")
     p.add_argument("--time", choices=sorted(TIME_MAP), help="only results from the last day/week/month/year (d/w/m/y)")
-    p.add_argument("--region", default="wt-wt", metavar="XX-xx", help="region/language such as us-en, de-de, ru-ru (default wt-wt = worldwide)")
+    p.add_argument("--region", metavar="XX-xx",
+                   help=f"region/language such as us-en, de-de, ru-ru (default {REGION_DEFAULT}; with --searx: the instance's default language)")
     p.add_argument("--site", action="append", metavar="HOST", help="restrict to a site (repeatable)")
     p.add_argument("--exclude-site", action="append", metavar="HOST", help="exclude a site (repeatable)")
     p.add_argument("--backend", choices=BACKENDS, default="auto", help="search backend (default auto: ddgs rotates several)")
@@ -254,6 +325,12 @@ def main(argv: list[str] | None = None, engine: Callable[[str, argparse.Namespac
     args = p.parse_args(argv)
     if not (1 <= args.max_results <= 50) or args.read < 0 or args.read_chars < 100 or args.timeout <= 0:
         sys.stderr.write("error: -n 1..50, --read ≥ 0, --read-chars ≥ 100, --timeout > 0\n")
+        return EXIT_BAD_INPUT
+    if args.region is not None and not re.fullmatch(r"[a-z]{2}-[a-z]{2}", args.region, re.I):
+        sys.stderr.write("error: --region must look like us-en, de-de or wt-wt (country-language)\n")
+        return EXIT_BAD_INPUT
+    if args.news and not args.searx and args.backend not in NEWS_BACKENDS:
+        sys.stderr.write(f"error: --news supports --backend {', '.join(NEWS_BACKENDS)} only\n")
         return EXIT_BAD_INPUT
     if args.searx and not re.match(r"^https?://", args.searx):
         sys.stderr.write("error: --searx needs an http(s) URL of your SearXNG instance\n")
@@ -279,12 +356,17 @@ def main(argv: list[str] | None = None, engine: Callable[[str, argparse.Namespac
     except EngineNetwork as e:
         sys.stderr.write(f"error: {e} — check connectivity or raise --timeout\n")
         return EXIT_NETWORK
+    except SearxConfigError as e:
+        sys.stderr.write(f"error: {e}\n")
+        return EXIT_BAD_INPUT
     except RuntimeError as e:
         sys.stderr.write(f"error: {e}\n")
         return EXIT_BAD_INPUT if "missing dependency" in str(e) else EXIT_OTHER
     except Exception as e:
         sys.stderr.write(f"error: search failed: {type(e).__name__}: {str(e).splitlines()[0] if str(e) else ''}\n")
         return EXIT_OTHER
+    if getattr(args, "backend_used", None):
+        engine_name = f"ddgs/auto→{args.backend_used}"
     results = normalise(raw if isinstance(raw, list) else [], args.news)
     if args.site:  # engines sometimes ignore site: — enforce it
         wanted = {s.lower().removeprefix("www.") for s in args.site}
