@@ -31,6 +31,7 @@ Exit codes: 0 records found · 1 no records matched · 2 bad input / missing web
 
 import argparse
 import csv
+import datetime
 import importlib.util
 import io
 import json
@@ -85,10 +86,14 @@ except ImportError as e:
 
 # ------------------------------------------------------------------ selectors
 
+class BadSelector(ValueError):
+    """A selector that compiled but fails when evaluated (e.g. an undefined XPath namespace prefix)."""
+
+
 class Field:
     """A parsed `name=SELECTOR[@attr][|mod…]` specification."""
 
-    def __init__(self, spec: str) -> None:
+    def __init__(self, spec: str, json_mode: bool = False) -> None:
         if "=" not in spec:
             raise ValueError(f"field {spec!r}: expected name=SELECTOR")
         self.name, rest = spec.split("=", 1)
@@ -101,14 +106,21 @@ class Field:
         if bad:
             raise ValueError(f"field {self.name}: unknown modifier {bad[0]!r} (known: {', '.join(sorted(MODIFIERS))})")
         self.attr: str | None = None
+        if json_mode:  # a dotted JSON path (`offers.price`, `image.0`, `@id`): kept verbatim, never compiled
+            if not sel:
+                raise ValueError(f"field {self.name}: empty JSON-LD path")
+            self.raw_selector, self.selector = sel, None
+            return
         m = re.search(r"@([\w:-]+)$", sel)
         if m and not sel.endswith("]") and not sel.lower().startswith("xpath:"):  # `a@href`; XPath keeps its own `@attr`
             self.attr, sel = m.group(1), sel[: m.start()].strip()
-        self.selector = compile_selector(sel or ".")
-        self.raw_selector = sel or "."
+        if sel == ".":
+            sel = ""
+        self.raw_selector = sel
+        self.selector = compile_selector(sel) if sel else None  # None = the item (or page) itself
 
     def extract(self, node: Any, base_url: str) -> Any:
-        nodes = self.selector(node) if self.raw_selector != "." else [node]
+        nodes = self.selector(node) if self.selector is not None else [node]
         want_all = "list" in self.mods or "join" in self.mods
         values: list[Any] = []
         for n in nodes if want_all else nodes[:1]:
@@ -130,7 +142,13 @@ def compile_selector(sel: str):
             xp = wx.lxml.etree.XPath(expr)
         except wx.lxml.etree.XPathError as e:
             raise ValueError(f"bad XPath {expr!r}: {e}") from e
-        return lambda node: _as_list(xp(node))
+
+        def run_xpath(node: Any) -> list[Any]:
+            try:
+                return _as_list(xp(node))
+            except wx.lxml.etree.XPathError as e:
+                raise BadSelector(f"bad XPath {expr!r}: {e}") from e
+        return run_xpath
     try:
         css = CSSSelector(sel, translator="html")
     except (SelectorError, Exception) as e:  # cssselect raises several classes
@@ -190,16 +208,25 @@ def apply_mods(s: str, mods: list[str], base_url: str, attr_name: str | None) ->
         return int(num) if num.is_integer() and "." not in raw else num
     if "date" in mods:
         for i, rx in enumerate(DATE_RES):
-            m = rx.search(s)
-            if m:
-                a, b, c = m.groups()
-                return f"{a}-{b}-{c}" if i != 1 else f"{c}-{b.zfill(2)}-{a.zfill(2)}"
+            for m in rx.finditer(s):
+                a, b, c = (int(x) for x in m.groups())
+                if i == 1:  # d.m.yyyy / d/m/yyyy; a slash date that only works month-first (12/31/2023) is read as US
+                    y, mo, d = (c, a, b) if "/" in m.group(0) and a <= 12 < b else (c, b, a)
+                else:
+                    y, mo, d = a, b, c
+                try:
+                    return datetime.date(y, mo, d).isoformat()
+                except ValueError:
+                    continue
         for i, rx in enumerate(WORD_DATE_RES):
             for m in rx.finditer(s):
                 month, day = (m.group(1), m.group(2)) if i == 0 else (m.group(2), m.group(1))
                 mi = MONTHS.get(month[:3].lower())
-                if mi and 1 <= int(day) <= 31:
-                    return f"{m.group(3)}-{mi:02d}-{int(day):02d}"
+                if mi:
+                    try:
+                        return datetime.date(int(m.group(3)), mi, int(day)).isoformat()
+                    except ValueError:
+                        continue
         return None
     return s if s != "" else None
 
@@ -230,7 +257,7 @@ def probe(tree: Any, limit: int = 15) -> list[dict[str, Any]]:
         links = sum(1 for n in nodes[:5] for _ in n.iter("a"))
         rows.append({"selector": sel, "parent": ptag, "count": len(nodes), "avg_chars": round(avg),
                      "links_per_item": round(links / min(5, len(nodes)), 1), "sample": texts[0][:160],
-                     "children": sorted({c.tag + (("." + c.get("class").split()[0]) if c.get("class") else "") for c in nodes[0] if isinstance(c.tag, str)})[:8]})
+                     "children": sorted({c.tag + "".join(f".{x}" for x in (c.get("class") or "").split()[:1]) for c in nodes[0] if isinstance(c.tag, str)})[:8]})
     rows.sort(key=lambda r: r["count"] * min(r["avg_chars"], 400), reverse=True)
     return rows[:limit]
 
@@ -246,6 +273,8 @@ class Scraper:
         self.item = compile_selector(args.item) if args.item else None
         self.next_sel = compile_selector(args.next) if args.next else None
         self.pages_fetched = 0
+        self.allow_private = False  # set per start URL in run()
+        self.origin: dict[int, tuple[str, str]] = {}  # id(record) → (start URL, listing page URL)
         self.diag: dict[str, Any] = {"pages": [], "item_matches": 0, "field_hits": {f.name: 0 for f in fields},
                                      "detail_field_hits": {f.name: 0 for f in detail_fields}, "details_fetched": 0, "details_failed": 0,
                                      "rendered": 0, "notes": []}
@@ -253,9 +282,16 @@ class Scraper:
                                      headful=False, profile=None, actions=None, action_steps=getattr(args, "action_steps", []),
                                      render_wait=args.render_wait, screenshot=None, raw=False)
 
-    def get(self, url: str, render: bool = False) -> tuple[Any, wx.Diag | None]:
-        """Fetch one page (HTTP or browser) → (Fetched, None) or (None, Diag). Block detection applied."""
-        f = wx.render_fetch(url, self.ns, self.ns.action_steps) if render else wx.fetch(self.session, url, timeout=self.timeout)
+    def get(self, url: str, render: bool = False, deadline: float | None = None) -> tuple[Any, wx.Diag | None]:
+        """Fetch one page (HTTP or browser) → (Fetched, None) or (None, Diag). Block detection applied.
+
+        With a deadline the request timeout shrinks to the remaining --max-time budget (at least 1 s)."""
+        left = None if deadline is None else deadline - time.monotonic()
+        timeout = self.timeout if left is None else max(1.0, min(self.timeout, left))
+        if render:
+            f = wx.render_fetch(url, argparse.Namespace(**{**vars(self.ns), "timeout": timeout}), self.ns.action_steps)
+        else:  # no retry when a second attempt would cross the --max-time deadline
+            f = wx.fetch(self.session, url, timeout=timeout, attempts=1 if left is not None and left < 2 * timeout else 2)
         if isinstance(f, wx.Diag):
             return None, f
         cls = wx.classify(f.status, f.headers, f.body[:wx.MARKER_SCAN_BYTES], f.url, len(f.body))
@@ -273,7 +309,10 @@ class Scraper:
     def parse(self, f: Any) -> Any:
         tree = wx.load_html(f.body)
         if tree is None:
-            tree = wx.lxml.html.fromstring(f.body or b"<html></html>")
+            try:
+                tree = wx.lxml.html.fromstring(f.body or b"<html></html>")
+            except (wx.lxml.etree.ParserError, ValueError):  # comment- or whitespace-only body
+                tree = wx.lxml.html.fromstring(b"<html></html>")
         return tree
 
     def records_from_tree(self, tree: Any, page_url: str) -> list[dict[str, Any]]:
@@ -293,8 +332,8 @@ class Scraper:
                 if v not in (None, [], ""):
                     self.diag["field_hits"][fld.name] += 1
                 rec[fld.name] = v
-            if a.item is None and not self.fields:
-                rec["text"] = collapse(tree.text_content())[:2000]
+            if not self.fields:  # --item alone: the text of each item
+                rec["text"] = collapse(n.text_content())[:2000]
             if any(v not in (None, [], "") for v in rec.values()):
                 out.append(rec)
         return out
@@ -315,7 +354,7 @@ class Scraper:
                     if want:
                         return
                 for k, v in obj.items():
-                    if k in ("@graph", "itemListElement", "mainEntity", "hasPart", "item", "offers", "review", "itemListElement"):
+                    if k in ("@graph", "itemListElement", "mainEntity", "hasPart", "item", "offers", "review"):
                         walk(v)
                     elif isinstance(v, (dict, list)) and not want:
                         pass
@@ -331,7 +370,7 @@ class Scraper:
         if self.fields:  # optional: pick keys with name=key (dotted path) from each object
             picked = []
             for obj in out:
-                rec = {f.name: dig(obj, f.raw_selector) for f in self.fields}
+                rec = {f.name: json_value(dig(obj, f.raw_selector), f.mods, page_url) for f in self.fields}
                 for f in self.fields:
                     if rec[f.name] not in (None, "", []):
                         self.diag["field_hits"][f.name] += 1
@@ -381,8 +420,13 @@ class Scraper:
                 cands = tree.xpath("//a[contains(translate(normalize-space(.),'NEXT→»›','next→»›'),'next') or normalize-space(.)='→' or normalize-space(.)='»' or normalize-space(.)='›']/@href")
         for c in cands:
             href = c if isinstance(c, str) else c.get("href")
-            if href and not href.startswith(("#", "javascript:")):
-                return urljoin(page_url, href.strip())
+            if not href or href.strip().startswith(("#", "javascript:")):
+                continue
+            u, why = safe_link(page_url, href, self.allow_private)
+            if u is None:  # note it and try the next candidate
+                self.diag["notes"].append(f"next link {href.strip()[:120]!r} not followed: {why}")
+                continue
+            return u
         return None
 
     def run(self, starts: list[str]) -> tuple[list[dict[str, Any]], wx.Diag | None]:
@@ -394,10 +438,11 @@ class Scraper:
         for start in starts:
             url: str | None = start
             page_no = 0
+            self.allow_private = wx.is_private_host(urlsplit(start).hostname)  # a public start never leads to local hosts
             while url and url not in seen_pages and page_no < a.max_pages and len(records) < a.limit and time.monotonic() < deadline:
                 seen_pages.add(url)
                 page_no += 1
-                f, err = self.get(url, render=(a.render == "always"))
+                f, err = self.get(url, render=(a.render == "always"), deadline=deadline)
                 if err:
                     if url == start and not records:
                         start_error = start_error or err
@@ -408,11 +453,12 @@ class Scraper:
                 recs = self.records_from_tree(tree, f.url)
                 if not recs and a.render == "auto" and wx.page_signals(f.body).dynamic and wx.playwright_api()[0] is not None:
                     wx.note("no matches in the HTTP body and the page looks client-rendered; rendering it in a headless browser")
-                    rf, rerr = self.get(url, render=True)
+                    rf, rerr = self.get(url, render=True, deadline=deadline)
                     if rf is not None:
                         f, tree = rf, self.parse(rf)
                         recs = self.records_from_tree(tree, f.url)
                 for r in recs:
+                    self.origin[id(r)] = (start, f.url)  # for --follow: relative URLs and the private-host rule
                     if not a.no_meta:
                         r["_page"] = f.url
                 records.extend(recs)
@@ -443,33 +489,66 @@ class Scraper:
 
     def fetch_details(self, records: list[dict[str, Any]], deadline: float) -> None:
         a = self.args
-        todo = [(i, r[a.follow]) for i, r in enumerate(records) if isinstance(r.get(a.follow), str) and r[a.follow].startswith("http")][:MAX_DETAILS]
+        by_url: dict[str, list[int]] = {}  # one fetch per distinct URL, its result copied to every record that has it
+        for i, r in enumerate(records[:MAX_DETAILS]):
+            v = r.get(a.follow)
+            if not isinstance(v, str) or not v.strip():
+                continue
+            start, page = self.origin.get(id(r), ("", ""))
+            u, why = safe_link(page or v, v, wx.is_private_host(urlsplit(start).hostname) if start else False)
+            if u is None:
+                self.diag["details_failed"] += 1
+                r["_detail_error"] = {"kind": "unsafe_url", "message": f"{v.strip()[:120]!r} not fetched: {why}"}
+                continue
+            by_url.setdefault(u, []).append(i)
         if len(records) > MAX_DETAILS:
             self.diag["notes"].append(f"details limited to the first {MAX_DETAILS} records")
 
-        def one(i: int, url: str) -> tuple[int, dict[str, Any] | None, str | None]:
+        def one(url: str) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
             if time.monotonic() > deadline:
-                return i, None, "time budget exhausted"
-            f, err = self.get(url, render=(a.render == "always"))
+                return url, None, {"kind": "time_budget", "message": "time budget exhausted"}
+            f, err = self.get(url, render=(a.render == "always"), deadline=deadline)
             if err:
-                return i, None, err.message
+                return url, None, {"kind": err.kind, "message": err.message}
             tree = self.parse(f)
-            rec = {}
-            for fld in self.detail_fields:
-                rec[fld.name] = fld.extract(tree, f.url)
-            return i, rec, None
+            return url, {fld.name: fld.extract(tree, f.url) for fld in self.detail_fields}, None
 
         with ThreadPoolExecutor(max_workers=max(1, a.concurrency)) as pool:
-            for i, rec, err in pool.map(lambda t: one(*t), todo):
-                if rec is None:
-                    self.diag["details_failed"] += 1
-                    records[i]["_detail_error"] = err
-                    continue
-                self.diag["details_fetched"] += 1
-                for k, v in rec.items():
-                    if v not in (None, "", []):
-                        self.diag["detail_field_hits"][k] += 1
-                    records[i].setdefault(k, v) if k in records[i] and records[i][k] not in (None, "") else records[i].__setitem__(k, v)
+            for url, rec, err in pool.map(one, list(by_url)):
+                for i in by_url[url]:
+                    if rec is None:
+                        self.diag["details_failed"] += 1
+                        records[i]["_detail_error"] = err
+                        continue
+                    self.diag["details_fetched"] += 1
+                    for k, v in rec.items():
+                        if v not in (None, "", []):
+                            self.diag["detail_field_hits"][k] += 1
+                        if records[i].get(k) in (None, "", []):  # listing values win over detail values
+                            records[i][k] = v
+
+
+def safe_link(base: str, href: str, allow_private: bool) -> tuple[str | None, str]:
+    """Absolute http(s) URL for a page-supplied link, or (None, reason) for other schemes and,
+    unless the run started on a private host, for loopback/LAN/internal hosts. Judged by host name
+    or IP literal only: names are not resolved, so a public name pointing at a private address passes."""
+    u = urljoin(base, href.strip())
+    ps = urlsplit(u)
+    if ps.scheme not in ("http", "https") or not ps.hostname:
+        return None, "not an http(s) URL"
+    if not allow_private and wx.is_private_host(ps.hostname):
+        return None, "points at a private/local host"
+    return u, ""
+
+
+def json_value(v: Any, mods: list[str], base_url: str) -> Any:
+    """A JSON-LD value with the text modifiers applied to scalars (`|number`, `|date`, …)."""
+    mods = [m for m in mods if m not in ("list", "join", "html", "text")]
+    if not mods or isinstance(v, (dict, list, bool)) or v is None:
+        return v
+    if isinstance(v, (int, float)) and ("number" in mods or "int" in mods):  # already numeric: no string round-trip
+        return int(v) if "int" in mods else v
+    return apply_mods(str(v), mods, base_url, attr_name=None)
 
 
 def dig(obj: Any, path: str) -> Any:
@@ -482,8 +561,6 @@ def dig(obj: Any, path: str) -> Any:
             cur = cur[int(part)]
         else:
             return None
-    if isinstance(cur, (dict, list)):
-        return cur
     return cur
 
 
@@ -535,7 +612,7 @@ def main(argv: list[str] | None = None) -> int:
     src.add_argument("--probe", action="store_true", help="list the page's repeating blocks (candidate --item selectors) and leave")
     nav = p.add_argument_group("pagination and detail pages")
     nav.add_argument("--next", metavar="SELECTOR", help="selector of the next-page link (default: rel=next, then a link reading next/→/»)")
-    nav.add_argument("--max-pages", type=int, default=1, help="listing pages to follow (default 1; with --next default 20)")
+    nav.add_argument("--max-pages", type=int, default=None, help="listing pages to follow (default 1; with --next default 20)")
     nav.add_argument("--follow", metavar="FIELD", help="open the URL in FIELD of every record and add --detail-field values")
     nav.add_argument("--detail-field", action="append", default=[], metavar="NAME=SEL", help="field taken from the followed detail page")
     nav.add_argument("--limit", type=int, default=MAX_RECORDS_DEFAULT, help=f"max records (default {MAX_RECORDS_DEFAULT})")
@@ -558,15 +635,15 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     wx.QUIET = args.quiet
 
+    if args.max_pages is None:
+        args.max_pages = 20 if args.next else 1
     if args.max_pages < 1 or args.limit < 1 or args.max_time <= 0 or args.timeout <= 0 or args.concurrency < 1:
         sys.stderr.write("error: --max-pages, --limit, --concurrency ≥ 1; --max-time, --timeout > 0\n")
         return EXIT_BAD_INPUT
-    if args.next and args.max_pages == 1:
-        args.max_pages = 20
     if sum(x is not None for x in (args.json_ld, args.table)) + bool(args.item) > 1:
         sys.stderr.write("error: use one of --item, --json-ld, --table\n")
         return EXIT_BAD_INPUT
-    if args.table is not None and args.table != "all" and not args.table.isdigit():
+    if args.table is not None and args.table != "all" and not (args.table.isdigit() and int(args.table) >= 1):
         sys.stderr.write("error: --table takes a 1-based number or `all`\n")
         return EXIT_BAD_INPUT
     if args.follow and not args.detail_field:
@@ -591,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_BAD_INPUT
         starts.append(u)
     try:
-        fields = [Field(s) for s in args.field]
+        fields = [Field(s, json_mode=args.json_ld is not None) for s in args.field]
         detail_fields = [Field(s) for s in args.detail_field]
         if args.follow and fields and args.follow not in {f.name for f in fields}:
             raise ValueError(f"--follow {args.follow!r} is not one of the fields")
@@ -603,6 +680,17 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("error: say what a record is: --item/--field, --json-ld, --table, or --probe to explore\n")
         return EXIT_BAD_INPUT
 
+    try:
+        return scrape_main(args, scraper, starts, fields)
+    except BadSelector as e:
+        sys.stderr.write(f"error: {e}\n")
+        return EXIT_BAD_INPUT
+    except Exception as e:  # anything unexpected: one error line, exit 7
+        sys.stderr.write(f"error: {type(e).__name__}: {e}\n")
+        return EXIT_OTHER
+
+
+def scrape_main(args: argparse.Namespace, scraper: Scraper, starts: list[str], fields: list[Field]) -> int:
     if args.probe:
         f, err = scraper.get(starts[0], render=(args.render == "always"))
         if err:
@@ -634,7 +722,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = (f"{len(records)} record(s) from {sum(1 for pg in d['pages'] if pg['ok'])} page(s)"
                + (f", {d['rendered']} rendered" if d["rendered"] else "")
                + (f"; details {d['details_fetched']} ok / {d['details_failed']} failed" if args.follow else ""))
-    if fields and args.json_ld is None and args.table is None:
+    if fields and args.table is None:
         misses = [f"{n} 0/{d['item_matches']}" for n, h in d["field_hits"].items() if h == 0]
         partial = [f"{n} {h}/{d['item_matches']}" for n, h in d["field_hits"].items() if 0 < h < d["item_matches"]]
         if misses:

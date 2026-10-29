@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -29,7 +30,7 @@ def listing(page_no: int, total: int = 2) -> bytes:
     return f"""<html><head><title>Shop</title>
     <script type="application/ld+json">{{"@context":"https://schema.org","@graph":[{{"@type":"BreadcrumbList","name":"crumbs"}},
       {{"@type":"ItemList","itemListElement":[{{"@type":"Product","name":"LD Widget {page_no}","offers":{{"@type":"Offer","price":"9.99"}}}}]}}]}}</script>
-    <script type="application/ld+json">{{"@type":"Product","name":"Solo Product","offers":{{"price":"1.50"}}}}</script>
+    <script type="application/ld+json">{{"@type":"Product","@id":"#solo","name":"Solo Product","image":["/a.png","/b.png"],"offers":{{"price":"1.50"}}}}</script>
     </head><body><nav><a href="/">home</a><a href="/about">about</a><a href="/help">help</a></nav>
     <ul id="products">{items}</ul>
     <table><caption>Stock</caption><tr><th>SKU</th><th>Qty</th></tr><tr><td>A</td><td>10</td></tr><tr><td>B</td><td>0</td></tr></table>
@@ -42,12 +43,30 @@ def detail(sku: str) -> bytes:
     <span class="weight">Weight: 1,250 g</span><span class="stock">In stock: 42 units</span></body></html>""".encode()
 
 
+DYNAMIC = b"""<html><head><title>App</title></head><body><div id="root"></div>
+<script>document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("root").innerHTML = '<ul>' + [1, 2, 3].map(i => '<li class="product"><h2>JS Widget ' + i + '</h2></li>').join('') + '</ul>';
+});</script></body></html>"""
+HITS: dict[str, int] = {}
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
     def do_GET(self):
         path = self.path
+        HITS[path] = HITS.get(path, 0) + 1
+        if path == "/dyn":
+            return self._send(200, DYNAMIC)
+        if path == "/slow":
+            time.sleep(4)
+            return self._send(200, detail("slow"))
+        if path == "/badnext":
+            return self._send(200, listing(1).replace(b'<div class="pager">', b'<div class="pager"><a class="nx" href="file:///etc/passwd">x</a>'
+                                                                               b'<a class="nx" href="/list?page=2">2</a>'))
+        if path == "/comment":
+            return self._send(200, b"<!-- maintenance -->")
         if path in ("/", "/list", "/list?page=1"):
             return self._send(200, listing(1))
         if path == "/list?page=2":
@@ -78,8 +97,8 @@ def server():
     srv.shutdown()
 
 
-def run(*args, timeout=120):
-    p = subprocess.run([sys.executable, str(SCRIPT), *args, "--impersonate", "none", "--render", "off"], capture_output=True, text=True,
+def run(*args, timeout=120, render="off"):
+    p = subprocess.run([sys.executable, str(SCRIPT), *args, "--impersonate", "none", "--render", render], capture_output=True, text=True,
                        encoding="utf-8", timeout=timeout)
     return p.returncode, p.stdout, p.stderr
 
@@ -110,6 +129,35 @@ def test_field_spec_parsing_and_modifiers():
     assert am("  a \n b ", [], "", None) == "a b" and am("  a \n b ", ["raw"], "", None) == "  a \n b "
     assert sc.dig({"offers": {"price": "9"}, "image": ["x", "y"]}, "offers.price") == "9" and sc.dig({"image": ["x", "y"]}, "image.1") == "y"
     assert sc.dig({"a": 1}, "a.b") is None
+    # dates are validated; a slash date that only works month-first is US-ordered
+    assert am("Posted 12/31/2023", ["date"], "", None) == "2023-12-31" and am("03/04/2024", ["date"], "", None) == "2024-04-03"
+    assert am("99.99.2024", ["date"], "", None) is None and am("2024-13-45", ["date"], "", None) is None
+    assert am("February 30, 2024", ["date"], "", None) is None
+    # an empty selector is the item itself; JSON-LD paths are kept verbatim
+    f = sc.Field("u=@href")
+    assert f.selector is None and f.attr == "href"
+    node = sc.wx.lxml.html.fromstring('<a href="/x">x</a>')
+    assert f.extract(node, "https://e.com/") == "https://e.com/x"
+    for spec, path in (("img=image.0", "image.0"), ("id=@id", "@id"), ("t=@type", "@type"), ("p=offers.price|number", "offers.price")):
+        f = sc.Field(spec, json_mode=True)
+        assert f.raw_selector == path and f.selector is None and f.attr is None
+    # an XPath that fails only when evaluated is a selector error, not a traceback
+    with pytest.raises(ValueError):
+        sc.Field("a=xpath:.//svg:a").extract(node, "https://e.com/")
+
+
+def test_json_ld_numbers_skip_string_round_trip():
+    assert sc.json_value(1e-05, ["number"], "") == 1e-05 and sc.json_value(3.7, ["int"], "") == 3 and sc.json_value(12, ["number"], "") == 12
+    assert sc.json_value(True, ["number"], "") is True and sc.json_value("€ 1,50", ["number"], "") == 1.5
+
+
+def test_safe_link_blocks_private_hosts_and_other_schemes():
+    assert sc.safe_link("https://shop.example/list", "/p/1", False) == ("https://shop.example/p/1", "")
+    for href in ("http://127.0.0.1:8080/", "http://169.254.169.254/latest/meta-data/", "http://intranet/x", "http://box.local/"):
+        assert sc.safe_link("https://shop.example/list", href, False)[0] is None
+    assert sc.safe_link("http://127.0.0.1/list", "http://127.0.0.1:8080/", True)[0] == "http://127.0.0.1:8080/"
+    for href in ("file:///etc/passwd", "ftp://shop.example/x", "data:text/html,x"):
+        assert sc.safe_link("https://shop.example/list", href, True)[0] is None
 
 
 def test_probe_finds_repeating_blocks():
@@ -118,6 +166,8 @@ def test_probe_finds_repeating_blocks():
     assert rows and rows[0]["selector"] == "li.product" and rows[0]["count"] == 3 and rows[0]["parent"] == "ul#products"
     assert "h2" in rows[0]["children"] and "Widget 11" in rows[0]["sample"]
     assert sc.probe(sc.wx.lxml.html.fromstring(b"<html><body><p>one</p></body></html>")) == []
+    blank = b"<ul>" + b'<li class="item"><div class=" ">some text long enough to count</div></li>' * 4 + b"</ul>"
+    assert sc.probe(sc.wx.lxml.html.fromstring(blank))[0]["children"] == ["div"]
 
 
 def test_output_formats():
@@ -161,6 +211,28 @@ def test_follow_detail_pages_and_unique(server):
     assert rows[1].endswith(",Long description for 11 with details.,1250,42") and "details 3 ok / 0 failed" in err
     rc, data, err = run_json(f"{server}/list", "--item", "li.product", "--field", "kind=.tags li:first-child", "--unique", "kind")
     assert rc == 0 and data["count"] == 1 and "2 duplicate(s) dropped" in err
+    # records sharing a detail URL: one fetch, copied to each
+    HITS.pop("/p/shared", None)
+    rc, data, err = run_json(f"{server}/list", "--item", "li.product", "--field", "name=h2 a", "--field", f'u=xpath:concat("{server}", "/p/shared")',
+                             "--follow", "u", "--detail-field", "desc=.desc p")
+    assert rc == 0 and HITS["/p/shared"] == 1 and all(r["desc"] == "Long description for shared with details." for r in data["records"])
+    assert data["stats"]["details_fetched"] == 3
+    # a slow detail page within --timeout fails into _detail_error / details_failed
+    rc, data, err = run_json(f"{server}/list", "--item", "li.product", "--field", "name=h2 a", "--field", f'u=xpath:concat("{server}", "/slow")',
+                             "--follow", "u", "--detail-field", "desc=.desc p", "--timeout", "1")
+    assert rc == 0 and data["stats"]["details_failed"] == 3 and data["records"][0]["_detail_error"]["message"]
+    # relative --follow URLs are resolved against the listing page
+    rc, data, err = run_json(f"{server}/list", "--item", "li.product", "--field", "u=xpath:string(.//h2/a/@href)", "--follow", "u",
+                             "--detail-field", "desc=.desc p")
+    assert rc == 0 and data["records"][0]["u"] == "/p/11" and data["records"][0]["desc"] == "Long description for 11 with details."
+    assert data["stats"]["details_failed"] == 0
+    # --max-time is not overshot by a retry
+    t0 = time.monotonic()
+    rc, _, _ = run(f"{server}/slow", "--item", "li", "--timeout", "2", "--max-time", "2")
+    assert rc == 6 and time.monotonic() - t0 < 3.9
+    # --item without fields: each item's text
+    rc, data, _ = run_json(f"{server}/list", "--item", "li.product")
+    assert rc == 0 and data["count"] == 3 and data["records"][0]["text"].startswith("Widget 11")
 
 
 def test_json_ld_and_tables(server):
@@ -168,6 +240,10 @@ def test_json_ld_and_tables(server):
     assert rc == 0 and [r["name"] for r in data["records"]] == ["LD Widget 1", "Solo Product"]  # nested @graph/itemListElement and bare object
     rc, data, _ = run_json(f"{server}/list", "--json-ld", "Product", "--field", "name=name", "--field", "price=offers.price")
     assert data["records"][0] == {"name": "LD Widget 1", "price": "9.99", "_page": f"{server}/list"}
+    rc, data, err = run_json(f"{server}/list", "--json-ld", "Product", "--field", "img=image.0", "--field", "id=@id", "--field", "t=@type",
+                             "--field", "price=offers.price|number", "--field", "sku=sku")
+    assert rc == 0 and data["records"][1] == {"img": "/a.png", "id": "#solo", "t": "Product", "price": 1.5, "sku": None, "_page": f"{server}/list"}
+    assert "fields never matched: sku 0/2" in err
     rc, data, _ = run_json(f"{server}/list", "--json-ld")
     assert {r["@type"] for r in data["records"]} >= {"BreadcrumbList", "ItemList", "Product"}
     rc, out, _ = run(f"{server}/list", "--table", "1", "-f", "markdown", "--no-meta")
@@ -195,6 +271,54 @@ def test_probe_command_and_failure_exit_codes(server):
     assert rc == 5
     rc, data, err = run_json("http://127.0.0.1:9/", "--item", ".x", "--field", "n=h2", "--timeout", "3")
     assert rc == 6
+    rc, data, err = run_json(f"{server}/comment", "--item", ".x", "--field", "n=h2")
+    assert rc == 1 and "Traceback" not in err
+    rc, out, err = run(f"{server}/list", "--item", "li.product", "--field", "n=h2", "-o", "/dev/null/x.json")
+    assert rc == 7 and err.strip().splitlines()[-1].startswith("error:") and "Traceback" not in err
+    rc, out, err = run(f"{server}/list", "--item", "li.product", "--field", "n=xpath:.//svg:a")
+    assert rc == 2 and "bad XPath" in err
+
+
+def test_follow_private_rule_uses_each_records_start():
+    import argparse
+    args = argparse.Namespace(timeout=2.0, impersonate="none", proxy=None, render="off", render_wait=0.0, item=None, next=None,
+                              follow="u", concurrency=1, action_steps=[])
+    scraper = sc.Scraper(args, [], [sc.Field("d=h1")])
+    pub = {"u": "http://127.0.0.1:9/x"}
+    loc = {"u": "/nowhere"}
+    scraper.origin = {id(pub): ("https://shop.example/", "https://shop.example/list"), id(loc): ("http://127.0.0.1:9/", "http://127.0.0.1:9/list")}
+    scraper.fetch_details([pub, loc], time.monotonic() + 5)
+    assert pub["_detail_error"]["kind"] == "unsafe_url"  # public start: a local detail URL is refused
+    assert loc["_detail_error"]["kind"] != "unsafe_url"  # local start: resolved to http://127.0.0.1:9/nowhere and tried
+
+
+def test_unsafe_next_candidate_is_skipped(server):
+    rc, data, _ = run_json(f"{server}/badnext", "--item", "li.product", "--field", "name=h2", "--next", "a.nx", "--max-pages", "2")
+    assert rc == 0 and data["count"] == 6 and data["pages"][1]["url"] == f"{server}/list?page=2"
+    assert any("file:///etc/passwd" in n and "not followed" in n for n in data["stats"]["notes"])
+
+
+def test_max_pages_one_with_next_is_honoured(server):
+    rc, data, _ = run_json(f"{server}/list", "--item", "li.product", "--field", "name=h2", "--next", "a.next", "--max-pages", "1")
+    assert rc == 0 and data["count"] == 3 and len(data["pages"]) == 1
+
+
+def _playwright_ready() -> bool:
+    try:
+        return sc.wx.playwright_api()[0] is not None
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright/Chromium not available")
+def test_render_auto_fallback_and_always(server):
+    rc, out, err = run(f"{server}/dyn", "--item", "li.product", "--field", "name=h2", "-f", "json", render="off")
+    assert rc == 1
+    for mode in ("auto", "always"):
+        rc, out, err = run(f"{server}/dyn", "--item", "li.product", "--field", "name=h2", "-f", "json", render=mode)
+        data = json.loads(out)
+        assert rc == 0, err
+        assert [r["name"] for r in data["records"]] == ["JS Widget 1", "JS Widget 2", "JS Widget 3"] and data["stats"]["rendered"] == 1
 
 
 def test_bad_arguments_exit2():
@@ -205,4 +329,7 @@ def test_bad_arguments_exit2():
     assert run("https://example.com/", "--item", ".a", "--field", "a=.a", "--follow", "nope", "--detail-field", "b=.b")[0] == 2
     assert run("https://example.com/", "--item", ".a", "--field", "a=.a", "--follow", "a")[0] == 2
     assert run("https://example.com/", "--table", "zero")[0] == 2
+    assert run("https://example.com/", "--table", "0")[0] == 2
+    assert run("https://example.com/", "--item", ".a", "--actions", "[]")[0] == 2  # --actions with --render off
+    assert run("https://example.com/", "--json-ld", "Product", "--field", "x=")[0] == 2
     assert run("not a url", "--table", "1")[0] == 2

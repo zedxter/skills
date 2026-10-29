@@ -70,30 +70,31 @@ For client-rendered lists install the browser once as described in
 | Part | Meaning |
 |------|---------|
 | `SELECTOR` | CSS (default) or `xpath:EXPR`. Relative XPath starts with `./`. |
-| `@attr` | Attribute instead of text; `href`, `src`, `data-src`, `action`, `poster` are made absolute. `@html` = inner HTML. |
-| `\|text` | Default: text with whitespace collapsed. `\|raw` keeps whitespace. |
+| `@attr` | Attribute instead of text; `href`, `src`, `data-src`, `data-href`, `action`, `poster` (and URL-like `content`) are made absolute. `@html` = inner HTML. A bare `@href` reads the item itself. |
+| `\|text` | Default: text with whitespace collapsed. `\|raw` keeps whitespace. `\|html` = inner HTML. |
 | `\|number` | First number: `€ 1.234,50` → `1234.5`, `1 250 g` → `1250`, `1,234.56` → `1234.56`. `\|int` → integer. No digits → null. |
-| `\|date` | First date → `YYYY-MM-DD`: ISO, `31.12.2023`, `2024/01/05`, `March 4, 2024`, `14 March 1879`. |
+| `\|date` | First valid date → `YYYY-MM-DD`: ISO, `31.12.2023`, `2024/01/05`, `March 4, 2024`, `14 March 1879`; `12/31/2023` (only valid month-first) is read as US; impossible dates → null. |
 | `\|list` | Every match as a list. `\|join` → every match joined with `, `. |
 
 `--json-ld TYPE` fields are dotted paths into the object (`offers.price`,
-`image.0`). Missing values are `null`; a field that never matches on any item
-is reported on stderr (`fields never matched: price 0/24`).
+`image.0`, `@id`), taken verbatim; scalar values accept the modifiers
+(`price=offers.price|number`). Missing values are `null`; a field that never
+matches on any item is reported on stderr (`fields never matched: price 0/24`).
 
 ## Options
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--item SEL` | the page | Repeating container; one record per match. Without it the page is one record. |
-| `--field NAME=SEL` | — | Repeatable. With no `--item` and no fields the record is the page text (first 2000 chars). |
-| `--json-ld [TYPE]` | — | Records from `<script type=application/ld+json>` objects of that `@type` (`@graph`, `itemListElement`, `mainEntity`, `hasPart`, `offers`, `review` are searched; `--json-ld` alone = every typed object). Objects are returned whole unless `--field` picks keys. |
+| `--item SEL` | the page | Repeating container; one record per match. Without it the page is one record. `--item` with no `--field` gives each item's text (`text`, first 2000 chars). |
+| `--field NAME=SEL` | — | Repeatable. |
+| `--json-ld [TYPE]` | — | Records from `<script type=application/ld+json>` objects of that `@type` (`@graph`, `itemListElement`, `item`, `mainEntity`, `hasPart`, `offers`, `review` are searched; `--json-ld` alone = every typed object). Objects are returned whole unless `--field` picks keys. |
 | `--table N\|all` | — | Records from the N-th data table (1-based; headers from the `<th>` row, else `col1…`) or from every table (`_table` column). |
 | `--probe` | off | Print the repeating blocks (selector, parent, count, average text, links per item, child elements, first sample), the number of tables and JSON-LD scripts; exit 1 when nothing is found. |
 | `--next SEL` | auto | Next-page link. Without it `rel=next` is used, then a link reading `next`/`→`/`»`/`›`; only followed when `--max-pages` > 1 or `--next` is given. |
 | `--max-pages N` | `1` (`20` with `--next`) | Listing pages to walk per start URL; a page already seen stops the walk. |
-| `--follow FIELD` | — | Open the URL in FIELD of each record (first 200 records, `--concurrency` 4) and add every `--detail-field`. Failures land in `_detail_error`. |
+| `--follow FIELD` | — | Open the URL in FIELD of each record (first 200 records, `--concurrency` 4, each distinct URL once) and add every `--detail-field`; listing values win over detail values. Failures land in `_detail_error` (`{kind, message}`). |
 | `--detail-field NAME=SEL` | — | Field read from the detail page (same syntax). |
-| `--limit N` | `1000` | Max records. `--unique FIELD` drops repeats of FIELD. `--max-time S` (300) bounds the run. |
+| `--limit N` | `1000` | Max records. `--unique FIELD` drops repeats of FIELD. `--max-time S` (300) bounds the run (each request's timeout shrinks to the remaining budget, and no retry crosses it). |
 | `-f json\|jsonl\|csv\|markdown` | `json` | `json`: `{count, records, pages, stats}`; `jsonl`: one record per line; `csv`: UTF-8 with header (lists as JSON strings); `markdown`: pipe table (hidden `_` columns, cells cut at 200 chars). |
 | `-o FILE` | stdout | Write to FILE; stdout gets `saved: …`. |
 | `--no-meta` | off | Omit `_page` (the listing URL each record came from). |
@@ -120,9 +121,9 @@ and the field diagnostics; errors are one `error:` line.
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | 0 | Records found (`--probe`: something to show). Check `stats.notes` for fields that never matched. | Use them; mention partial fields. |
-| 1 | No records: the selector matched nothing, the table/type does not exist, or `--probe` found no repeating blocks. The message says how many elements `--item` matched. | `--probe`, look at `web-extract URL -f html` or `--raw`, fix the selector; `--render always` for client-rendered lists. Do not retry unchanged. |
-| 2 | Bad input: no record definition, two of `--item/--json-ld/--table`, bad field spec/selector/modifier, `--follow` without `--detail-field` or naming an unknown field, `--render always` without Playwright, `web-extract` missing. | Fix the arguments. |
-| 3 / 4 / 5 / 6 / 7 | The first listing page failed: HTTP error / bot wall or 429 / not HTML / network / unexpected. Same kinds as `web-extract`. | 4: stop, say it is blocked; 3/6: check the URL; 5: this is a file, use `web-extract`. |
+| 1 | No records: the selector matched nothing, the table/type does not exist, or `--probe` found no repeating blocks, tables or JSON-LD. The message says how many elements `--item` matched. | `--probe`, look at `web-extract URL -f html` or `--raw`, fix the selector; `--render always` for client-rendered lists. Do not retry unchanged. |
+| 2 | Bad input: no record definition, two of `--item/--json-ld/--table`, bad field spec/selector/modifier (also an XPath that fails when evaluated), `--table 0`, `--actions`/`--render-wait` with `--render off`, `--follow` without `--detail-field` or naming an unknown field, `--render always` without Playwright, `web-extract` missing. | Fix the arguments. |
+| 3 / 4 / 5 / 6 / 7 | The first listing page failed: HTTP error / bot wall or 429 / not HTML / network; 7 = any unexpected error (e.g. `-o` not writable), one `error:` line. Same kinds as `web-extract`. | 4: stop, say it is blocked; 3/6: check the URL; 5: this is a file, use `web-extract`. |
 
 ## Workflow for the agent
 
@@ -156,9 +157,9 @@ and the field diagnostics; errors are one `error:` line.
 
 ## Limitations
 
-- CSS selectors are cssselect's (CSS 3 plus `:first-child`, `:nth-child`,
-  attribute selectors; no `:has()`, no `:contains()`). Use `xpath:` for text
-  conditions: `xpath:.//a[contains(., "Download")]/@href`.
+- CSS selectors are cssselect's: CSS 3 plus `:contains("text")`, `:has()`,
+  `:is()`/`:where()`, `:nth-child`, attribute selectors; `xpath:` remains for
+  anything else (`xpath:.//a[contains(., "Download")]/@href`).
 - Numbers use heuristics for thousands/decimal separators; ambiguous
   `1,234` is read as 1234, `12,5` as 12.5. Dates: English month names only.
 - JSON-LD is what the site publishes (may be incomplete, stale or marketing);
@@ -172,8 +173,13 @@ and the field diagnostics; errors are one `error:` line.
 - Client-rendered lists need the optional browser; `auto` detects them by the
   script-to-text ratio and renders when nothing matched. Rendered pages
   reflect one visit.
-- Detail pages are fetched once each, first 200 records, same site or not;
-  no login, no forms.
+- Detail pages: first 200 records, each distinct URL fetched once, same site
+  or not; no login, no forms. Relative `--follow` URLs are resolved against
+  the listing page. `--follow` and `--next` only open http(s) URLs, and never
+  loopback/LAN/internal hosts unless the record's start URL is one itself
+  (those land in `_detail_error` / a `stats.notes` line instead). Hosts are
+  judged by name or IP literal; names are not resolved, so a public name that
+  points at a private address is not caught.
 
 ## Chaining
 
