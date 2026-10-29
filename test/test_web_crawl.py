@@ -9,9 +9,12 @@ as a subprocess so exit codes and output formats are tested end to end.
 import gzip
 import http.server
 import json
+import os
+import shutil
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -103,6 +106,46 @@ def run(*args, timeout=120):
     return p.returncode, p.stdout, p.stderr
 
 
+@pytest.fixture
+def mini_server():
+    """Start a throwaway server for a routes dict {path: (status, content-type, body[, delay_s])}; `{origin}` in bodies is replaced."""
+    servers = []
+
+    def start(routes):
+        class H(http.server.BaseHTTPRequestHandler):
+            hits: list[str] = []
+
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                H.hits.append(self.path)
+                status, ctype, body, *delay = routes.get(self.path.split("?", 1)[0], (404, "text/html", b"<html><body>nope</body></html>"))
+                if delay:
+                    time.sleep(delay[0])
+                body = body.replace(b"{origin}", f"http://{self.headers['Host']}".encode())
+                try:
+                    self.send_response(status)
+                    if ctype == "redirect":
+                        self.send_header("Location", body.decode())
+                        body = b""
+                    self.send_header("Content-Type", ctype)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except OSError:  # client gave up (timeout test)
+                    pass
+
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        servers.append(srv)
+        return f"http://127.0.0.1:{srv.server_address[1]}", H.hits
+
+    yield start
+    for srv in servers:
+        srv.shutdown()
+
+
 def run_json(*args):
     rc, out, err = run(*args, "-f", "json")
     return rc, json.loads(out), err
@@ -124,7 +167,10 @@ def test_page_links_resolves_filters_and_dedupes():
             b"<a href='https://other.example/z?utm_source=t'>o</a><area href='/area'></body></html>")
     links = cw.page_links(body, "https://site.example/dir/page")
     assert links == ["https://site.example/sub/p2", "https://site.example/sub/a", "https://site.example/up", "https://other.example/z", "https://site.example/area"]
-    assert cw.page_links(b"\xff\xfe not html", "https://x.example/") == [] or isinstance(cw.page_links(b"", "https://x.example/"), list)
+    assert cw.page_links(b"\xff\xfe not html", "https://x.example/") == []
+    assert cw.page_links(b"", "https://x.example/") == []
+    assert cw.page_links(b"<a href='http://localhost:PORT/api'>x</a><a href='/ok'>y</a>", "https://x.example/") == ["https://x.example/ok"]
+    assert cw.page_links(b"<link rel='alternate' hreflang='de' href='/de/'><link rel='next' href='/p2'>", "https://x.example/") == ["https://x.example/p2"]
     assert cw.slug_for("https://x.example/docs/a b/c?x=1") == "docs-a-b-c-x-1.md" and cw.slug_for("https://x.example/") == "index.md"
 
 
@@ -214,8 +260,130 @@ def test_start_url_failures_set_exit_code(server):
     assert rc == 6 and data["failed"][0]["error"]["code"] == 6
 
 
+def test_robots_403_and_5xx_disallow_all(mini_server):
+    origin, hits = mini_server({"/robots.txt": (403, "text/plain", b"no"), "/": (200, "text/html", SITE["/about"])})
+    rc, data, _ = run_json(f"{origin}/", "--no-sitemap")
+    assert rc == 4 and data["failed"][0]["error"]["kind"] == "robots_disallow" and "/" not in hits
+    origin, hits = mini_server({"/robots.txt": (503, "text/plain", b"down"), "/": (200, "text/html", SITE["/about"])})
+    rc, data, _ = run_json(f"{origin}/", "--no-sitemap")
+    assert rc == 4 and data["failed"][0]["error"]["kind"] == "robots_unreachable" and "/" not in hits
+    assert any("RFC 9309" in n for n in data["stats"]["notes"])
+
+
+def test_crawl_delay_is_capped(mini_server):
+    origin, _ = mini_server({"/robots.txt": (200, "text/plain", b"User-agent: *\nCrawl-delay: 20\n"), "/": (200, "text/html", SITE["/about"])})
+    rc, data, _ = run_json(f"{origin}/", "--no-sitemap", "--depth", "0")
+    assert rc == 0 and any("Crawl-delay 20s: waiting 10s" in n and "capped" in n for n in data["stats"]["notes"])
+
+
+def test_markdown_stdout_is_truncated(mini_server):
+    big = page("Big", "".join(f"<p>Paragraph {i} " + "with plenty of words in it " * 12 + "</p>" for i in range(400)))
+    origin, _ = mini_server({"/": (200, "text/html", big)})
+    rc, out, err = run(f"{origin}/", "--no-sitemap", "--depth", "0")
+    assert rc == 0 and len(out) < 61_000 and "[truncated: showed " in out and "output truncated" in err
+
+
+def test_missing_web_extract_and_override(tmp_path):
+    script = tmp_path / "a" / "b" / "scripts" / "crawl.py"
+    script.parent.mkdir(parents=True)
+    shutil.copy(SCRIPT, script)
+    (tmp_path / "home").mkdir()
+    env = {k: v for k, v in os.environ.items() if k != "WEB_EXTRACT_SCRIPT"} | {"HOME": str(tmp_path / "home"), "USERPROFILE": str(tmp_path / "home")}
+    p = subprocess.run([sys.executable, str(script), "--help"], check=False, capture_output=True, text=True, env=env, cwd=tmp_path, timeout=60)
+    assert p.returncode == 2 and "web-extract skill was not found" in p.stderr
+    env["WEB_EXTRACT_SCRIPT"] = str(ROOT / "skills" / "web-extract" / "scripts" / "extract.py")
+    p = subprocess.run([sys.executable, str(script), "--help"], check=False, capture_output=True, text=True, env=env, cwd=tmp_path, timeout=60)
+    assert p.returncode == 0 and "--max-pages" in p.stdout
+
+
+def test_max_time_bounds_wall_clock(mini_server):
+    routes = {"/": (200, "text/html", page("Home", PARA, [f"/slow/{i}" for i in range(8)]))}
+    routes |= {f"/slow/{i}": (200, "text/html", page(f"Slow {i}", PARA), 6) for i in range(8)}
+    origin, _ = mini_server(routes)
+    t0 = time.monotonic()
+    rc, data, _ = run_json(f"{origin}/", "--no-sitemap", "--no-robots", "--max-time", "2", "--timeout", "3", "--concurrency", "2")
+    wall = time.monotonic() - t0
+    assert rc == 0 and data["count"] == 1
+    assert data["stats"]["elapsed_s"] <= 2 + 3 and wall < 2 + 3 + 5  # budget + one request timeout (+ interpreter start-up)
+    assert any(n.startswith("stopped: max_time") for n in data["stats"]["notes"])
+
+
+def test_sitemap_comment_offsite_and_ports(mini_server):
+    other, other_hits = mini_server({"/internal.xml": (200, "application/xml", b"<urlset><url><loc>http://10.0.0.1/x</loc></url></urlset>")})
+    sm = b"<?xml version='1.0'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'><!-- generated --><?pi x?><url><loc>{origin}/from-sitemap</loc></url></urlset>"
+    home = page("Home", PARA, ["http://localhost:PORT/api", "/next", f"{other}/elsewhere"])
+    origin, _ = mini_server({
+        "/robots.txt": (200, "text/plain", f"User-agent: *\nSitemap: {{origin}}/sm.xml\nSitemap: {other}/internal.xml\n".encode()),
+        "/sm.xml": (200, "application/xml", sm), "/": (200, "text/html", home),
+        "/next": (200, "text/html", page("Next", PARA + "<p>Next page.</p>")),
+        "/from-sitemap": (200, "text/html", page("From sitemap", PARA + "<p>Sitemap page.</p>"))})
+    rc, data, _ = run_json(f"{origin}/")
+    urls = {p["url"] for p in data["pages"]}
+    assert rc == 0 and urls == {f"{origin}/", f"{origin}/next", f"{origin}/from-sitemap"}
+    assert other_hits == [] and any("internal.xml: off-site, skipped" in n for n in data["stats"]["notes"])
+    assert data["stats"]["skipped"]["other_port"] == 1  # same host 127.0.0.1, other server's port
+    rc, out, _ = run(f"{origin}/", "--map", "-f", "jsonl")
+    rows = [json.loads(ln) for ln in out.splitlines()]
+    assert rc == 0 and {"url": f"{origin}/next", "title": "Next"} in rows and "stats" in rows[-1] and len(rows) == 4
+
+
+def test_max_requests_budget(mini_server):
+    origin, hits = mini_server({"/": (200, "text/html", page("Home", PARA, [f"/dead/{i}" for i in range(20)]))})
+    rc, data, _ = run_json(f"{origin}/", "--no-sitemap", "--max-requests", "4", "--concurrency", "1")
+    assert rc == 0 and data["stats"]["requests"] == 4 and len(data["failed"]) == 3
+    assert sum(h.startswith("/dead/") for h in hits) == 3 and any(n.startswith("stopped: max_requests") for n in data["stats"]["notes"])
+
+
+def test_robots_disallowed_links_do_not_use_request_budget(mini_server):
+    home = page("Home", PARA, [f"/search/{i}" for i in range(20)] + [f"/doc/{i}" for i in range(3)])
+    routes = {"/robots.txt": (200, "text/plain", b"User-agent: *\nDisallow: /search/\n"), "/": (200, "text/html", home)}
+    routes |= {f"/doc/{i}": (200, "text/html", page(f"Doc {i}", PARA + f"<p>Document number {i} text.</p>")) for i in range(3)}
+    origin, hits = mini_server(routes)
+    rc, data, _ = run_json(f"{origin}/", "--no-sitemap", "--max-pages", "5")
+    assert rc == 0 and data["count"] == 4 and data["stats"]["requests"] == 4
+    assert not any(h.startswith("/search/") for h in hits) and sum(f["error"]["kind"] == "robots_disallow" for f in data["failed"]) == 20
+
+
+def test_slow_robots_respects_max_time_and_reports_cause(mini_server):
+    origin, hits = mini_server({"/robots.txt": (200, "text/plain", b"User-agent: *\n", 8), "/": (200, "text/html", SITE["/about"])})
+    rc, data, err = run_json(f"{origin}/", "--no-sitemap", "--max-time", "2")
+    assert rc == 6 and data["stats"]["elapsed_s"] <= 3.5 and "/" not in hits
+    assert data["failed"][0]["error"]["kind"] == "robots_unreachable" and "error: start URL failed (robots_unreachable)" in err
+
+
+def test_slow_sitemap_spends_budget_before_start(mini_server):
+    origin, hits = mini_server({"/robots.txt": (200, "text/plain", b"User-agent: *\nSitemap: {origin}/sm.xml\n"),
+                                "/sm.xml": (200, "application/xml", b"<urlset></urlset>", 8), "/": (200, "text/html", SITE["/about"])})
+    rc, data, err = run_json(f"{origin}/", "--max-time", "2")
+    assert rc == 6 and data["failed"][0]["error"]["kind"] == "max_time" and "before the start URL was fetched" in err and "/" not in hits
+
+
+def test_start_redirect_to_other_port_keeps_links(mini_server):
+    target, _ = mini_server({"/": (200, "text/html", page("Home", PARA, ["/next"])),
+                             "/next": (200, "text/html", page("Next", PARA + "<p>Next page.</p>"))})
+    origin, _ = mini_server({"/": (302, "redirect", f"{target}/".encode())})
+    rc, data, _ = run_json(f"{origin}/", "--no-sitemap", "--no-robots")
+    assert rc == 0 and {p["title"] for p in data["pages"]} == {"Home", "Next"}
+
+
+def test_output_probe_creates_nothing(server, tmp_path):
+    ns = lambda out=None, out_dir=None: cw.argparse.Namespace(out=out, out_dir=out_dir)  # noqa: E731
+    assert cw.check_writable(ns(out=str(tmp_path / "new" / "deeper" / "site.md"))) is None
+    assert cw.check_writable(ns(out_dir=str(tmp_path / "pages" / "sub"))) is None
+    assert sorted(tmp_path.iterdir()) == []  # the probe created no directories
+    blocker = tmp_path / "file.txt"
+    blocker.write_text("x")
+    assert cw.check_writable(ns(out=str(blocker / "x.md"))) is not None
+    assert cw.check_writable(ns(out_dir=str(blocker))) is not None
+    rc, _, err = run(f"{server}/", "--no-sitemap", "-o", str(blocker / "x.md"))
+    assert rc == 2 and "error: cannot write" in err
+
+
 def test_bad_arguments_exit2():
     assert run("not a url")[0] == 2
+    assert run("http://example.com:abc/")[0] == 2
+    assert run("https://example.com/", "--map", "--out-dir", "d")[0] == 2
+    assert run("https://example.com/", "--max-requests", "0")[0] == 2
     assert run("https://example.com/", "--depth", "-1")[0] == 2
     assert run("https://example.com/", "--include", "(")[0] == 2
     assert run("https://example.com/", "-o", "a.md", "--out-dir", "d")[0] == 2
