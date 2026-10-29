@@ -19,8 +19,10 @@ everywhere.
 |-------|--------------|
 | [`youtube-search`](skills/youtube-search) | Searches YouTube without an API key and returns title, channel, **publish date, view count, duration** and URL. Sort by date/views, filter by period, duration, min views, channel. Triggers when the user wants to find videos on a topic or needs a video to summarise but has no link. |
 | [`youtube-transcript`](skills/youtube-transcript) | Fetches a YouTube video's transcript (captions) as text, timestamps, SRT or JSON via the free, key-less `youtube-transcript-api`. Triggers on YouTube links when the user wants a transcript, summary, notes or translation. |
+| [`web-extract`](skills/web-extract) | Fetches a web page from the user's own machine with a browser-grade TLS fingerprint (`curl_cffi`) and returns its **main content as Markdown, text or JSON** (title, author, date, links) via `trafilatura`; falls back to the newest **Wayback Machine** snapshot when the page is blocked, gone or unreachable. Triggers when the user shares a URL to read, summarise or quote, or when the built-in fetch tool got 403, "Just a moment" or an empty page. |
 
-The two chain naturally: search → pick a video by date/views/length → transcript → summary.
+They chain naturally: search → pick a video by date/views/length → transcript →
+summary; and the links in a video's `--details` description go to `web-extract`.
 
 ## Requirements
 
@@ -128,6 +130,7 @@ skills/
     ├── SKILL.md        # frontmatter (name, description, …) + instructions
     ├── scripts/        # executable helpers the agent runs (optional)
     └── references/     # longer docs loaded on demand (optional)
+test/                   # pytest suites for the scripts (uv run --with pytest python -m pytest test)
 ```
 
 `SKILL.md` follows the [Agent Skills specification](https://agentskills.io/specification):
