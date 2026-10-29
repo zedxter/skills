@@ -1,21 +1,27 @@
 # web-extract reference
 
 Detail behind `SKILL.md`: the fetch pipeline, the warning vocabulary, how bot
-walls are detected, what the archive fallback does, and the extraction
-post-processing. Nothing here changes how the script is invoked.
+walls are detected, the browser render, what the archive fallback does, PDF,
+structured data, change tracking and the extraction post-processing. Nothing
+here changes how the script is invoked.
 
 ## Fetch pipeline
 
 ```
-live GET ──ok──▶ extract ──text──▶ output (source=live)
-   │                └─ empty ──▶ retry with recall ──▶ still empty → exit 1 ──▶ --jina? ──▶ jina
+live GET (curl_cffi; or Chromium with --render always)
+   ├─ ok ──▶ HTML: extract ──text──▶ output (source=live | browser)
+   │          │     └─ empty, or < 50 words beside heavy scripts ──▶ --render auto + browser installed?
+   │          │                 ├─ yes ──▶ Chromium render ──more words──▶ output (source=browser, live_error=js_shell)
+   │          │                 │                          └─ not better / failed ──▶ fallback_errors, go on
+   │          │                 └─ no ──▶ exit 1 ──▶ --jina? ──▶ jina
+   │          └─ PDF: pypdf text layer ──▶ output (content_format=text, pages) · no text → exit 1
    ├─ blocked (4, not redirect_to_private), HTTP error (3, not 401), network (6)
    │        └──▶ Wayback CDX: newest text/html 200 captures (up to 3), raw `id_` bytes
    │                 ├─ snapshot with challenge markers or < 100 words ──▶ next candidate
    │                 ├─ usable snapshot ──▶ output (source=wayback)
    │                 └─ no snapshot / all unusable / archive down ──▶ --jina? ──▶ jina
    │                                                                      └─ no ──▶ exit with the live code
-   └─ not HTML (5), bad input (2), 401, redirect into a private host ──▶ no fallback
+   └─ other binary (5), bad input (2), 401, redirect into a private host ──▶ no fallback
 ```
 
 - One HTTP session per run (curl_cffi), reused for every URL and fallback.
@@ -84,6 +90,9 @@ names with a hint):
 | `binary_saved` | `--raw -o` wrote a binary body; `content` is empty, `saved_to` names the file. | no |
 | `feed` | RSS/Atom feed returned as raw XML. | no |
 | `author_dropped` | trafilatura reported an author that looked like a page element, a date token or the site name; it was discarded. | no |
+| `pages_truncated` | PDF text stopped after 500 pages. | no |
+| `action_failed` | An `--actions` step (or the screenshot) failed: selector not found, timeout, unwritable path. The page was read anyway; the `note:` names the step. | no |
+| `human_timeout` | `--headful`: the bot check / interstitial was still showing when the wait ran out; the content is that interstitial. | no |
 
 `fallback_errors` examples: `wayback-cdx: no snapshot`, `wayback-cdx: HTTP 403
 (archive.org restricts CDX lookups for this domain; snapshot index
@@ -119,6 +128,125 @@ Observed on real sites (2026-10): dblp.org serves an Anubis challenge (HTTP
 202) to a datacenter IP; rumble.com answered 200 with impersonation and 403
 without from one network on one day; rewe.de returns a 251 KB normal-looking
 body under `cf-mitigated: challenge`. Results depend on IP reputation.
+
+## Browser render (`--render`)
+
+- Dependency: the `playwright` Python package (not in the script's inline
+  metadata, so plain runs stay light) plus Chromium's headless shell
+  (`playwright install chromium-headless-shell`, ~100 MB under the user's
+  cache; `playwright install chromium` for `--headful`, which needs the full
+  browser). `uv run --with playwright scripts/extract.py …` is the simplest
+  invocation; `pip install playwright` works too. Playwright and the browser
+  build must match, so reinstall the shell after upgrading the package.
+- `auto` (default) renders only when the HTTP response was HTML and either the
+  extraction returned nothing (exit 1) or under 50 words while `<script>`
+  bytes exceed half the body (`Signals.dynamic`). The render replaces the
+  HTTP result only when it has more words; otherwise a `note:` says so and the
+  HTTP result stands. Without Playwright a `note:` names the install command
+  and nothing else changes. `always` fetches through the browser from the
+  start and skips the curl_cffi request; `off` never launches one.
+- Loading: `goto` waits for `domcontentloaded`, then `load` (up to
+  `--timeout`), then `networkidle` for at most min(10 s, timeout/3); sites
+  that poll never reach idle, so that wait is best-effort. `--actions` run
+  next, each step bounded by `--timeout`; `--render-wait` sleeps; the
+  screenshot is taken; the DOM is serialised (`page.content()`, UTF-8). The
+  final main-frame navigation response supplies `status` and headers, so a
+  human-passed challenge ends with the real page's status. Headless renders
+  abort image, media and font requests; `--headful` loads everything.
+- Identification: headless renders use Chromium's own `HeadlessChrome/…`
+  `User-Agent` with ` web-extract/1.0 (+https://github.com/zedxter/skills)`
+  appended; `--headful` keeps the stock `User-Agent` because a person is
+  browsing. No stealth patches, no fingerprint spoofing: a wall that blocks
+  headless Chromium stays blocked (exit 4 as usual).
+- `--headful` waits while `classify()` still sees something a human can pass
+  on the current DOM (a bot wall, exit-4 kind, a 401 login, or
+  `challenge_suspected`; not 404/5xx), polling every second for up to
+  max(`--timeout`, 120) s, then reads whatever is there (`human_timeout` if
+  the wall never went away). It is a human-in-the-loop, not a solver.
+- `--profile DIR` uses `launch_persistent_context`: cookies, local storage and
+  logins persist in plain files under DIR. Headless runs with a profile carry
+  the project token in the `User-Agent` like any headless render. Chromium
+  holds a lock on the profile: one run at a time. Add `--no-wayback`: a
+  failing logged-in URL would otherwise be looked up on archive.org.
+- `--proxy user:pass@host` credentials are passed to Chromium as separate
+  proxy username/password. A failed `type` action is reported with the typed
+  text replaced by its length.
+- A non-HTML main response (JSON, plain text) under `--render always` is
+  returned as the server's bytes, not Chromium's viewer page.
+- Errors are mapped like curl's: `net::ERR_NAME_NOT_RESOLVED` → 6 `dns`,
+  `ERR_CERT_*`/`ERR_SSL_*` → 6 `tls`, `ERR_CONNECTION_*` and friends → 6
+  `connection`, Playwright timeouts → 6 `timeout`, `ERR_TOO_MANY_REDIRECTS` →
+  6 `redirects`, `ERR_ABORTED` or Playwright's `Download is starting` (a download) → 5, missing browser or system
+  libraries → 2 with the install command, anything else → 7. The same
+  private-host redirect rule as the HTTP path applies (exit 4
+  `redirect_to_private`, body discarded).
+- Cost: one fresh browser per URL, roughly 1–3 s plus the page's own load time;
+  `--render always` on a batch of URLs launches one per URL. For a page-by-page
+  session (log in, navigate, read several pages) use the `web-browse` skill.
+
+## PDF
+
+- Any body that is `application/pdf` or starts with `%PDF-` (whatever the
+  declared type) goes to `pypdf`, not to exit 5: `extract_text()` per page,
+  first 500 pages (`pages_truncated` beyond), pages joined with
+  `--- page N ---` lines when there are several, runs of blank lines
+  collapsed. `content_format` is `text`, `pages` the page count, `coverage`
+  null.
+- Metadata: `/Title` (else the file name from the URL), `/Author`,
+  `/CreationDate` or `/ModDate` as `YYYY-MM-DD`, `/Subject` as
+  `description`. Scanned PDFs (no text at all) are exit 1
+  `nothing_extracted`; password-protected or corrupt files are exit 5 with a
+  `--raw -o FILE` hint; an empty password is tried first. `--raw` bypasses
+  pypdf and passes the bytes through as before.
+- A PDF larger than the 10 MB body cap arrives cut, and pypdf needs the
+  trailer at the end of the file: exit 5 `too_large`, no parse attempt
+  (`--raw -o` would save the same truncated copy; use a download tool).
+- Known limits: reading order is the PDF's internal order (multi-column
+  layouts may interleave), ligatures and hyphenation follow the font, no OCR,
+  no form fields. The Wayback fallback filters `mimetype:text/html`, so an
+  archived PDF is only reached with `--raw` (which disables that filter).
+
+## Structured data (`--structured`)
+
+Collected from the full fetched HTML (not only the main content), after the
+same byte-level parsing the extractor uses, and placed in `structured`:
+
+- `json_ld`: every `<script type="application/ld+json">` parsed (HTML comment
+  and CDATA wrappers stripped, lists flattened, invalid JSON skipped), first
+  20 objects, `truncated: true` beyond. Values are whatever the site
+  published: untrusted and possibly stale.
+- `opengraph`: `og:*`, `article:*`, `twitter:*`, `fb:*`, `al:*` meta tags,
+  first occurrence wins. `meta`: `description`, `keywords`, `author`,
+  `robots`, `generator`, `application-name`, `citation_*`, `dc.*`,
+  `canonical` (absolute) and `feeds` (RSS/Atom/oEmbed `<link rel=alternate>`).
+- `tables`: each `<table>` with 2+ rows and 2+ columns as `headers` (the
+  first row when it is all `<th>`, else null), `rows` (cell text, whitespace
+  collapsed; first 500 rows, `row_count` and `truncated` tell), `caption`.
+  Nested tables contribute their rows to the outer one. First 50 tables.
+- In markdown/text output the JSON-LD, OpenGraph and meta parts are appended
+  under `## Structured data` as a fenced JSON block (capped at 20 000 chars);
+  tables are not repeated because the body already has them as pipe tables.
+  The block is also filled on exit 1 (a JavaScript shell usually still ships
+  its JSON-LD and OpenGraph).
+
+## Change tracking (`--track`)
+
+- Store: one JSON file per URL (`sha256(url)[:32].json`: `url`, `fetched_at`,
+  `source`, `final_url`, full `content` before any `--max-chars` cut) under
+  `$WEB_EXTRACT_CACHE/track`, else `$XDG_CACHE_HOME`/`~/.cache/web-extract/track`
+  (`%LOCALAPPDATA%\web-extract\track` on Windows). Nothing leaves the machine.
+  The track store holds the full extracted text of every tracked URL
+  (logged-in pages included), so the directory is created 0700 and files 0600.
+- `change.status`: `new` (no stored copy), `same` (identical `content`),
+  `changed` (unified diff, one line of context, `added`/`removed` counts,
+  truncated at 20 000 chars with `diff_truncated`). `previous` is the stored
+  copy's `fetched_at`; `store` the file path. The new content is written after
+  comparing, so the next run compares against this one. Failed results are not
+  stored and get `change: null`.
+- Comparison is on the extracted text in the format requested (`markdown`
+  vs `text` runs are different texts), so keep the flags stable between runs.
+  Boilerplate that survives extraction (dates in bylines, view counters)
+  shows up as changes; `--precision` reduces that.
 
 ## Wayback fallback
 

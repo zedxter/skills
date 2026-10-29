@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["curl_cffi>=0.17,<1", "trafilatura>=2.3,<3", "lxml_html_clean"]
+# dependencies = ["curl_cffi>=0.17,<1", "trafilatura>=2.3,<3", "lxml_html_clean", "pypdf>=5,<7"]
 # ///
 """Fetch a web page and print its main content as Markdown, text, JSON or HTML.
 
 Fetches with curl_cffi (browser-grade TLS fingerprint, honest User-Agent) and
-extracts the main content with trafilatura. When the live page is blocked, gone
+extracts the main content with trafilatura; PDFs are read with pypdf. When the
+page is a JavaScript shell it is rendered in a local headless Chromium
+(optional Playwright dependency, --render); when the live page is blocked, gone
 or unreachable it falls back to the newest Wayback Machine snapshot; with --jina
 it may, as a last resort, ask the third-party r.jina.ai reader.
 Works on macOS, Linux and Windows.
 
 Run with uv (installs the dependencies automatically):
     uv run extract.py URL [URL ...] [options]
-Or with plain Python after `pip install curl_cffi trafilatura lxml_html_clean`:
+    uv run --with playwright extract.py URL --render always   # after: uv run --with playwright playwright install chromium-headless-shell
+Or with plain Python after `pip install curl_cffi trafilatura lxml_html_clean pypdf`:
     python3 extract.py URL [URL ...] [options]
 
 Exit codes:
@@ -23,21 +26,26 @@ Exit codes:
 """
 
 import argparse
+import difflib
 import email.utils
+import hashlib
 import html
+import io
 import ipaddress
 import json
+import logging
 import os
 import re
 import socket
 import sys
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
-PIP_HINT = "pip install curl_cffi trafilatura lxml_html_clean, or run with uv run"
+PIP_HINT = "pip install curl_cffi trafilatura lxml_html_clean pypdf, or run with uv run"
 try:
     from curl_cffi import CurlOpt, requests
     from curl_cffi.requests import exceptions as cx
@@ -64,6 +72,16 @@ MAX_LINKS = 500
 DEFAULT_MAX_CHARS = 60_000
 CDX_URL = "https://web.archive.org/cdx/search/cdx"
 JINA_URL = "https://r.jina.ai/"
+PLAYWRIGHT_HINT = ("the optional headless browser is not available — run the script with `uv run --with playwright` "
+                   "(or `pip install playwright`) and once `playwright install chromium-headless-shell` (~100 MB)")
+PLAYWRIGHT_HEADFUL_HINT = ("--headful needs the full Chromium build, not the headless shell — run once "
+                           "`uv run --with playwright playwright install chromium` (full browser, needed for --headful)")
+RENDER_BLOCKED_RESOURCES = {"image", "media", "font"}  # never needed for the DOM; skipped in headless renders
+RENDER_HUMAN_WAIT = 120.0  # --headful: minimum seconds to wait for a human to pass a bot check or log in
+ACTION_KINDS = {"wait": (int, float), "wait_for": str, "click": str, "type": str, "press": str, "scroll": int}
+MAX_PDF_PAGES = 500
+MAX_TABLES, MAX_TABLE_ROWS, MAX_JSON_LD = 50, 500, 20
+MAX_DIFF_CHARS = 20_000
 PLAIN_HEADERS = {  # sent only with --impersonate none (browser profiles bring their own)
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
@@ -114,7 +132,7 @@ CONSENT_PHRASES = re.compile(
     r"|ihre privatsph[äa]re ist uns wichtig|before you continue|cookie-richtlinie|cookie policy", re.I)
 WARNING_HINTS = {
     "low_coverage": "extraction is far below the page's paragraph text; try --recall, compare words with para_words, --raw to see what was dropped",
-    "js_shell": "JavaScript app; body is a shell, try --links for a data URL or --jina",
+    "js_shell": "JavaScript app; body is a shell, try --render always (local headless browser), --links for a data URL or --jina",
     "links_pruned": "most of the page's anchors were outside the main content (link lists / index pages are removed as boilerplate); use --raw to see every href",
     "consent_wall": "cookie/consent interstitial, not the article — try --wayback or the user's browser",
     "truncated": "rerun with -o FILE to get everything", "size_limit": "body cut at 10 MB",
@@ -122,6 +140,9 @@ WARNING_HINTS = {
     "third_party": "content came from r.jina.ai", "links_truncated": f"first {MAX_LINKS} links kept",
     "redirected": "final host differs from the requested one; check # url",
     "downgraded": "https request ended on plain http", "feed": "RSS/Atom feed returned as raw XML",
+    "pages_truncated": f"PDF text stopped after {MAX_PDF_PAGES} pages",
+    "action_failed": "an --actions step failed (see the note: line); the page was read anyway",
+    "human_timeout": "the bot check was still showing when the --headful wait ran out",
 }
 HEADER_WARNINGS = set(WARNING_HINTS) | {"short", "binary_saved"}
 NO_RETRY_SUFFIX = "do not retry in a loop"
@@ -151,6 +172,9 @@ class Fetched:
     truncated: bool = False
     redirected: bool = False
     downgraded: bool = False  # https request ended on plain http
+    screenshot: str | None = None  # --screenshot path written by the browser render
+    action_errors: list[str] = field(default_factory=list)  # failed --actions steps (browser render)
+    human_timeout: bool = False  # --headful: the challenge never went away
 
     @property
     def ctype(self) -> str:
@@ -643,6 +667,463 @@ def fetch(session: Any, url: str, *, timeout: float, attempts: int = 2, headers:
     return Diag(EXIT_OTHER, "other", "no attempts made")  # unreachable
 
 
+# -------------------------------------------------------------------- browser
+
+def playwright_api() -> tuple[Any, str | None]:
+    """The Playwright sync API module, or (None, reason) when the optional dependency is missing."""
+    try:
+        import playwright.sync_api as pw
+    except ImportError:
+        return None, PLAYWRIGHT_HINT
+    return pw, None
+
+
+def parse_actions(text: str | None) -> list[dict[str, Any]] | str:
+    """Validate --actions JSON: a list of single-step objects. Returns the list, or an error message.
+
+    >>> parse_actions('[{"click": "#more"}, {"type": "input[name=q]", "text": "cats"}, {"press": "Enter"}, {"wait_for": ".results"}, {"wait": 1.5}, {"scroll": 3}]')[5]
+    {'scroll': 3}
+    >>> parse_actions('{"wait": 2}'), parse_actions(None)
+    ([{'wait': 2}], [])
+    >>> parse_actions('[{"hover": "x"}]'), parse_actions('[{"type": "input"}]'), parse_actions('[{"scroll": 99}]'), parse_actions('nope')[:9]
+    ('--actions step 1: unknown step "hover" (known: click, press, scroll, type, wait, wait_for)', '--actions step 1: "type" needs a "text" string', '--actions step 1: "scroll" must be an integer 1-50', '--actions')
+    """
+    if not text:
+        return []
+    try:
+        steps = json.loads(text)
+    except ValueError as e:
+        return f"--actions is not valid JSON: {e}"
+    if isinstance(steps, dict):
+        steps = [steps]
+    if not isinstance(steps, list):
+        return "--actions must be a JSON list of step objects"
+    out: list[dict[str, Any]] = []
+    for i, step in enumerate(steps, 1):
+        if not isinstance(step, dict) or not step:
+            return f"--actions step {i}: must be a non-empty object"
+        kinds = [k for k in step if k != "text"]
+        if len(kinds) != 1 or kinds[0] not in ACTION_KINDS:
+            name = kinds[0] if len(kinds) == 1 else ", ".join(kinds)
+            return f'--actions step {i}: unknown step "{name}" (known: {", ".join(sorted(ACTION_KINDS))})'
+        kind, val = kinds[0], step[kinds[0]]
+        if kind == "wait":
+            if isinstance(val, bool) or not isinstance(val, (int, float)) or not 0 <= val <= 120:
+                return f'--actions step {i}: "wait" must be seconds between 0 and 120'
+        elif kind == "scroll":
+            if isinstance(val, bool) or not isinstance(val, int) or not 1 <= val <= 50:
+                return f'--actions step {i}: "scroll" must be an integer 1-50'
+        elif not isinstance(val, str) or not val.strip():
+            return f'--actions step {i}: "{kind}" needs a non-empty selector/key string'
+        if kind == "type" and not isinstance(step.get("text"), str):
+            return f'--actions step {i}: "type" needs a "text" string'
+        out.append({kind: val, "text": step["text"]} if kind == "type" else {kind: val})
+    return out
+
+
+def browser_error(e: Exception, url: str, timeout: float, headful: bool = False) -> Diag:
+    """Map a Playwright/Chromium failure onto the script's exit codes.
+
+    >>> browser_error(Exception("Executable doesn't exist at /x/chromium-1200/chrome-linux/chrome"), "https://a.example/", 5).message.endswith("for --headful)")
+    True
+    >>> "headless-shell" in browser_error(Exception("Executable doesn't exist at /x/chromium_headless_shell-1200/x"), "https://a.example/", 5).message
+    True
+    >>> browser_error(Exception("Page.goto: Download is starting"), "https://a.example/a.pdf", 5).kind
+    'non_html'
+    """
+    msg = (str(e).splitlines() or [type(e).__name__])[0].strip()
+    m = re.search(r"net::(ERR_[A-Z_0-9]+)", str(e))
+    code = m.group(1) if m else ""
+    if "Executable doesn't exist" in str(e) or "playwright install" in str(e):
+        full = "chromium-" in str(e) and "headless_shell" not in str(e)  # path of the full build, not the shell
+        return Diag(EXIT_BAD_INPUT, "bad_input",
+                    f"browser not installed: {PLAYWRIGHT_HEADFUL_HINT if headful or full else PLAYWRIGHT_HINT}")
+    if "shared libraries" in str(e) or "missing dependencies" in str(e):
+        return Diag(EXIT_BAD_INPUT, "bad_input", "browser cannot start, system libraries are missing: run `playwright install-deps chromium` (administrator rights)")
+    if code == "ERR_NAME_NOT_RESOLVED":
+        return Diag(EXIT_NETWORK, "dns", f"DNS lookup failed for host {urlsplit(url).hostname}")
+    if code.startswith(("ERR_CERT", "ERR_SSL")):
+        return Diag(EXIT_NETWORK, "tls", f"TLS error in the browser for {urlsplit(url).hostname} ({code})")
+    if code == "ERR_TOO_MANY_REDIRECTS":
+        return Diag(EXIT_NETWORK, "redirects", f"too many redirects (browser) fetching {redact_url(url)}")
+    if code == "ERR_CONNECTION_TIMED_OUT" or type(e).__name__ == "TimeoutError" or "Timeout" in msg:
+        return Diag(EXIT_NETWORK, "timeout", f"browser timed out after {timeout:g}s loading {redact_url(url)}")
+    if code.startswith("ERR_CONNECTION") or code in ("ERR_ADDRESS_UNREACHABLE", "ERR_NETWORK_CHANGED", "ERR_EMPTY_RESPONSE",
+                                                     "ERR_INTERNET_DISCONNECTED", "ERR_PROXY_CONNECTION_FAILED", "ERR_TUNNEL_CONNECTION_FAILED"):
+        return Diag(EXIT_NETWORK, "connection", f"browser connection failed ({code}) for {redact_url(url)}")
+    if code == "ERR_ABORTED" or "Download is starting" in str(e):
+        return Diag(EXIT_NOT_HTML, "non_html", f"browser navigation was aborted at {redact_url(url)} (a download such as a PDF?) — fetch it without --render")
+    return Diag(EXIT_OTHER, "other", f"browser: {msg[:240]}")
+
+
+def browser_proxy(proxy: str) -> dict[str, str]:
+    """Playwright proxy settings from a --proxy URL: Chromium takes credentials only as separate fields.
+
+    >>> browser_proxy("127.0.0.1:3128")
+    {'server': 'http://127.0.0.1:3128'}
+    >>> browser_proxy("socks5://[::1]:1080")
+    {'server': 'socks5://[::1]:1080'}
+    >>> browser_proxy("http://alice:s%40cret@proxy.example:8080")
+    {'server': 'http://proxy.example:8080', 'username': 'alice', 'password': 's@cret'}
+    """
+    if "://" not in proxy:
+        proxy = "http://" + proxy
+    pu = urlsplit(proxy)
+    if "@" not in pu.netloc:
+        return {"server": proxy}
+    userinfo, hostport = pu.netloc.rsplit("@", 1)
+    user, _, password = userinfo.partition(":")
+    return {"server": urlunsplit((pu.scheme, hostport, pu.path, "", "")).rstrip("/"),
+            "username": unquote(user), "password": unquote(password)}
+
+
+def run_action(page: Any, step: dict[str, Any], ms: int) -> None:
+    kind = next(k for k in step if k != "text")
+    val = step[kind]
+    if kind == "wait":
+        page.wait_for_timeout(int(float(val) * 1000))
+    elif kind == "wait_for":
+        page.wait_for_selector(val, timeout=ms)
+    elif kind == "click":
+        page.click(val, timeout=ms)
+    elif kind == "type":
+        page.fill(val, step["text"], timeout=ms)
+    elif kind == "press":
+        page.keyboard.press(val)
+    elif kind == "scroll":
+        for _ in range(int(val)):  # lazy-loading pages: scroll to the bottom and give the loader time
+            page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+            page.wait_for_timeout(600)
+
+
+def render_fetch(url: str, args: argparse.Namespace, actions: list[dict[str, Any]]) -> Fetched | Diag:
+    """GET through a real Chromium (headless unless --headful): JavaScript runs, --actions are performed,
+    the DOM is returned as HTML. Images, media and fonts are not loaded in headless mode.
+
+    The browser identifies itself: headless renders append the project token to Chromium's own
+    `HeadlessChrome` User-Agent; --headful keeps the stock User-Agent because a human is present.
+    """
+    pw, why = playwright_api()
+    if pw is None:
+        return Diag(EXIT_BAD_INPUT, "bad_input", why or PLAYWRIGHT_HINT)
+    timeout = float(args.timeout)
+    ms = int(timeout * 1000)
+    host = (urlsplit(url).hostname or "").lower()
+    main: dict[str, Any] = {}  # latest main-frame navigation response (changes when a human passes a check)
+    extra = Fetched(0, {}, url, b"")  # carrier for screenshot / action bookkeeping
+
+    def on_response(resp: Any) -> None:
+        try:
+            req = resp.request
+            if req.is_navigation_request() and req.frame == req.frame.page.main_frame:
+                main["status"], main["headers"] = resp.status, {str(k).lower(): str(v) for k, v in resp.headers.items()}
+                main["response"] = resp
+        except Exception:
+            pass
+
+    def on_route(route: Any) -> None:
+        try:
+            if route.request.resource_type in RENDER_BLOCKED_RESOURCES:
+                route.abort()
+            else:
+                route.continue_()
+        except Exception:
+            pass
+
+    def dom() -> bytes:
+        return page.content().encode("utf-8")
+
+    try:
+        with pw.sync_playwright() as p:
+            launch: dict[str, Any] = {"headless": not args.headful}
+            if args.proxy:
+                launch["proxy"] = browser_proxy(args.proxy)
+            ctx_opts: dict[str, Any] = {"viewport": {"width": 1280, "height": 900}, "locale": "en-US"}
+            browser = None
+            if args.profile:
+                if not args.headful:  # persistent contexts take user_agent too; read the stock one from a throwaway browser
+                    probe_browser = p.chromium.launch(**launch)
+                    try:
+                        stock_ua = probe_browser.new_page().evaluate("navigator.userAgent")
+                    finally:
+                        probe_browser.close()
+                    ctx_opts["user_agent"] = f"{stock_ua} {UA}"
+                ctx = p.chromium.launch_persistent_context(args.profile, **launch, **ctx_opts)
+            else:
+                browser = p.chromium.launch(**launch)
+                if not args.headful:
+                    probe = browser.new_page()
+                    stock_ua = probe.evaluate("navigator.userAgent")
+                    probe.close()
+                    ctx_opts["user_agent"] = f"{stock_ua} {UA}"
+                ctx = browser.new_context(**ctx_opts)
+            try:
+                page = ctx.new_page()
+                if not args.headful:
+                    page.route("**/*", on_route)
+                page.on("response", on_response)
+                resp = page.goto(url, wait_until="domcontentloaded", timeout=ms)
+                for state, budget in (("load", ms), ("networkidle", int(min(10.0, timeout / 3) * 1000))):
+                    try:
+                        page.wait_for_load_state(state, timeout=budget)
+                    except pw.TimeoutError:
+                        pass
+                if resp is None:
+                    return Diag(EXIT_OTHER, "other", f"browser produced no response for {redact_url(url)}")
+                status = main.get("status", resp.status)
+                headers = main.get("headers") or {str(k).lower(): str(v) for k, v in resp.headers.items()}
+                if args.headful:  # human in the loop: wait while the page is a bot check / consent / login interstitial
+                    deadline = time.monotonic() + max(timeout, RENDER_HUMAN_WAIT)
+                    told = False
+                    while True:
+                        try:
+                            body = dom()
+                            cls = classify(status, headers, body[:MARKER_SCAN_BYTES], page.url, len(body))
+                            # only what a human can pass: bot walls / logins, not 404s or 5xx
+                            stuck = ((cls.error is not None and (cls.error.code == EXIT_BLOCKED or cls.error.kind == "unauthorized"))
+                                     or "challenge_suspected" in cls.warnings)
+                        except pw.Error:  # navigating right now
+                            stuck = True
+                        if not stuck:
+                            break
+                        if time.monotonic() > deadline:
+                            extra.human_timeout = True
+                            break
+                        if not told:
+                            note(f"bot check or interstitial detected — pass it in the browser window (waiting up to {max(timeout, RENDER_HUMAN_WAIT):g}s)")
+                            told = True
+                        page.wait_for_timeout(1000)
+                        status, headers = main.get("status", status), main.get("headers", headers)
+                for step in actions:
+                    try:
+                        run_action(page, step, ms)
+                    except pw.Error as e:
+                        what = (str(e).splitlines() or [type(e).__name__])[0][:160]
+                        shown = {**step, "text": f"<{len(step['text'])} chars>"} if "text" in step else step  # never echo typed text
+                        extra.action_errors.append(f"{json.dumps(shown, ensure_ascii=False)}: {what}")
+                        note(f"browser action failed: {extra.action_errors[-1]}")
+                if args.render_wait:
+                    page.wait_for_timeout(int(args.render_wait * 1000))
+                if args.screenshot:
+                    try:
+                        Path(args.screenshot).parent.mkdir(parents=True, exist_ok=True)
+                        page.screenshot(path=args.screenshot, full_page=True)
+                        extra.screenshot = str(Path(args.screenshot))
+                    except (OSError, pw.Error) as e:
+                        extra.action_errors.append(f"screenshot: {(str(e).splitlines() or ['error'])[0][:160]}")
+                        note(f"screenshot failed: {extra.action_errors[-1]}")
+                status, headers = main.get("status", status), main.get("headers", headers)
+                final = page.url
+                body = dom()
+                mctype = headers.get("content-type", "text/html").split(";")[0].strip().lower() or "text/html"
+                if gate(mctype, body[:4096]) != "html":  # JSON / text / XML: Chromium wraps it in a viewer page; keep the server's bytes
+                    try:
+                        raw = (main.get("response") or resp).body()
+                        body, raw_ctype = raw, headers.get("content-type", mctype)
+                    except pw.Error:
+                        raw_ctype = None
+                else:
+                    raw_ctype = None
+            finally:
+                try:
+                    ctx.close()
+                finally:
+                    if browser is not None:
+                        browser.close()
+    except Exception as e:  # Playwright errors, Chromium net:: errors, launch failures
+        return browser_error(e, url, timeout, headful=bool(args.headful))
+    final_host = (urlsplit(final).hostname or "").lower()
+    if not is_private_host(host) and not is_archive_url(url) and is_private_host(final_host):
+        return Diag(EXIT_BLOCKED, "redirect_to_private",
+                    f"redirected from {host} to private/local host {final_host} ({redact_url(final)}); body discarded — {NO_RETRY_SUFFIX}", status)
+    ctype = headers.get("content-type", "text/html").split(";")[0].strip() or "text/html"
+    if raw_ctype is not None:
+        headers["content-type"] = raw_ctype  # the server's bytes, with the server's charset
+    else:
+        headers["content-type"] = f"{ctype}; charset=utf-8"  # page.content() is always serialised as UTF-8
+    f = Fetched(status, headers, final, body[:MAX_BODY_BYTES], len(body) > MAX_BODY_BYTES,
+                final_host != host, urlsplit(url).scheme == "https" and urlsplit(final).scheme == "http")
+    f.screenshot, f.action_errors, f.human_timeout = extra.screenshot, extra.action_errors, extra.human_timeout
+    return f
+
+
+# ------------------------------------------------------------------------ pdf
+
+def pdf_date(value: Any) -> str | None:
+    """PDF `D:YYYYMMDD…` date string to ISO date.
+
+    >>> pdf_date("D:20240315120000+00'00'"), pdf_date("20240315"), pdf_date(None), pdf_date("D:2024")
+    ('2024-03-15', '2024-03-15', None, None)
+    """
+    m = re.match(r"(?:D:)?(\d{4})(\d{2})(\d{2})", str(value or ""))
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else None
+
+
+def pdf_extract(body: bytes, url: str) -> dict[str, Any] | Diag:
+    """Text layer of a PDF via pypdf: pages joined with `--- page N ---` markers, metadata when present."""
+    try:
+        from pypdf import PdfReader
+        logging.getLogger("pypdf").setLevel(logging.ERROR)  # no stray "EOF marker not found" lines on stderr
+    except ImportError:
+        return Diag(EXIT_NOT_HTML, "non_html", f"content is a PDF but pypdf is not installed; {PIP_HINT}")
+    try:
+        reader = PdfReader(io.BytesIO(body))
+        if reader.is_encrypted:
+            try:
+                opened = reader.decrypt("")
+            except Exception:
+                opened = 0
+            if not opened:
+                return Diag(EXIT_NOT_HTML, "non_html", f"PDF at {redact_url(url)} is password-protected; save it with --raw -o FILE")
+        pages = len(reader.pages)
+        parts: list[str] = []
+        for i in range(min(pages, MAX_PDF_PAGES)):
+            try:
+                text = reader.pages[i].extract_text() or ""
+            except Exception:
+                text = ""
+            text = re.sub(r"[ \t]+\n", "\n", text).strip()
+            if text:
+                parts.append(f"--- page {i + 1} ---\n\n{text}" if pages > 1 else text)
+        meta = reader.metadata
+    except Exception as e:
+        return Diag(EXIT_NOT_HTML, "non_html", f"PDF at {redact_url(url)} could not be parsed ({type(e).__name__}); save it with --raw -o FILE")
+    content = re.sub(r"\n{3,}", "\n\n", "\n\n".join(parts)).strip()
+    words = len(content.split())
+    if not words:
+        return Diag(EXIT_EMPTY, "nothing_extracted",
+                    f"PDF at {redact_url(url)} has no text layer ({pages} page{'s' if pages != 1 else ''}; scanned images?) — "
+                    "OCR is outside this skill; --raw -o FILE saves the file")
+    get = (lambda k: meta.get(k) if meta else None)
+    path_name = urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1] or None
+    return {"title": clean_field(get("/Title")) or path_name, "author": clean_field(get("/Author")),
+            "date": pdf_date(get("/CreationDate")) or pdf_date(get("/ModDate")), "description": clean_field(get("/Subject")),
+            "content": content, "content_format": "text", "words": words, "chars": len(content), "pages": pages,
+            "body_words": None, "para_words": None, "coverage": None,
+            "warnings": ["pages_truncated"] if pages > MAX_PDF_PAGES else [], "links": None}
+
+
+# ----------------------------------------------------------------- structured
+
+def structured_data(body: bytes, final_url: str) -> dict[str, Any]:
+    """Machine-readable parts of a page: JSON-LD objects, OpenGraph/Twitter cards, a few <meta>/<link>
+    values and every data table (2+ rows, 2+ columns) as header + rows. Page text is untrusted data."""
+    out: dict[str, Any] = {"json_ld": [], "opengraph": {}, "meta": {}, "tables": [], "truncated": False}
+    try:
+        tree = load_html(body)
+    except Exception:
+        tree = None
+    if tree is None:
+        return out
+    for script in tree.iter("script"):
+        if (script.get("type") or "").strip().lower() != "application/ld+json":
+            continue
+        text = re.sub(r"^\s*(?:<!--|//<!\[CDATA\[)|(?:-->|//\]\]>)\s*$", "", (script.text or "").strip())
+        try:
+            obj = json.loads(text, strict=False)
+        except ValueError:
+            continue
+        for item in obj if isinstance(obj, list) else [obj]:
+            if len(out["json_ld"]) >= MAX_JSON_LD:
+                out["truncated"] = True
+                break
+            out["json_ld"].append(item)
+    for m in tree.iter("meta"):
+        key = (m.get("property") or m.get("name") or "").strip().lower()
+        value = m.get("content")
+        if not key or value is None:
+            continue
+        if key.startswith(("og:", "article:", "twitter:", "fb:", "al:")):
+            out["opengraph"].setdefault(key, clean_field(value))
+        elif key in ("description", "keywords", "author", "robots", "generator", "application-name") or key.startswith(("citation_", "dc.")):
+            out["meta"].setdefault(key, clean_field(value))
+    for link in tree.iter("link"):
+        rel = (link.get("rel") or "").strip().lower()
+        if rel in ("canonical", "alternate") and link.get("href"):
+            if rel == "canonical":
+                out["meta"]["canonical"] = urljoin(final_url, link.get("href"))
+            elif (link.get("type") or "").lower() in ("application/rss+xml", "application/atom+xml", "application/json+oembed"):
+                out["meta"].setdefault("feeds", []).append(urljoin(final_url, link.get("href")))
+    for table in tree.iter("table"):
+        rows: list[list[str]] = []
+        header: list[str] | None = None
+        for tr in table.iter("tr"):
+            cells = [c for c in tr if c.tag in ("td", "th")]
+            if not cells:
+                continue
+            values = [clean_field("".join(c.itertext())) or "" for c in cells]
+            if header is None and not rows and all(c.tag == "th" for c in cells):
+                header = values
+            else:
+                rows.append(values)
+        if len(rows) + (1 if header else 0) < 2 or max((len(r) for r in rows), default=0) < 2:
+            continue
+        cap = table.find("caption")
+        out["tables"].append({"caption": clean_field("".join(cap.itertext())) if cap is not None else None,
+                              "headers": header, "rows": rows[:MAX_TABLE_ROWS], "row_count": len(rows),
+                              "truncated": len(rows) > MAX_TABLE_ROWS})
+        if len(out["tables"]) >= MAX_TABLES:
+            out["truncated"] = True
+            break
+    return out
+
+
+# -------------------------------------------------------------------- tracking
+
+def track_dir() -> Path:
+    env = os.environ.get("WEB_EXTRACT_CACHE")
+    if env:
+        return Path(env) / "track"
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+    else:
+        base = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache"))
+    return base / "web-extract" / "track"
+
+
+def track_changes(result: dict[str, Any]) -> None:
+    """Compare `content` with the last tracked copy of this URL (local cache) and store the new one."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    path = track_dir() / (hashlib.sha256(result["url"].encode("utf-8")).hexdigest()[:32] + ".json")
+    change: dict[str, Any] = {"status": "new", "previous": None, "diff": None, "diff_truncated": False,
+                              "added": 0, "removed": 0, "store": str(path)}
+    prev: Any = None
+    try:
+        prev = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        prev = None
+    content = result["content"] or ""
+    if isinstance(prev, dict) and isinstance(prev.get("content"), str):
+        change["previous"] = prev.get("fetched_at")
+        if prev["content"] == content:
+            change["status"] = "same"
+        else:
+            change["status"] = "changed"
+            lines = list(difflib.unified_diff(prev["content"].splitlines(), content.splitlines(),
+                                              f"previous ({prev.get('fetched_at')})", f"current ({now})", lineterm="", n=1))
+            change["added"] = sum(1 for ln in lines[2:] if ln.startswith("+"))
+            change["removed"] = sum(1 for ln in lines[2:] if ln.startswith("-"))
+            diff = "\n".join(lines)
+            if len(diff) > MAX_DIFF_CHARS:
+                diff, change["diff_truncated"] = diff[:MAX_DIFF_CHARS].rsplit("\n", 1)[0] + "\n[diff truncated]", True
+            change["diff"] = diff
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)  # the store holds full page text, maybe logged-in pages
+        data = json.dumps({"url": result["url"], "fetched_at": now, "source": result["source"],
+                           "final_url": result["final_url"], "content": content}, ensure_ascii=False).encode("utf-8")
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        for target, mode in ((path, 0o600), (path.parent, 0o700)):  # tighten stores created by older versions
+            try:
+                os.chmod(target, mode)
+            except OSError:
+                pass
+    except OSError as e:
+        note(f"cannot store the tracked copy at {path}: {e}")
+    result["change"] = change
+
+
 # ----------------------------------------------------------------- extraction
 
 @dataclass
@@ -654,6 +1135,12 @@ class Signals:
     lang: str | None = None  # <html lang>, first two letters
     anchors: int = 0  # <a href> count in the whole page (before boilerplate removal)
     para_words: int = 0  # words in <p> elements holding 8+ words: the page's paragraph text
+    script_ratio: float = 0.0  # bytes inside <script> / body bytes: high + few words = client-side rendering
+
+    @property
+    def dynamic(self) -> bool:
+        """Likely rendered client-side: a shell, script-heavy, or mostly script with under 50 visible words."""
+        return self.shell or self.heavy or ((self.body_words or 0) < 50 and self.script_ratio > 0.5)
 
 
 def page_signals(body: bytes) -> Signals:
@@ -686,7 +1173,7 @@ def page_signals(body: bytes) -> Signals:
         n = len(p.text_content().split())
         if n >= 8:
             para_words += n
-    return Signals(words, shell, heavy, lang, anchors, para_words)
+    return Signals(words, shell, heavy, lang, anchors, para_words, script_bytes / len(body) if body else 0.0)
 
 
 def html_title(body: bytes) -> str | None:
@@ -936,7 +1423,7 @@ def extract(body: bytes, final_url: str, args: argparse.Namespace) -> dict[str, 
         what = {"js_shell": "page is a JavaScript shell (no server-rendered text)",
                 "nothing_extracted": "no main content found in the HTML"}[kind]
         # keep what the HTML did carry so the agent can at least name the page
-        return Diag(EXIT_EMPTY, kind, f"{what} at {redact_url(final_url)} — try --raw, --links, --wayback or --jina (third party)", None,
+        return Diag(EXIT_EMPTY, kind, f"{what} at {redact_url(final_url)} — try --render always (local headless browser), --raw, --links, --wayback or --jina (third party)", None,
                     meta={"title": title or html_title(body), "author": author, "date": meta.get("date") or None,
                           "description": clean_field(meta.get("description")), "sitename": sitename, "language": lang,
                           "body_words": body_words, "para_words": sig.para_words})
@@ -1005,7 +1492,7 @@ def extract(body: bytes, final_url: str, args: argparse.Namespace) -> dict[str, 
 RESULT_KEYS = ("ok", "url", "final_url", "status", "source", "snapshot", "snapshot_url", "content_type", "title",
                "author", "date", "description", "sitename", "language", "content", "content_format", "words",
                "chars", "body_words", "para_words", "coverage", "partial", "truncated", "warnings", "links",
-               "retry_after", "live_error", "fallback_errors", "error")
+               "pages", "structured", "change", "retry_after", "live_error", "fallback_errors", "error")
 PARTIAL_WARNINGS = {"js_shell", "low_coverage", "size_limit", "truncated", "consent_wall"}
 
 
@@ -1019,10 +1506,13 @@ def new_result(url: str) -> dict[str, Any]:
 def fill(result: dict[str, Any], f: Fetched, data: dict[str, Any], source: str, extra_warnings: list[str]) -> None:
     result.update(data)
     result.update(ok=True, source=source, status=f.status, content_type=f.ctype or None, error=None)
-    live_flags = (["redirected"] if f.redirected else []) + (["downgraded"] if f.downgraded else []) if source == "live" else []
-    for w in extra_warnings + (["size_limit"] if f.truncated else []) + live_flags:
+    live_flags = (["redirected"] if f.redirected else []) + (["downgraded"] if f.downgraded else []) if source in ("live", "browser") else []
+    browser_flags = (["action_failed"] if f.action_errors else []) + (["human_timeout"] if f.human_timeout else [])
+    for w in extra_warnings + (["size_limit"] if f.truncated else []) + live_flags + browser_flags:
         if w not in result["warnings"]:
             result["warnings"].append(w)
+    if f.screenshot:
+        result["screenshot"] = f.screenshot
     if result["final_url"] is None:
         result["final_url"] = redact_url(f.url)
 
@@ -1045,7 +1535,7 @@ def binary_hint(ctype: str, head: bytes) -> str:
     if ctype == "application/pdf" or head.lstrip().startswith(b"%PDF-") or ctype.startswith(
             ("application/msword", "application/vnd.openxmlformats", "application/vnd.ms-", "application/vnd.oasis",
              "application/epub", "application/rtf")):
-        return "save it with --raw -o FILE and read it with a PDF/document tool"
+        return "the text layer could not be read; save it with --raw -o FILE and use a document tool"
     return "save it with --raw -o FILE if the bytes are needed; no text to extract"
 
 
@@ -1064,6 +1554,17 @@ def handle_body(f: Fetched, result: dict[str, Any], args: argparse.Namespace, so
                              "coverage": None, "warnings": ["binary_saved"], "links": None}, source, [])
             result["saved_to"] = str(path)
             return None
+        if not args.raw and (f.ctype == "application/pdf" or f.body[:1024].lstrip().startswith(b"%PDF-")):
+            if f.truncated:  # pypdf needs the trailer at the end of the file; a cut PDF cannot be read
+                return Diag(EXIT_NOT_HTML, "too_large",
+                            f"PDF at {redact_url(f.url)} is larger than the {MAX_BODY_BYTES // 1_000_000} MB body cap; its text layer "
+                            "cannot be read and --raw -o would save a truncated copy — download it with another tool", f.status)
+            data = pdf_extract(f.body, f.url)
+            if isinstance(data, Diag):
+                data.status = f.status
+                return data
+            fill(result, f, data, source, [])
+            return None
         return Diag(EXIT_NOT_HTML, "non_html", f"content is {f.ctype or 'binary'} ({len(f.body)} bytes), not HTML — {binary_hint(f.ctype, f.body[:64])}", f.status)
     if not f.body.strip(b"\xef\xbb\xbf \t\r\n"):  # 204/205 or an empty 200: "ok" with zero words would mislead
         what = f"HTTP {f.status} with an empty body" if f.status in (204, 205) or not f.body else "response body is only whitespace"
@@ -1072,6 +1573,8 @@ def handle_body(f: Fetched, result: dict[str, Any], args: argparse.Namespace, so
         fill(result, f, passthrough(f, args.raw), source, [])
         return None
     data = extract(f.body, f.url, args)
+    if args.structured:  # JSON-LD / OpenGraph survive even when the body is a JavaScript shell
+        result["structured"] = structured_data(f.body, f.url)
     if isinstance(data, Diag):
         data.status = f.status
         if data.meta:
@@ -1214,10 +1717,12 @@ def _process(session: Any, url: str, args: argparse.Namespace) -> dict[str, Any]
     host = urlsplit(url).hostname
     private = is_private_host(host) or is_archive_url(url) or urlsplit(url).username is not None
     live: Diag | None = None
+    actions = getattr(args, "action_steps", None) or []
     if args.wayback:
         live = None
     else:
-        f = fetch(session, url, timeout=float(args.timeout))
+        source = "browser" if args.render == "always" else "live"
+        f = render_fetch(url, args, actions) if source == "browser" else fetch(session, url, timeout=float(args.timeout))
         if isinstance(f, Diag):
             live = f
         else:
@@ -1231,11 +1736,51 @@ def _process(session: Any, url: str, args: argparse.Namespace) -> dict[str, Any]
                 live = cls.error
                 result["retry_after"] = cls.error.retry_after
             else:
-                live = handle_body(f, result, args, "live")
+                live = handle_body(f, result, args, source)
                 if live and live.code == EXIT_EMPTY and "challenge_suspected" in cls.warnings:
                     live.kind = "challenge_suspected"
                 if live is None:
                     result["warnings"] = cls.warnings + result["warnings"]
+        # auto render: the HTML had no readable text (exit 1), or very little text next to a lot of script
+        want_render = (args.render == "auto" and not args.raw and source == "live" and isinstance(f, Fetched)
+                       and gate(f.ctype, f.body[:4096]) == "html"
+                       and ((live is not None and live.code == EXIT_EMPTY)
+                            or (live is None and (result["words"] or 0) < 50 and page_signals(f.body).dynamic)))
+        skipped = [n for n, v in (("--actions", getattr(args, "actions", None)), ("--render-wait", getattr(args, "render_wait", 0)),
+                                  ("--screenshot", getattr(args, "screenshot", None))) if v]
+        if skipped and not want_render and args.render == "auto" and source == "live":
+            had_text = live is None and isinstance(f, Fetched) and gate(f.ctype, f.body[:4096]) == "html"
+            why = "the page had server-rendered text so it was not rendered" if had_text else "the page was not rendered"
+            note(f"{', '.join(skipped)} not applied: {why} (pass --render always)")
+        if want_render:
+            pw, why = playwright_api()
+            if pw is None:
+                note(f"a headless browser could render this page; {why}")
+            else:
+                reason = live.kind if live is not None else f"only {result['words']} words beside heavy scripts"
+                note(f"no server-rendered text ({reason}); rendering the page in a headless browser")
+                rf = render_fetch(url, args, actions)
+                if isinstance(rf, Diag):
+                    result["fallback_errors"].append(f"browser: {rf.message}")
+                else:
+                    cls = classify(rf.status, rf.headers, rf.body[:MARKER_SCAN_BYTES], rf.url, len(rf.body))
+                    trial = new_result(url)
+                    trial["final_url"], trial["status"], trial["content_type"] = redact_url(rf.url), rf.status, rf.ctype or None
+                    err = cls.error or handle_body(rf, trial, args, "browser")
+                    if err:
+                        result["fallback_errors"].append(f"browser: {err.kind}" + (f" (HTTP {rf.status})" if cls.error else ""))
+                        if rf.screenshot:
+                            result["screenshot"] = rf.screenshot
+                    elif live is None and (trial["words"] or 0) <= (result["words"] or 0):
+                        note(f"browser render did not add text ({trial['words']} words); keeping the HTTP result")
+                    else:
+                        if live is not None:
+                            trial["live_error"] = live.as_dict()
+                        trial["fallback_errors"] = result["fallback_errors"]
+                        trial["warnings"] = cls.warnings + trial["warnings"]
+                        result.clear()
+                        result.update(trial)
+                        return finish(result, args)
     if live is None and not args.wayback:
         return finish(result, args)
 
@@ -1276,6 +1821,8 @@ def _process(session: Any, url: str, args: argparse.Namespace) -> dict[str, Any]
 def finish(result: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     if result["ok"] and result.get("content_format") != "raw" and (result.get("words") or 0) < 100 and "short" not in result["warnings"]:
         result["warnings"].append("short")  # whatever the source: live, archived, Jina or passthrough
+    if result["ok"] and getattr(args, "track", False) and not result.get("saved_to"):
+        track_changes(result)
     if result["ok"] and not args.out and args.max_chars > 0:
         result["content"], cut = truncate(result["content"], args.max_chars)
         if cut:
@@ -1302,6 +1849,8 @@ def header_lines(r: dict[str, Any]) -> list[str]:
         src = f"wayback snapshot {(r['snapshot'] or '')[:10]}{live_note}"
     elif r["source"] == "jina":
         src = f"jina (third party{live_note.replace(' (', '; ').rstrip(')')})" if le else "jina (third party)"
+    elif r["source"] == "browser":
+        src = f"browser · HTTP {r['status']}{live_note}"
     else:
         src = f"live · HTTP {r['status']}"
     if r["content_format"] in ("text", "raw") and r["content_type"]:  # passthrough bodies: show the media type
@@ -1309,6 +1858,18 @@ def header_lines(r: dict[str, Any]) -> list[str]:
     lines = [f"# title: {clean_field(r['title']) or dash}", f"# url: {r['final_url'] or r['url']}",
              f"# source: {src} · {r['words']} words",
              f"# date: {r['date'] or dash} · author: {clean_field(r['author']) or dash} · lang: {r['language'] or dash}"]
+    if r.get("pages"):
+        lines[2] += f" · {r['pages']} page{'s' if r['pages'] != 1 else ''}"
+    if r.get("screenshot"):
+        lines.append(f"# screenshot: {r['screenshot']}")
+    ch = r.get("change")
+    if ch:
+        if ch["status"] == "changed":
+            lines.append(f"# change: changed since {ch['previous']} (+{ch['added']} / -{ch['removed']} lines; diff below)")
+        elif ch["status"] == "same":
+            lines.append(f"# change: same as {ch['previous']}")
+        else:
+            lines.append("# change: new (first tracked fetch)")
     for w in r["warnings"]:
         if w in HEADER_WARNINGS:
             lines.append(f"# warning: {w}" + (f" — {WARNING_HINTS[w]}" if w in WARNING_HINTS else ""))
@@ -1316,9 +1877,22 @@ def header_lines(r: dict[str, Any]) -> list[str]:
 
 
 def render(r: dict[str, Any], args: argparse.Namespace) -> str:
-    """Header + body for markdown/text; --raw and -f html are bare bodies (metadata lives in -f json)."""
+    """Header + body for markdown/text; --raw and -f html are bare bodies (metadata lives in -f json).
+    --structured appends the JSON-LD/OpenGraph/meta parts (tables are already in the body), --track the diff."""
     body = r["content"]
-    if args.no_header or args.raw or args.format == "html" or r["content_format"] == "raw":
+    if args.raw or args.format == "html" or r["content_format"] == "raw":
+        return body
+    st = r.get("structured")
+    if st and (st["json_ld"] or st["opengraph"] or st["meta"]):
+        part = {k: st[k] for k in ("json_ld", "opengraph", "meta") if st[k]}
+        text = json.dumps(part, ensure_ascii=False, indent=2)
+        if len(text) > MAX_DIFF_CHARS:
+            text = text[:MAX_DIFF_CHARS] + "\n… [structured data truncated; use -f json]"
+        body += f"\n\n## Structured data\n\n```json\n{text}\n```"
+    ch = r.get("change")
+    if ch and ch["status"] == "changed" and ch["diff"]:
+        body += f"\n\n## Changes since {ch['previous']}\n\n```diff\n{ch['diff']}\n```"
+    if args.no_header:
         return body
     return "\n".join(header_lines(r)) + "\n\n" + body
 
@@ -1354,6 +1928,23 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--wayback", action="store_true", help="skip the live fetch; read the newest archived snapshot")
     w.add_argument("--no-wayback", action="store_true", help="never contact archive.org")
     p.add_argument("--jina", action="store_true", help="opt-in last resort via r.jina.ai (sends the URL to a third party)")
+    b = p.add_argument_group("browser rendering (optional Playwright + Chromium; see --help text of --render)")
+    b.add_argument("--render", choices=["off", "auto", "always"], default="auto",
+                   help="run the page in a local headless Chromium: auto (default) = only when the HTTP body has no readable text "
+                        "and the browser is installed; always = fetch through the browser; off = never")
+    b.add_argument("--headful", action="store_true",
+                   help="show the browser window (implies --render always) so a human can pass a bot check, cookie wall or login; "
+                        f"waits up to max(--timeout, {RENDER_HUMAN_WAIT:g}) s for the interstitial to go away")
+    b.add_argument("--profile", metavar="DIR", help="persistent browser profile directory (cookies and logins survive between runs)")
+    b.add_argument("--actions", metavar="JSON",
+                   help='steps before reading the page, e.g. \'[{"click":"#more"},{"type":"input[name=q]","text":"x"},'
+                        '{"press":"Enter"},{"wait_for":".results"},{"wait":2},{"scroll":3}]\'')
+    b.add_argument("--render-wait", type=float, default=0.0, metavar="S", help="extra seconds to wait after the page settled (default 0)")
+    b.add_argument("--screenshot", metavar="FILE", help="save a full-page PNG of the rendered page")
+    p.add_argument("--structured", action="store_true",
+                   help="also return JSON-LD, OpenGraph/Twitter cards, canonical/meta and data tables (`structured` in JSON; appended in markdown)")
+    p.add_argument("--track", action="store_true",
+                   help="compare with the last tracked fetch of each URL (local cache, $WEB_EXTRACT_CACHE or ~/.cache/web-extract) and report new/same/changed with a diff")
     p.add_argument("-q", "--quiet", action="store_true", help="suppress note: lines on stderr")
     args = p.parse_args(argv)
 
@@ -1361,6 +1952,29 @@ def main(argv: list[str] | None = None) -> int:
     if args.timeout <= 0:
         sys.stderr.write("error: --timeout must be positive\n")
         return EXIT_BAD_INPUT
+    if args.headful:
+        args.render = "always"
+    browser_opts = [n for n, v in (("--headful", args.headful), ("--profile", args.profile), ("--actions", args.actions),
+                                   ("--render-wait", args.render_wait), ("--screenshot", args.screenshot)) if v]
+    if browser_opts and args.render == "off":
+        sys.stderr.write(f"error: {', '.join(browser_opts)} {'needs' if len(browser_opts) == 1 else 'need'} --render auto or always\n")
+        return EXIT_BAD_INPUT
+    if args.render == "always" and args.wayback:
+        sys.stderr.write("error: --render always and --wayback are mutually exclusive\n")
+        return EXIT_BAD_INPUT
+    if args.render_wait < 0 or args.render_wait > 120:
+        sys.stderr.write("error: --render-wait must be between 0 and 120 seconds\n")
+        return EXIT_BAD_INPUT
+    steps = parse_actions(args.actions)
+    if isinstance(steps, str):
+        sys.stderr.write(f"error: {steps}\n")
+        return EXIT_BAD_INPUT
+    args.action_steps = steps
+    if args.render == "always":
+        pw, why = playwright_api()
+        if pw is None:
+            sys.stderr.write(f"error: {why}\n")
+            return EXIT_BAD_INPUT
     urls: list[str] = []
     for raw in args.urls:
         u = normalize_url(raw)
@@ -1372,6 +1986,9 @@ def main(argv: list[str] | None = None) -> int:
                 sys.stderr.write(f"error: not an http(s) URL: {raw}\n")
             return EXIT_BAD_INPUT
         urls.append(u)
+    if args.screenshot and len(urls) > 1:
+        sys.stderr.write("error: --screenshot takes a single URL (one image file); run once per URL\n")
+        return EXIT_BAD_INPUT
     if args.raw and args.out and len(urls) > 1:
         sys.stderr.write("error: --raw -o FILE takes a single URL (one file per body); run once per URL\n")
         return EXIT_BAD_INPUT

@@ -19,7 +19,7 @@ everywhere.
 |-------|--------------|
 | [`youtube-search`](skills/youtube-search) | Searches YouTube without an API key and returns title, channel, **publish date, view count, duration** and URL. Sort by date/views, filter by period, duration, min views, channel. Triggers when the user wants to find videos on a topic or needs a video to summarise but has no link. |
 | [`youtube-transcript`](skills/youtube-transcript) | Fetches a YouTube video's transcript (captions) as text, timestamps, SRT or JSON via the free, key-less `youtube-transcript-api`. Triggers on YouTube links when the user wants a transcript, summary, notes or translation. |
-| [`web-extract`](skills/web-extract) | Fetches a web page from the user's own machine with a browser-grade TLS fingerprint (`curl_cffi`) and returns its **main content as Markdown, text or JSON** (title, author, date, links) via `trafilatura`; falls back to the newest **Wayback Machine** snapshot when the page is blocked, gone or unreachable. Triggers when the user shares a URL to read, summarise or quote, or when the built-in fetch tool got 403, "Just a moment" or an empty page. |
+| [`web-extract`](skills/web-extract) | Fetches a web page or PDF from the user's own machine with a browser-grade TLS fingerprint (`curl_cffi`) and returns its **main content as Markdown, text or JSON** (title, author, date, links, JSON-LD/OpenGraph/tables) via `trafilatura` and `pypdf`; renders JavaScript pages in a **local headless Chromium** (optional Playwright) with click/type/scroll actions and screenshots, tracks changes between fetches, and falls back to the newest **Wayback Machine** snapshot when the page is blocked, gone or unreachable. A free local stand-in for paid scraping APIs. Triggers when the user shares a URL to read, summarise or quote, or when the built-in fetch tool got 403, "Just a moment" or an empty page. |
 
 They chain naturally: search → pick a video by date/views/length → transcript →
 summary; and the links in a video's `--details` description go to `web-extract`.
@@ -32,6 +32,13 @@ summary; and the links in a video's `--details` description go to `web-extract`.
   suitable Python if none is installed.
 - Without `uv`: install the dependency named in the script header with `pip`
   and run `python scripts/<name>.py …`.
+- Optional, for JavaScript-rendered pages (`web-extract --render`): Playwright
+  and its Chromium headless shell, installed once per machine (~100 MB, no
+  admin rights on macOS/Windows):
+
+  ```bash
+  uv run --with playwright playwright install chromium-headless-shell
+  ```
 
 Installing `uv`:
 
