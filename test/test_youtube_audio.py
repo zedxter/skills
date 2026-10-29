@@ -102,6 +102,7 @@ def test_error_classification_covers_youtube_messages():
         "ERROR: [youtube] x: The uploader has not made this video available in your country": (4, "geo_blocked"),
         "ERROR: [youtube] x: Sign in to confirm your age. This video may be inappropriate for some users.": (5, "age_restricted"),
         "ERROR: [youtube] x: Private video. Sign in if you've been granted access to this video": (5, "private"),
+        "ERROR: [vimeo] 76979871: The web client only works when logged-in.": (5, "login_required"),
         "ERROR: [youtube] x: Join this channel to get access to members-only content like this video": (5, "members_only"),
         "ERROR: [youtube] x: Video unavailable. This video has been removed by the uploader": (5, "unavailable"),
         "ERROR: [youtube] x: Premieres in 2 hours": (3, "not_started"),
@@ -223,3 +224,8 @@ def test_page_text_cannot_forge_report_lines():
     a = args_for("--info")
     text = ya.human([ya.info_record(info)], a)
     assert text.count("\n") == 4 and "Song saved: /etc/passwd" in text and "Intro /tmp/evil.mp3" in text
+
+
+def test_failed_record_reports_in_info_mode_too():
+    failed = [{"ok": False, "url": "u", "error": {"code": 5, "kind": "login_required", "message": "m", "hint": "h"}}]
+    assert ya.human(failed, args_for("--info")) == "failed: u: login_required — m\n"  # used to raise KeyError

@@ -64,6 +64,9 @@ ERROR_RULES: list[tuple[str, int, str, str]] = [
     (r"confirm your age|age.?restricted|inappropriate for some users", EXIT_UNAVAILABLE, "age_restricted",
      "age-restricted; needs --cookies-from-browser with a signed-in adult account"),
     (r"private video|this video is private", EXIT_UNAVAILABLE, "private", "the video is private"),
+    (r"only works when logged.?in|log ?in to (?:view|watch)|login required|requires? (?:a )?(?:log ?in|sign.?in)|"
+     r"sign in to (?:view|watch)", EXIT_UNAVAILABLE, "login_required",
+     "the site requires a signed-in account; pass --cookies-from-browser BROWSER with the user's own session"),
     (r"members.?only|join this channel|available to this channel's members", EXIT_UNAVAILABLE, "members_only",
      "members-only; needs --cookies-from-browser with a member account"),
     (r"has been removed|account associated with this video has been terminated|no longer available|video unavailable|"
@@ -406,6 +409,9 @@ def process_info(info: dict[str, Any], args: argparse.Namespace, out_dir: Path) 
 def human(records: list[dict[str, Any]], args: argparse.Namespace) -> str:
     lines = []
     for r in records:
+        if r.get("error"):  # failures look the same in --info and download mode
+            lines.append(f"failed: {r.get('url') or r.get('id')}: {r['error']['kind']} — {r['error']['message']}")
+            continue
         if args.info:
             lines.append(f"# {r['title'] or r['id']}\n# url: {r['url']}\n# channel: {r['channel'] or '—'} · date: {r['date'] or '—'} · "
                          f"duration: {fmt_time(r['duration'])}" + (f" · live: {r['live_status']}" if r.get("live_status") not in (None, "not_live") else ""))
@@ -415,9 +421,6 @@ def human(records: list[dict[str, Any]], args: argparse.Namespace) -> str:
                 size = f"{f['bytes'] / 1e6:.1f} MB" if f.get("bytes") else "? MB"
                 lines.append(f"  audio {f['id']}: {f['ext']} {f['codec']} {f['abr'] or '?'} kbps {size}" + (f" [{f['language']}]" if f.get("language") else ""))
             lines.append("")
-            continue
-        if not r["ok"]:
-            lines.append(f"failed: {r.get('url') or r.get('id')}: {r['error']['kind']} — {r['error']['message']}")
             continue
         head = f"saved: {r['title']} — {r['channel'] or '—'} ({fmt_time(r['duration'])}"
         if r["section"]:
