@@ -20,9 +20,12 @@ everywhere.
 | [`youtube-search`](skills/youtube-search) | Searches YouTube without an API key and returns title, channel, **publish date, view count, duration** and URL. Sort by date/views, filter by period, duration, min views, channel. Triggers when the user wants to find videos on a topic or needs a video to summarise but has no link. |
 | [`youtube-transcript`](skills/youtube-transcript) | Fetches a YouTube video's transcript (captions) as text, timestamps, SRT or JSON via the free, key-less `youtube-transcript-api`. Triggers on YouTube links when the user wants a transcript, summary, notes or translation. |
 | [`web-extract`](skills/web-extract) | Fetches a web page or PDF from the user's own machine with a browser-grade TLS fingerprint (`curl_cffi`) and returns its **main content as Markdown, text or JSON** (title, author, date, links, JSON-LD/OpenGraph/tables) via `trafilatura` and `pypdf`; renders JavaScript pages in a **local headless Chromium** (optional Playwright) with click/type/scroll actions and screenshots, tracks changes between fetches, and falls back to the newest **Wayback Machine** snapshot when the page is blocked, gone or unreachable. A free local stand-in for paid scraping APIs. Triggers when the user shares a URL to read, summarise or quote, or when the built-in fetch tool got 403, "Just a moment" or an empty page. |
+| [`web-crawl`](skills/web-crawl) | Crawls a site breadth-first from the user's machine and collects every page's **main content into one Markdown file**, a folder of pages with `index.json`, or JSON/JSONL; `--map` lists the URLs. Bounded by depth, page count and time, include/exclude patterns, same site only, robots.txt honoured, sitemap.xml as seed; each page goes through `web-extract` (PDF text, optional headless rendering). Free stand-in for Firecrawl crawl/map. Triggers when the user wants a whole documentation site, blog or section read, summarised or turned into notes, or asks which pages a site has. |
 
 They chain naturally: search → pick a video by date/views/length → transcript →
-summary; and the links in a video's `--details` description go to `web-extract`.
+summary; the links in a video's `--details` description go to `web-extract`;
+`web-crawl --map` shows a site's structure, then `web-crawl --include` collects
+the right section through `web-extract`'s engine.
 
 ## Requirements
 
@@ -139,6 +142,9 @@ skills/
     └── references/     # longer docs loaded on demand (optional)
 test/                   # pytest suites for the scripts (uv run --with pytest python -m pytest test)
 ```
+
+`web-crawl` imports `web-extract`'s script at run time, so install both (the
+install commands above copy every skill).
 
 `SKILL.md` follows the [Agent Skills specification](https://agentskills.io/specification):
 `name` matches the folder name, `description` says both what the skill does and
