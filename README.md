@@ -145,7 +145,17 @@ skills/
     ├── SKILL.md        # frontmatter (name, description, …) + instructions
     ├── scripts/        # executable helpers the agent runs (optional)
     └── references/     # longer docs loaded on demand (optional)
-test/                   # pytest suites for the scripts (uv run --with pytest python -m pytest test)
+test/                   # pytest suites for the scripts
+```
+
+Run the test suites with every script dependency available (browser tests skip
+when Playwright's Chromium is not installed; network tests skip with
+`WEB_EXTRACT_OFFLINE=1`):
+
+```bash
+uv run --with pytest --with curl_cffi --with trafilatura --with lxml_html_clean \
+    --with pypdf --with cssselect --with 'ddgs>=9,<10' --with playwright \
+    python -I -m pytest test -q
 ```
 
 `web-crawl`, `web-scrape`, `web-search --read` and `web-browse read` import

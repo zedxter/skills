@@ -44,13 +44,13 @@ uv run scripts/browse.py start                       # headless session (idle ti
 uv run scripts/browse.py open https://example.com/login
 uv run scripts/browse.py snapshot
 #   url: https://example.com/login
-#   title: Login · HTTP 200
+#   title: Login · HTTP 200 · scrolled 0/0
 #   headings: # Sign in
 #   interactive elements: 6 shown of 6
 #   [1] link "About"  (→ https://example.com/about)
-#   [2] textbox "Email"  (type=email; name=email; placeholder=you@example.com; required)
-#   [3] textbox "Password"  (type=password; name=pw)
-#   [4] checkbox "Remember me"  (unchecked)
+#   [2] textbox "Email"  (type="email"; name="email"; placeholder="you@example.com"; required)
+#   [3] textbox "Password"  (type="password"; name="pw")
+#   [4] checkbox "Remember me"  (type="checkbox"; name="remember"; unchecked)
 #   [5] combobox "Language"  (options: English | Deutsch)
 #   [6] button "Sign in"
 uv run scripts/browse.py type 2 "me@example.com"
@@ -67,20 +67,23 @@ Linux may also need `playwright install-deps chromium`. Without `uv`:
 `pip install playwright curl_cffi trafilatura lxml_html_clean pypdf`.
 
 Every action prints the resulting state (`url:`, `title:`, HTTP status, tab);
-`--json` before the command gives machine-readable output for any command.
+`--json` (before or after the command) gives JSON output for any command,
+including `html` and `read -o`. Page-controlled strings in snapshots are
+flattened to one line and attribute values are quoted, so a page cannot fake a
+`url:`/`title:` line or an extra `[N]` line in the output.
 
 ## Commands
 
 | Command | What it does |
 |---------|--------------|
-| `start [--headful] [--profile DIR] [--idle-timeout MIN]` | Launch the session (no-op if one is running). `--headful`: visible window, stock Chromium `User-Agent` (a person is present). `--profile DIR`: cookies, storage and logins persist across sessions. Headless sessions append `web-browse/1.0 (+repo)` to the `User-Agent`. |
-| `stop` / `status` | End the session / show mode, tabs, whether web-extract is available, the last commands. |
+| `start [--headful] [--profile DIR] [--idle-timeout MIN]` | Launch the session (no-op if one is running). `--headful`: visible window, stock Chromium `User-Agent` (a person is present). `--profile DIR`: cookies, storage and logins persist across sessions (directory kept owner-only). Headless sessions, with or without `--profile`, append `web-browse/1.0 (+repo)` to the `User-Agent`. |
+| `stop` / `status` | End the session (also while a command is stuck) / show mode, tabs, whether web-extract is available, the last commands (typed text and `eval` code shown as `***`, URLs without query string). |
 | `open URL` | Navigate the current tab (`https://` added when missing); waits for load + up to 5 s network idle. Exit 3 on HTTP ≥ 400, exit 4 with `BLOCKED:` when web-extract's bot-wall detection fires. |
-| `snapshot [--all] [--max N]` | Interactive elements (links, buttons, inputs, selects, textareas, ARIA roles, contenteditable) with refs, role, label, href/type/name/placeholder/value, checked/expanded/disabled/required, `below fold`; headings; scroll position; iframe count. Hidden elements only with `--all`. Refs are written into the DOM, stay stable across `snapshot`/`find` calls, and reset when the page navigates. |
-| `find TEXT` | Elements (visible or not) whose label/attributes contain TEXT, with refs. |
-| `click TARGET [--right] [--double]`, `hover`, `check`, `uncheck`, `focus` | TARGET = ref number, CSS selector, or `text=…` (substring). Waits for the page to settle afterwards. |
+| `snapshot [--all] [--max N]` | Interactive elements (links, buttons, inputs, selects, textareas, ARIA roles, contenteditable) with refs, role, label, href/type/name/placeholder/value, checked/expanded/disabled/required, `below fold`; headings; scroll position; iframe count. Hidden elements only with `--all`. Refs are written into the DOM, stay stable across `snapshot`/`find` calls, and reset when the page navigates; a ref the page duplicated (cloned node) is renumbered by the next `snapshot`, and acting on a ref found on several elements fails with exit 1. |
+| `find TEXT` | Elements (visible or not) whose label, href, name, placeholder, value, type or role contains TEXT (case-insensitive), with refs. |
+| `click TARGET [--right] [--double]`, `hover`, `check`, `uncheck`, `focus` | TARGET = ref number, CSS selector, or `text=…` (substring; clickable elements first, nested clickables such as `<a><button>` count as one, an exact-text match wins). A selector or text matching several elements is refused with exit 1 (`matches N elements; use a ref`), never guessed. Waits for the page to settle afterwards. |
 | `type TARGET TEXT [--enter] [--append]` | Fill a field (replaces the value; `--append` types after it); `--enter` submits. |
-| `select TARGET LABEL [--value]` | Choose an `<option>` by visible label (or by value). |
+| `select TARGET LABEL [--value]` | Choose an `<option>` by visible label (or by value); an unknown option fails at once (exit 1) and lists the options. |
 | `press KEY` | `Enter`, `Tab`, `Escape`, `ArrowDown`, `Control+a`, `Shift+Enter` … |
 | `scroll [down\|up\|top\|bottom\|TARGET] [--px N]` | One screen by default; or scroll an element into view. |
 | `back`, `forward`, `reload` | History navigation. |
@@ -89,21 +92,21 @@ Every action prints the resulting state (`url:`, `title:`, HTTP status, tab);
 | `html [-o FILE]` | The current DOM as HTML (for picking selectors). |
 | `screenshot PATH [--full] [--of TARGET]` | PNG of the viewport, the full page, or one element. |
 | `eval JS` | Run JavaScript in the page, print the JSON result (`document.title`, `localStorage.length`, …). |
-| `tabs`, `tab N`, `tab new [URL]`, `tab close` | Tab management; new tabs opened by the page are tracked. |
+| `tabs`, `tab N`, `tab new [URL]`, `tab close` | Tab management (N from 1; no such tab → exit 2; `tab close` on the last tab leaves a fresh blank one); new tabs opened by the page are tracked. |
 | `cookies` | Cookie names and domains in the session (never values). |
-| global `--timeout S` (20), `--json` | Per action; machine output. |
+| global `--timeout S` (20), `--json` | Per action; JSON output. A command that gets no answer from the page within 3×S+10 s (plus the seconds of `wait N`) fails with exit 1 `page is unresponsive` and that tab is closed. |
 
 ## Exit codes
 
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | 0 | Done; the printed state is the new situation. | Continue: `snapshot` after anything that changed the page. |
-| 1 | Element not found (ref gone after a page change, selector matches nothing or several), action timed out, wait condition not met. | `snapshot` again and use fresh refs; narrow the selector; `wait --for` the element first; `scroll` it into view. Do not repeat the same command blindly. |
+| 1 | Element not found (ref gone after a page change, selector matches nothing or several), no such option, action timed out, wait condition not met, page unresponsive (a script on it never yields). | `snapshot` again and use fresh refs; narrow the selector or use a ref; `wait --for` the element first; `scroll` it into view. Unresponsive page: `reload` or `open` (they replace the stuck tab with a fresh one) or `tab close`. Do not repeat the same command blindly. |
 | 2 | No session (`start` first, or it ended after the idle timeout), browser not installed, bad arguments, no such tab. | `start`; install the browser (message says how). |
 | 3 | The opened page answered HTTP 4xx/5xx. | Check the URL; a 401/403 after login may mean the session expired. |
 | 4 | Bot wall / challenge detected on the opened page. | Stop. Offer `start --headful` so the user passes it themselves; never try to solve it. |
 | 6 | Navigation failed: DNS, connection, TLS, timeout, or the URL was a download. | Check the URL/network; downloads: use `web-extract --raw -o`. |
-| 7 | Unexpected error in the session. | Report it; `status` shows recent commands; `stop`/`start` resets. |
+| 7 | Session still busy with an earlier command, or an unexpected error in the session. | Retry `status` in a moment; report persistent errors; `stop`/`start` resets. |
 
 ## Workflow for the agent
 
@@ -137,9 +140,13 @@ Every action prints the resulting state (`url:`, `title:`, HTTP status, tab);
 
 ## Limitations
 
-- One session per machine user (state file in the cache dir, or
-  `$WEB_BROWSE_STATE`); the session process ends after `--idle-timeout`
-  minutes (default 30) and everything not in a `--profile` is lost.
+- One session per machine user (owner-only state file with the session
+  token in the cache dir, or `$WEB_BROWSE_STATE`); the session process ends
+  after `--idle-timeout` minutes (default 30) and everything not in a
+  `--profile` is lost.
+- Commands run one at a time; a second command waits for the first. A page
+  stuck in an endless script makes reads fail with exit 1 (`unresponsive`);
+  a command stuck inside it is abandoned and the tab closed.
 - Snapshots cover the main document only: elements inside iframes and closed
   shadow roots are not listed (the iframe count is shown); use `eval` or a
   selector for those. Canvas-only apps have nothing to list.

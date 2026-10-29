@@ -20,19 +20,21 @@ session (it also ends by itself after --idle-timeout minutes).
     uv run browse.py type 4 "secret" --enter
     uv run browse.py wait --text "Welcome"
     uv run browse.py read -o page.md
-    uv run browse.py click "a.settings"             # selectors work too
+    uv run browse.py click "a.settings"             # selectors work too (must match one element)
     uv run browse.py screenshot shot.png
     uv run browse.py stop
 
-Exit codes: 0 ok · 1 element/selector not found or action failed · 2 bad input, no
-    session, browser missing · 3 page HTTP error · 4 bot wall · 6 navigation/network
-    error or timeout · 7 other
+Exit codes: 0 ok · 1 element/selector not found or ambiguous, action failed, page
+    unresponsive · 2 bad input, no session, browser missing · 3 page HTTP error ·
+    4 bot wall · 6 navigation/network error or timeout · 7 other (session busy)
 """
 
 import argparse
+import hmac
 import importlib.util
 import json
 import os
+import queue
 import re
 import secrets
 import socket
@@ -42,24 +44,34 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 EXIT_OK, EXIT_FAIL, EXIT_BAD_INPUT, EXIT_HTTP, EXIT_BLOCKED, EXIT_NOT_HTML, EXIT_NETWORK, EXIT_OTHER = range(8)
 DEFAULT_IDLE_MIN = 30
 MAX_SNAPSHOT = 150
+MAX_REQUEST = 4 << 20          # bytes of one JSON request line
+PRE_AUTH_TIMEOUT = 5.0         # seconds a client gets to send its request line
+STOP_GRACE = 15.0              # seconds `stop`/idle exit waits for a clean shutdown before killing the process
 UA_TOKEN = "web-browse/1.0 (+https://github.com/zedxter/skills)"
+INTERACTIVE = ("a, button, input, select, textarea, summary, label, [role=button], [role=link], [role=tab], "
+               "[role=menuitem], [role=option], [onclick]")
+UNRESPONSIVE = "page is unresponsive (a script on it is busy)"
 SNAPSHOT_JS = r"""
 ([max, all]) => {
   const sel = 'a[href], button, input, select, textarea, summary, [role=button], [role=link], [role=tab], [role=menuitem], ' +
               '[role=checkbox], [role=radio], [role=switch], [role=option], [role=combobox], [role=textbox], [role=searchbox], ' +
               '[contenteditable=""], [contenteditable="true"], [onclick], [tabindex]:not([tabindex="-1"])';
+  // every page-controlled string is flattened to one line so it cannot forge snapshot/state lines
+  const clean = (v, n) => String(v == null ? '' : v).replace(/[\s\x00-\x1f\x7f-\x9f]+/g, ' ').trim().slice(0, n);
   // refs are stable for the life of the document: existing numbers are kept, new elements continue the sequence
+  // a ref already used by another element in this pass (cloned node, page-set attribute) gets a new number
   let next = 0;
-  document.querySelectorAll('[data-wb-ref]').forEach(e => { const n = +e.getAttribute('data-wb-ref'); if (n > next) next = n; });
+  document.querySelectorAll('[data-wb-ref]').forEach(e => { const n = +e.getAttribute('data-wb-ref'); if (Number.isInteger(n) && n > next && n < 1e9) next = n; });
   const els = Array.from(document.querySelectorAll(sel));
-  const out = []; const seen = new Set();
+  const out = []; const seen = new Set(); const taken = new Set();
   const roleOf = (el) => {
     const tag = el.tagName.toLowerCase();
-    if (el.getAttribute('role')) return el.getAttribute('role');
+    if (el.getAttribute('role')) return clean(el.getAttribute('role'), 30);
     if (tag === 'a') return 'link'; if (tag === 'button' || tag === 'summary') return 'button';
     if (tag === 'select') return 'combobox'; if (tag === 'textarea') return 'textbox';
     if (tag === 'input') return ({checkbox: 'checkbox', radio: 'radio', submit: 'button', button: 'button', reset: 'button',
@@ -75,37 +87,62 @@ SNAPSHOT_JS = r"""
     if (role === 'hidden') continue;
     if (!visible && !all) continue;
     let ref = +el.getAttribute('data-wb-ref');
-    if (!ref) { ref = ++next; el.setAttribute('data-wb-ref', String(ref)); }
+    if (!(ref > 0) || !Number.isInteger(ref) || taken.has(ref)) { ref = ++next; el.setAttribute('data-wb-ref', String(ref)); }
+    taken.add(ref);
     const tag = el.tagName.toLowerCase();
     let label = el.getAttribute('aria-label') || (el.labels && el.labels[0] && el.labels[0].innerText) || el.getAttribute('title') ||
                 el.getAttribute('alt') || (tag === 'input' || tag === 'textarea' || tag === 'select' ? '' : el.innerText) || el.value || '';
     if (!label && (tag === 'input')) label = el.placeholder || el.name || '';
     if (!label) { const img = el.querySelector('img[alt]'); if (img) label = img.getAttribute('alt'); }
-    const item = {ref, role, tag, text: String(label || '').replace(/\s+/g, ' ').trim().slice(0, 100)};
-    if (tag === 'a' && el.href) item.href = el.href;
+    const item = {ref, role, tag, text: clean(label, 100)};
+    if (tag === 'a' && el.href) item.href = clean(el.href, 300);
     if (tag === 'input' || tag === 'textarea') {
-      if (el.type && el.type !== 'text') item.type = el.type;
-      if (el.value && el.type !== 'password') item.value = String(el.value).slice(0, 80);
-      if (el.placeholder) item.placeholder = el.placeholder.slice(0, 80);
-      if (el.name) item.name = el.name;
+      const choice = el.type === 'checkbox' || el.type === 'radio';
+      if (el.type && el.type !== 'text') item.type = clean(el.type, 30);
+      if (el.value && el.type !== 'password' && !choice) item.value = clean(el.value, 80);
+      if (el.placeholder) item.placeholder = clean(el.placeholder, 80);
+      if (el.name) item.name = clean(el.name, 80);
       if (el.required) item.required = true;
     }
     if (tag === 'input' && (el.type === 'checkbox' || el.type === 'radio')) item.checked = el.checked;
     if (el.getAttribute('aria-expanded') !== null) item.expanded = el.getAttribute('aria-expanded') === 'true';
     if (el.disabled) item.disabled = true;
-    if (tag === 'select') item.options = Array.from(el.options).slice(0, 25).map(o => o.text.trim().slice(0, 50));
+    if (tag === 'select') item.options = Array.from(el.options).slice(0, 25).map(o => clean(o.text, 50));
     if (!visible) item.hidden = true;
     item.viewport = r.bottom > 0 && r.top < innerHeight;
     out.push(item);
     if (out.length >= max) break;
   }
   const headings = Array.from(document.querySelectorAll('h1,h2,h3')).filter(h => h.offsetParent !== null).slice(0, 40)
-    .map(h => ({level: +h.tagName[1], text: h.innerText.replace(/\s+/g, ' ').trim().slice(0, 120)}));
+    .map(h => ({level: +h.tagName[1], text: clean(h.innerText, 120)}));
   const frames = document.querySelectorAll('iframe').length;
-  return {items: out, total: els.length, headings, frames, title: document.title, url: location.href,
+  return {items: out, total: els.length, headings, frames, title: clean(document.title, 300), url: location.href,
           scroll: {y: Math.round(scrollY), height: document.documentElement.scrollHeight, viewport: innerHeight}};
 }
 """
+_CLEAN_RE = re.compile(r"[\s\x00-\x1f\x7f-\x9f]+")
+
+
+def clean(v: Any) -> str:
+    """One line of page-controlled text (no newlines/control characters that could forge output lines)."""
+    return _CLEAN_RE.sub(" ", str(v)).strip()
+
+
+def budget(cmd: str, a: dict[str, Any]) -> float:
+    """Seconds the daemon lets one command run before declaring the page unresponsive (the client waits a bit longer)."""
+    try:
+        t = max(0.1, float(a.get("timeout") or 20))
+    except (TypeError, ValueError):
+        t = 20.0
+    b = 3 * t + 10  # open = goto (t) + settle (t + 5 s) + checks
+    if cmd == "wait" and a.get("seconds"):
+        try:
+            b += max(0.0, float(a["seconds"]))
+        except (TypeError, ValueError):
+            pass
+    if cmd == "read":
+        b += 60  # web-extract runs in Python after the DOM is taken
+    return b
 
 
 # ------------------------------------------------------------------ state file
@@ -121,12 +158,59 @@ def state_path() -> Path:
 
 def read_state() -> dict[str, Any] | None:
     try:
-        return json.loads(state_path().read_text(encoding="utf-8"))
+        st = json.loads(state_path().read_text(encoding="utf-8"))
+        return st if isinstance(st, dict) else None
     except (OSError, ValueError):
         return None
 
 
+def write_state(data: dict[str, Any]) -> None:
+    """Owner-only (0600) state file in an owner-only directory, replaced atomically: it holds the session token."""
+    path = state_path()
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data))
+    os.replace(tmp, path)
+
+
+def remove_own_state() -> None:
+    try:
+        path = state_path()
+        if json.loads(path.read_text(encoding="utf-8")).get("pid") == os.getpid():
+            path.unlink()
+    except (OSError, ValueError, AttributeError):
+        pass
+
+
+def pid_alive(pid: Any) -> bool:
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    if os.name == "nt":  # os.kill(pid, 0) would send CTRL_C_EVENT on Windows
+        import ctypes
+        k32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        h = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        ok = k32.GetExitCodeProcess(h, ctypes.byref(code))
+        k32.CloseHandle(h)
+        return bool(ok) and code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 def load_web_extract() -> Any | None:
+    if os.environ.get("WEB_BROWSE_NO_EXTRACT", "").strip() not in ("", "0"):
+        return None
     here = Path(__file__).resolve()
     candidates = [Path(os.environ["WEB_EXTRACT_SCRIPT"])] if os.environ.get("WEB_EXTRACT_SCRIPT") else []
     candidates += [here.parent.parent.parent / "web-extract" / "scripts" / "extract.py", here.parent / "extract.py"]
@@ -149,7 +233,7 @@ def load_web_extract() -> Any | None:
 # --------------------------------------------------------------------- server
 
 class Session:
-    """The browser-owning side: one Playwright, one context, N pages, executed on one thread."""
+    """The browser-owning side: one Playwright, one context, N pages. Every Playwright call happens on the main thread."""
 
     def __init__(self, headful: bool, profile: str | None, idle_min: float) -> None:
         from playwright.sync_api import sync_playwright
@@ -157,40 +241,55 @@ class Session:
         launch: dict[str, Any] = {"headless": not headful}
         ctx_opts: dict[str, Any] = {"viewport": {"width": 1280, "height": 900}, "locale": "en-US", "accept_downloads": True}
         self.browser = None
-        if profile:
-            self.ctx = self.pw.chromium.launch_persistent_context(profile, **launch, **ctx_opts)
-        else:
-            self.browser = self.pw.chromium.launch(**launch)
-            if not headful:
-                probe = self.browser.new_page()
-                ua = probe.evaluate("navigator.userAgent")
-                probe.close()
-                ctx_opts["user_agent"] = f"{ua} {UA_TOKEN}"
-            self.ctx = self.browser.new_context(**ctx_opts)
+        try:
+            if profile:
+                if not headful:  # identify the headless browser in persistent sessions too
+                    probe = self.pw.chromium.launch(headless=True)
+                    try:
+                        ctx_opts["user_agent"] = f"{probe.new_page().evaluate('navigator.userAgent')} {UA_TOKEN}"
+                    finally:
+                        probe.close()
+                Path(profile).mkdir(parents=True, exist_ok=True, mode=0o700)
+                self.ctx = self.pw.chromium.launch_persistent_context(profile, **launch, **ctx_opts)
+                if os.name != "nt":
+                    try:
+                        os.chmod(profile, 0o700)  # cookies and logins live here
+                    except OSError:
+                        pass
+            else:
+                self.browser = self.pw.chromium.launch(**launch)
+                if not headful:
+                    probe = self.browser.new_page()
+                    ua = probe.evaluate("navigator.userAgent")
+                    probe.close()
+                    ctx_opts["user_agent"] = f"{ua} {UA_TOKEN}"
+                self.ctx = self.browser.new_context(**ctx_opts)
+        except BaseException:
+            self.pw.stop()
+            raise
         self.ctx.set_default_timeout(20_000)
         self.page = self.ctx.pages[0] if self.ctx.pages else self.ctx.new_page()
         self.headful, self.profile, self.idle = headful, profile, idle_min * 60
-        self.last_status: int | None = None
-        self.last_headers: dict[str, str] = {}
+        self.nav: dict[Any, tuple[int, dict[str, str]]] = {}  # page → status and headers of its last main-frame navigation
         self.wx = load_web_extract()
         self.log: list[str] = []
-        self.ctx.on("page", self._on_new_page)
-        self._watch(self.page)
+        self.cached: dict[str, Any] = {}  # last state(), served to `ping` without touching the browser
+        self.ctx.on("page", self._watch)
+        for p in self.ctx.pages:
+            self._watch(p)
+        self.state()
 
     # bookkeeping ----------------------------------------------------------
-    def _on_new_page(self, page: Any) -> None:
-        self._watch(page)
-
     def _watch(self, page: Any) -> None:
         def on_response(resp: Any) -> None:
             try:
                 req = resp.request
                 if req.is_navigation_request() and req.frame == page.main_frame:
-                    self.last_status = resp.status
-                    self.last_headers = {str(k).lower(): str(v) for k, v in resp.headers.items()}
+                    self.nav[page] = (resp.status, {str(k).lower(): str(v) for k, v in resp.headers.items()})
             except Exception:
                 pass
         page.on("response", on_response)
+        page.on("close", lambda *_: self.nav.pop(page, None))
 
     def pages(self) -> list[Any]:
         return [p for p in self.ctx.pages if not p.is_closed()]
@@ -201,92 +300,172 @@ class Session:
             self.page = ps[-1] if ps else self.ctx.new_page()
         return self.page
 
+    def status_of(self, page: Any) -> tuple[int | None, dict[str, str]]:
+        return self.nav.get(page, (None, {}))
+
+    def responsive(self, page: Any, ms: int) -> bool:
+        """True when the page's main thread runs a trivial script within `ms` (a busy loop would hang page.title()/content() forever)."""
+        try:
+            page.wait_for_function("() => true", timeout=max(100, ms), polling=100)
+            return True
+        except Exception:
+            return False
+
+    def title_of(self, page: Any, ms: int = 1500) -> str | None:
+        if not self.responsive(page, ms):
+            return None
+        try:
+            return clean(page.title())
+        except Exception:
+            return None
+
     def settle(self, timeout_ms: int) -> None:
         page = self.ensure_page()
-        for state, budget in (("load", timeout_ms), ("networkidle", min(5000, timeout_ms // 3))):
+        for state, budget_ms in (("load", timeout_ms), ("networkidle", min(5000, timeout_ms // 3))):
             try:
-                page.wait_for_load_state(state, timeout=budget)
+                page.wait_for_load_state(state, timeout=budget_ms)
             except Exception:
                 pass
 
     def state(self) -> dict[str, Any]:
         page = self.ensure_page()
-        try:
-            title = page.title()
-        except Exception:
-            title = None
-        return {"url": page.url, "title": title, "status": self.last_status, "tabs": len(self.pages()),
-                "tab": self.pages().index(page) + 1 if page in self.pages() else 1}
+        ps = self.pages()
+        title = self.title_of(page)
+        out = {"url": page.url, "title": title, "status": self.status_of(page)[0], "tabs": len(ps),
+               "tab": ps.index(page) + 1 if page in ps else 1}
+        if title is None and not self.responsive(page, 100):
+            out["unresponsive"] = True
+        self.cached = dict(out)
+        return out
+
+    def tab_list(self) -> list[dict[str, Any]]:
+        cur = self.ensure_page()
+        return [{"index": i + 1, "url": p.url, "title": self.title_of(p, 1000) or ("(unresponsive)" if not self.responsive(p, 100) else ""),
+                 "current": p == cur} for i, p in enumerate(self.pages())]
 
     def locator(self, target: str) -> Any:
+        """A locator for exactly one element: a ref, `text=…`, or a CSS selector. Several matches are an error (use a ref)."""
         page = self.ensure_page()
         if re.fullmatch(r"\d+", target.strip()):
             loc = page.locator(f'[data-wb-ref="{target.strip()}"]')
-            if loc.count() == 0:
+            n = loc.count()
+            if n == 0:
                 raise LookupError(f"ref {target} is not on the page any more; run `snapshot` again")
-            return loc.first
+            if n > 1:  # cloned nodes or the page itself set the attribute; `snapshot` renumbers duplicates
+                raise LookupError(f"ref {target} is on {n} elements now; run `snapshot` again")
+            return loc
         if target.startswith("text="):  # prefer something clickable/typable over a heading or paragraph with the same words
             needle = target[5:]
-            inter = page.locator("a, button, input, select, textarea, summary, label, [role=button], [role=link], [role=tab], "
-                                 "[role=menuitem], [role=option], [onclick]").filter(has_text=re.compile(re.escape(needle), re.I))
-            if inter.count():
-                return inter.first
+            exact_re = re.compile(r"^\s*" + re.escape(needle) + r"\s*$", re.I)
+            text_re = re.compile(re.escape(needle), re.I)
+            inter = page.locator(INTERACTIVE).filter(has_text=text_re)
+            n = inter.count()
+            if n == 1:
+                return inter
+            if n > 1:
+                # nested clickables (<a><button>Sign in</button></a>) are one target: keep the innermost match
+                inner = inter.filter(has_not=page.locator(INTERACTIVE).filter(has_text=text_re))
+                m = inner.count()
+                if m == 1:
+                    return inner
+                exact = (inner if m else inter).filter(has_text=exact_re)
+                if exact.count() == 1:
+                    return exact
+                raise LookupError(f"text={needle!r} matches {m or n} clickable elements; use a ref from `snapshot`")
             loc = page.get_by_text(needle, exact=False)
-            if loc.count() == 0:
+            n = loc.count()
+            if n == 0:
                 raise LookupError(f"no element with text {needle!r}; run `snapshot` or `find {needle}`")
-            return loc.first
+            if n > 1:
+                exact = page.get_by_text(needle, exact=True)
+                if exact.count() == 1:
+                    return exact
+                raise LookupError(f"text={needle!r} matches {n} elements; use a ref from `snapshot`")
+            return loc
         loc = page.locator(target)
-        if loc.count() == 0:
+        n = loc.count()
+        if n == 0:
             raise LookupError(f"nothing matches {target!r}; run `snapshot` for refs or check the selector")
-        return loc.first
+        if n > 1:
+            raise LookupError(f"{target!r} matches {n} elements; use a ref from `snapshot` or a narrower selector")
+        return loc
 
     def classify_page(self) -> Any | None:
         """web-extract's bot-wall detection on the current DOM (None when web-extract is unavailable)."""
-        if self.wx is None or self.last_status is None:
-            return None
         page = self.ensure_page()
+        status, headers = self.status_of(page)
+        if self.wx is None or status is None or not self.responsive(page, 2000):
+            return None
         body = page.content().encode("utf-8")
-        return self.wx.classify(self.last_status, self.last_headers, body[: self.wx.MARKER_SCAN_BYTES], page.url, len(body))
+        return self.wx.classify(status, headers, body[: self.wx.MARKER_SCAN_BYTES], page.url, len(body))
+
+    def replace_if_stuck(self, page: Any) -> tuple[Any, bool]:
+        """A tab whose script never yields cannot navigate away; close it and continue in a fresh tab."""
+        if self.responsive(page, 1000):
+            return page, False
+        try:
+            page.close(run_before_unload=False)
+        except Exception:
+            pass
+        self.page = self.ctx.new_page()
+        return self.page, True
+
+    def request_close(self, page: Any) -> None:
+        """Called from another thread when a command is wedged in a busy page: close that tab on Playwright's own
+        event loop (the main thread is blocked inside it), which makes the pending call fail and frees the session."""
+        try:
+            loop, impl = page._loop, page._impl_obj
+            loop.call_soon_threadsafe(lambda: loop.create_task(impl.close(runBeforeUnload=False)))
+        except Exception:
+            pass
 
     # commands -------------------------------------------------------------
     def handle(self, cmd: str, a: dict[str, Any]) -> dict[str, Any]:
         page = self.ensure_page()
         t = int(float(a.get("timeout", 20)) * 1000)
+        fail = lambda e: {"ok": False, "code": EXIT_FAIL, "error": str(e)}  # noqa: E731
         if cmd == "ping":
             return {"ok": True, **self.state()}
         if cmd == "status":
             return {"ok": True, **self.state(), "headful": self.headful, "profile": self.profile, "web_extract": self.wx is not None,
-                    "pages": [{"index": i + 1, "url": p.url, "title": p.title(), "current": p == page} for i, p in enumerate(self.pages())],
-                    "recent": self.log[-10:]}
-        if cmd == "open":
+                    "pages": self.tab_list(), "recent": self.log[-10:]}
+        if cmd in ("snapshot", "find", "read", "html", "eval", "scroll", "press") and not self.responsive(page, min(t, 5000)):
+            return {"ok": False, "code": EXIT_FAIL, "kind": "unresponsive",
+                    "error": f"{UNRESPONSIVE}; `reload` or `open` replaces the tab, `tab close` drops it"}
+        if cmd == "open" or (cmd == "reload" and not self.responsive(page, 1000)):
+            url = a["url"] if cmd == "open" else page.url
+            page, replaced = self.replace_if_stuck(page)
+            self.nav.pop(page, None)
             try:
-                resp = page.goto(a["url"], wait_until="domcontentloaded", timeout=t)
+                resp = page.goto(url, wait_until="domcontentloaded", timeout=t)
             except Exception as e:
-                return nav_error(e, a["url"])
+                return nav_error(e, url)
             self.settle(t)
-            if resp is not None:
-                self.last_status = resp.status
+            if resp is not None and page not in self.nav:
+                self.nav[page] = (resp.status, {str(k).lower(): str(v) for k, v in resp.headers.items()})
             cls = self.classify_page()
-            out = {"ok": True, **self.state()}
+            out = {"ok": True, **self.state(), **({"replaced_tab": True} if replaced else {})}
+            status = out.get("status")
             if cls is not None and cls.error is not None and cls.error.code == EXIT_BLOCKED:
                 out.update(blocked=cls.error.as_dict())
-            elif (self.last_status or 0) >= 400:
-                out.update(http_error=self.last_status)
+            elif (status or 0) >= 400:
+                out.update(http_error=status)
             return out
         if cmd == "snapshot":
             data = page.evaluate(SNAPSHOT_JS, [int(a.get("max", MAX_SNAPSHOT)), bool(a.get("all"))])
-            return {"ok": True, **data, "status": self.last_status}
+            return {"ok": True, **data, "status": self.status_of(page)[0]}
         if cmd == "find":
             data = page.evaluate(SNAPSHOT_JS, [1000, True])
-            needle = a["text"].lower()
-            hits = [it for it in data["items"] if needle in json.dumps(it, ensure_ascii=False).lower()]
+            needle = str(a["text"]).lower()
+            fields = ("text", "href", "name", "placeholder", "value", "type", "role")
+            hits = [it for it in data["items"] if needle in " ".join(str(it.get(k, "")) for k in fields).lower()]
             return {"ok": True, "items": hits[: int(a.get("max", 50))], "url": data["url"], "title": data["title"]}
         if cmd in ("click", "hover", "check", "uncheck", "focus"):
             try:
                 loc = self.locator(a["target"])
                 getattr(loc, cmd)(timeout=t) if cmd != "click" else loc.click(timeout=t, button=a.get("button", "left"), click_count=int(a.get("count", 1)))
             except LookupError as e:
-                return {"ok": False, "code": EXIT_FAIL, "error": str(e)}
+                return fail(e)
             except Exception as e:
                 return action_error(e, cmd, a["target"])
             self.settle(t)
@@ -297,26 +476,37 @@ class Session:
                 if a.get("clear", True):
                     loc.fill(a["text"], timeout=t)
                 else:
-                    loc.type(a["text"], timeout=t)
+                    loc.evaluate("e => { e.focus(); const n = (e.value || '').length;"
+                                 " if (e.setSelectionRange) { try { e.setSelectionRange(n, n); } catch (_) {} } }", timeout=t)
+                    loc.press_sequentially(a["text"], timeout=t)
                 if a.get("enter"):
                     loc.press("Enter", timeout=t)
                     self.settle(t)
             except LookupError as e:
-                return {"ok": False, "code": EXIT_FAIL, "error": str(e)}
+                return fail(e)
             except Exception as e:
                 return action_error(e, "type", a["target"])
             return {"ok": True, **self.state()}
         if cmd == "select":
+            want = str(a["value"])
             try:
                 loc = self.locator(a["target"])
-                chosen = loc.select_option(label=a["value"], timeout=t) if not a.get("by_value") else loc.select_option(value=a["value"], timeout=t)
+                opts = loc.evaluate("e => e.options ? Array.from(e.options).map(o => [o.text.trim(), o.value]) : null", timeout=t)
+                if opts is None:
+                    return fail(f"{a['target']!r} is not a <select>; use `click` for custom drop-downs")
+                if a.get("by_value"):
+                    match = [v for _, v in opts if v == want]
+                else:
+                    match = ([v for lbl, v in opts if lbl == want] or [v for lbl, v in opts if lbl.lower() == want.lower()]
+                             or [v for _, v in opts if v == want])
+                if not match:
+                    shown = " | ".join(clean(lbl)[:50] for lbl, _ in opts[:30]) + (" …" if len(opts) > 30 else "")
+                    return fail(f"no option {want!r} ({'value' if a.get('by_value') else 'label'}); options: {shown}")
+                chosen = loc.select_option(value=match[0], timeout=t)
             except LookupError as e:
-                return {"ok": False, "code": EXIT_FAIL, "error": str(e)}
+                return fail(e)
             except Exception as e:
-                try:
-                    chosen = self.locator(a["target"]).select_option(value=a["value"], timeout=t)
-                except Exception:
-                    return action_error(e, "select", a["target"])
+                return action_error(e, "select", a["target"])
             self.settle(t)
             return {"ok": True, "selected": chosen, **self.state()}
         if cmd == "press":
@@ -328,11 +518,11 @@ class Session:
             return {"ok": True, **self.state()}
         if cmd == "scroll":
             where = a.get("where", "down")
-            if re.fullmatch(r"\d+", str(where)) or (isinstance(where, str) and not where in ("down", "up", "top", "bottom")):
+            if re.fullmatch(r"\d+", str(where)) or (isinstance(where, str) and where not in ("down", "up", "top", "bottom")):
                 try:
                     self.locator(str(where)).scroll_into_view_if_needed(timeout=t)
                 except LookupError as e:
-                    return {"ok": False, "code": EXIT_FAIL, "error": str(e)}
+                    return fail(e)
                 except Exception as e:
                     return action_error(e, "scroll", str(where))
             else:
@@ -344,6 +534,7 @@ class Session:
             pos = page.evaluate("({y: Math.round(scrollY), height: document.documentElement.scrollHeight, viewport: innerHeight})")
             return {"ok": True, "scroll": pos, **self.state()}
         if cmd in ("back", "forward", "reload"):
+            self.nav.pop(page, None)
             try:
                 getattr(page, "go_back" if cmd == "back" else "go_forward" if cmd == "forward" else "reload")(timeout=t, wait_until="domcontentloaded")
             except Exception as e:
@@ -362,6 +553,8 @@ class Session:
                     page.wait_for_timeout(int(float(a["seconds"]) * 1000))
                 else:
                     self.settle(t)
+            except re.error as e:
+                return {"ok": False, "code": EXIT_BAD_INPUT, "error": f"bad --url pattern: {e}"}
             except Exception as e:
                 return action_error(e, "wait", a.get("selector") or a.get("text") or a.get("url") or "")
             return {"ok": True, **self.state()}
@@ -371,17 +564,18 @@ class Session:
                 text = page.evaluate("document.body ? document.body.innerText : ''")
                 return {"ok": True, **self.state(), "content": text, "content_format": "text", "words": len(text.split()), "warnings": ["no_web_extract"]}
             wx = self.wx
+            status, headers = self.status_of(page)
             ns = argparse.Namespace(format="text" if a.get("format") == "text" else "markdown", links=bool(a.get("links")), raw=bool(a.get("raw")),
                                     comments=False, recall=False, precision=False, structured=bool(a.get("structured")), out=None, max_chars=0)
-            f = wx.Fetched(self.last_status or 200, {**self.last_headers, "content-type": "text/html; charset=utf-8"}, page.url, html)
+            f = wx.Fetched(status or 200, {**headers, "content-type": "text/html; charset=utf-8"}, page.url, html)
             result = wx.new_result(page.url)
             err = wx.handle_body(f, result, ns, "browser")
             if err is not None:
                 text = page.evaluate("document.body ? document.body.innerText : ''")
                 return {"ok": True, **self.state(), "content": text, "content_format": "text", "words": len(text.split()),
                         "warnings": ["extraction_failed:" + err.kind], "title": result.get("title")}
-            return {"ok": True, **self.state(), **{k: result[k] for k in ("title", "author", "date", "content", "content_format", "words",
-                                                                       "warnings", "links", "structured", "language")}}
+            return {"ok": True, **self.state(), **{k: result.get(k) for k in ("title", "author", "date", "content", "content_format", "words",
+                                                                           "warnings", "links", "structured", "language")}}
         if cmd == "html":
             return {"ok": True, **self.state(), "html": page.content()}
         if cmd == "screenshot":
@@ -391,9 +585,9 @@ class Session:
                 if a.get("target"):
                     self.locator(a["target"]).screenshot(path=str(path), timeout=t)
                 else:
-                    page.screenshot(path=str(path), full_page=bool(a.get("full")))
+                    page.screenshot(path=str(path), full_page=bool(a.get("full")), timeout=t)
             except LookupError as e:
-                return {"ok": False, "code": EXIT_FAIL, "error": str(e)}
+                return fail(e)
             except Exception as e:
                 return action_error(e, "screenshot", str(path))
             return {"ok": True, "path": str(path), **self.state()}
@@ -408,33 +602,33 @@ class Session:
                 value = str(value)
             return {"ok": True, "value": value, **self.state()}
         if cmd == "tabs":
-            return {"ok": True, "pages": [{"index": i + 1, "url": p.url, "title": p.title(), "current": p == page} for i, p in enumerate(self.pages())]}
+            return {"ok": True, "pages": self.tab_list()}
         if cmd == "tab":
             ps = self.pages()
-            which = a.get("which")
+            which = str(a.get("which"))
             if which == "new":
                 self.page = self.ctx.new_page()
                 if a.get("url"):
                     return self.handle("open", {"url": a["url"], "timeout": a.get("timeout", 20)})
                 return {"ok": True, **self.state()}
             if which == "close":
-                if len(ps) > 1:
-                    page.close()
-                    self.page = self.pages()[-1]
-                else:
-                    page.goto("about:blank")
+                if len(ps) <= 1:  # keep one tab open: a fresh blank one (works even when the old one is stuck)
+                    self.ctx.new_page()
+                page.close(run_before_unload=False)
+                self.page = self.pages()[-1]
                 return {"ok": True, **self.state()}
             try:
-                self.page = ps[int(which) - 1]
-                self.page.bring_to_front()
-            except (ValueError, IndexError):
+                n = int(which)
+            except ValueError:
+                n = 0
+            if not 1 <= n <= len(ps):
                 return {"ok": False, "code": EXIT_BAD_INPUT, "error": f"no tab {which}; there are {len(ps)}"}
+            self.page = ps[n - 1]
+            self.page.bring_to_front()
             return {"ok": True, **self.state()}
         if cmd == "cookies":
             cs = self.ctx.cookies()
             return {"ok": True, "count": len(cs), "cookies": [{"name": c["name"], "domain": c["domain"], "expires": c.get("expires")} for c in cs]}
-        if cmd == "stop":
-            return {"ok": True, "stopping": True}
         return {"ok": False, "code": EXIT_BAD_INPUT, "error": f"unknown command {cmd}"}
 
     def close(self) -> None:
@@ -464,69 +658,226 @@ def action_error(e: Exception, cmd: str, target: str) -> dict[str, Any]:
         return {"ok": False, "code": EXIT_FAIL, "error": f"{cmd} {target!r} timed out — {hint}", "kind": "timeout"}
     if "strict mode" in msg or "resolved to" in msg:
         return {"ok": False, "code": EXIT_FAIL, "error": f"{cmd} {target!r}: selector matches several elements; use a ref from `snapshot`", "kind": "ambiguous"}
+    if "closed" in msg and ("Target" in msg or "page" in msg):
+        return {"ok": False, "code": EXIT_FAIL, "error": f"{cmd} {target!r}: the tab was closed ({UNRESPONSIVE}?)", "kind": "closed"}
     return {"ok": False, "code": EXIT_FAIL, "error": f"{cmd} {target!r} failed: {msg[:200]}", "kind": "action"}
+
+
+def log_line(cmd: str, args: dict[str, Any], resp: dict[str, Any]) -> str:
+    """One `recent` entry: typed text and eval source are redacted, URLs lose query, fragment and credentials."""
+    shown: dict[str, Any] = {k: ("***" if k in ("text", "js") and v else v) for k, v in args.items() if k != "timeout" and v not in (None, False, "")}
+    if isinstance(shown.get("url"), str) and cmd != "wait":
+        try:
+            u = urlsplit(shown["url"])
+            shown["url"] = u._replace(netloc=u.netloc.rsplit("@", 1)[-1], query="", fragment="").geturl()
+        except ValueError:
+            shown["url"] = "***"
+    return f"{cmd} {json.dumps(shown, ensure_ascii=False)[:100]} → {'ok' if resp.get('ok') else 'fail'}"
+
+
+class Job:
+    """One authenticated request, handed from a connection thread to the main (browser) thread."""
+
+    def __init__(self, cmd: str, args: dict[str, Any]) -> None:
+        self.cmd, self.args = cmd, args
+        self.done = threading.Event()
+        self.result: dict[str, Any] | None = None
+        self.state = "queued"  # queued → running → done, or abandoned (client gave up / session stopping)
+
+
+class Daemon:
+    """Sockets on background threads, Playwright on the main thread.
+
+    The accept thread owns the idle timer and `stop`, and each connection thread waits for its job only up to
+    the command's budget, so a page stuck in a busy script can neither hang a client nor keep the session alive:
+    the client gets `page is unresponsive`, the stuck tab is closed, and `stop` still ends the process."""
+
+    def __init__(self, session: Session, srv: socket.socket, token: str) -> None:
+        self.session, self.srv, self.token = session, srv, token
+        self.jobs: queue.Queue[Job | None] = queue.Queue()
+        self.lock = threading.Lock()
+        self.current: Job | None = None
+        self.last = time.monotonic()
+        self.stopping = threading.Event()
+
+    # main thread ----------------------------------------------------------
+    def run(self) -> None:
+        threading.Thread(target=self.accept_loop, name="wb-accept", daemon=True).start()
+        while True:
+            try:
+                job = self.jobs.get(timeout=1.0)
+            except queue.Empty:
+                continue
+            if job is None:
+                break
+            with self.lock:
+                if job.state != "queued":
+                    continue
+                job.state, self.current = "running", job
+            try:
+                resp = self.session.handle(job.cmd, job.args)
+            except Exception as e:  # never let one command kill the session
+                resp = {"ok": False, "code": EXIT_OTHER, "error": f"{type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]}"}
+            self.session.log.append(log_line(job.cmd, job.args, resp))
+            with self.lock:
+                if job.state == "running":
+                    job.result, job.state = resp, "done"
+                self.current, self.last = None, time.monotonic()
+            job.done.set()
+
+    # background threads ---------------------------------------------------
+    def accept_loop(self) -> None:
+        self.srv.settimeout(1.0)
+        while not self.stopping.is_set():
+            with self.lock:
+                idle = self.current is None and time.monotonic() - self.last > self.session.idle
+            if idle:
+                self.shutdown()
+                return
+            try:
+                conn, _ = self.srv.accept()
+            except (socket.timeout, TimeoutError):
+                continue
+            except OSError:
+                return
+            threading.Thread(target=self.serve_conn, args=(conn,), name="wb-conn", daemon=True).start()
+
+    def serve_conn(self, conn: socket.socket) -> None:
+        with conn:
+            try:
+                conn.settimeout(PRE_AUTH_TIMEOUT)  # an unauthenticated client cannot hold the line open
+                raw = b""
+                while not raw.endswith(b"\n"):
+                    chunk = conn.recv(65536)
+                    if not chunk:
+                        return
+                    raw += chunk
+                    if len(raw) > MAX_REQUEST:
+                        return
+                req = json.loads(raw.decode("utf-8"))
+                tok = req.get("token") if isinstance(req, dict) else None
+                if not isinstance(tok, str) or not hmac.compare_digest(tok.encode("utf-8"), self.token.encode("utf-8")):
+                    return self.reply(conn, {"ok": False, "code": EXIT_BAD_INPUT, "error": "bad session token"})
+                cmd = str(req.get("cmd"))
+                args = req.get("args") if isinstance(req.get("args"), dict) else {}
+                with self.lock:
+                    self.last = time.monotonic()
+                if cmd == "stop":
+                    self.reply(conn, {"ok": True, "stopping": True})
+                    self.shutdown()
+                    return
+                if cmd == "ping":  # answered here so `start` sees a live session even while a long command runs
+                    with self.lock:
+                        busy = self.current.cmd if self.current else None
+                    return self.reply(conn, {"ok": True, **self.session.cached, "pid": os.getpid(), "busy": busy})
+                if self.stopping.is_set():
+                    return self.reply(conn, {"ok": False, "code": EXIT_BAD_INPUT, "error": "the session is stopping; run `start` again"})
+                job = Job(cmd, args)
+                self.jobs.put(job)
+                limit = budget(cmd, args)
+                if job.done.wait(limit):
+                    return self.reply(conn, job.result or {"ok": False, "code": EXIT_OTHER, "error": "no result"})
+                stuck = False
+                with self.lock:
+                    if job.state == "queued":
+                        job.state = "abandoned"
+                        resp = {"ok": False, "code": EXIT_OTHER, "error": "the session is still busy with an earlier command; retry in a moment"}
+                    elif job.state == "running":
+                        job.state, stuck = "abandoned", True
+                        resp = {"ok": False, "code": EXIT_FAIL, "kind": "unresponsive",
+                                "error": f"{UNRESPONSIVE}: `{cmd}` got no answer in {limit:g} s; closing that tab"}
+                    else:
+                        resp = job.result or {"ok": False, "code": EXIT_OTHER, "error": "no result"}
+                self.reply(conn, resp)
+                if stuck:
+                    self.unwedge(job)
+            except (OSError, ValueError, UnicodeDecodeError):
+                pass
+
+    @staticmethod
+    def reply(conn: socket.socket, resp: dict[str, Any]) -> None:
+        try:
+            conn.settimeout(30)
+            conn.sendall((json.dumps(resp, ensure_ascii=False) + "\n").encode("utf-8"))
+        except OSError:
+            pass
+
+    def unwedge(self, job: Job) -> None:
+        """Close the tab the main thread is stuck in; if that does not free it, end the process rather than hang forever."""
+        self.session.request_close(self.session.page)
+        if not self.wait_idle(job, 20):
+            self.hard_exit()
+
+    def wait_idle(self, job: Job, seconds: float) -> bool:
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            with self.lock:
+                if self.current is not job:
+                    return True
+            time.sleep(0.1)
+        return False
+
+    def shutdown(self) -> None:
+        """`stop` or idle timeout: refuse queued work, let the main thread close the browser; force it if it is stuck."""
+        if self.stopping.is_set():
+            return
+        self.stopping.set()
+        gone = {"ok": False, "code": EXIT_OTHER, "error": "the session was stopped while this command waited"}
+        with self.lock:
+            while True:
+                try:
+                    j = self.jobs.get_nowait()
+                except queue.Empty:
+                    break
+                if j is not None:
+                    j.state, j.result = "abandoned", gone
+                    j.done.set()
+            running = self.current
+        self.jobs.put(None)
+        if running is not None:
+            with self.lock:
+                running.state, running.result = "abandoned", gone
+            running.done.set()
+            self.session.request_close(self.session.page)
+        timer = threading.Timer(STOP_GRACE, self.hard_exit)
+        timer.daemon = True
+        timer.start()
+
+    def hard_exit(self) -> None:
+        remove_own_state()
+        try:
+            self.srv.close()
+        finally:
+            time.sleep(0.3)  # let connection threads flush their replies
+            os._exit(EXIT_OK)  # the Playwright driver sees its pipe close and takes Chromium down with it
 
 
 def serve(args: argparse.Namespace) -> int:
     """Daemon: own the browser, answer JSON-line requests on a loopback socket, exit when idle or told to."""
-    path = state_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
     token = secrets.token_hex(16)
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind(("127.0.0.1", 0))
-    srv.listen(8)
-    srv.settimeout(1.0)
+    srv.listen(16)
     port = srv.getsockname()[1]
     try:
         session = Session(args.headful, args.profile, args.idle_timeout)
     except Exception as e:
-        path.write_text(json.dumps({"error": f"browser failed to start: {(str(e).splitlines() or [type(e).__name__])[0][:300]}"}), encoding="utf-8")
+        write_state({"error": f"browser failed to start: {(str(e).splitlines() or [type(e).__name__])[0][:300]}", "pid": os.getpid()})
+        srv.close()
         return EXIT_BAD_INPUT
-    path.write_text(json.dumps({"port": port, "token": token, "pid": os.getpid(), "headful": args.headful, "profile": args.profile,
-                                "started": time.strftime("%Y-%m-%dT%H:%M:%S"), "idle_timeout_min": args.idle_timeout}), encoding="utf-8")
-    last = time.monotonic()
-    stopping = False
+    write_state({"port": port, "token": token, "pid": os.getpid(), "headful": args.headful, "profile": args.profile,
+                 "started": time.strftime("%Y-%m-%dT%H:%M:%S"), "idle_timeout_min": args.idle_timeout})
+    daemon = Daemon(session, srv, token)
     try:
-        while not stopping:
-            if time.monotonic() - last > session.idle:
-                break
-            try:
-                conn, _ = srv.accept()
-            except socket.timeout:
-                continue
-            with conn:
-                conn.settimeout(600)
-                try:
-                    raw = b""
-                    while not raw.endswith(b"\n"):
-                        chunk = conn.recv(65536)
-                        if not chunk:
-                            break
-                        raw += chunk
-                    req = json.loads(raw.decode("utf-8"))
-                    if req.get("token") != token:
-                        resp = {"ok": False, "code": EXIT_BAD_INPUT, "error": "bad session token"}
-                    else:
-                        last = time.monotonic()
-                        try:
-                            resp = session.handle(req["cmd"], req.get("args") or {})
-                        except Exception as e:  # never let one command kill the session
-                            resp = {"ok": False, "code": EXIT_OTHER, "error": f"{type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]}"}
-                        session.log.append(f"{req['cmd']} {json.dumps(req.get('args') or {}, ensure_ascii=False)[:80]} → {'ok' if resp.get('ok') else 'fail'}")
-                        stopping = bool(resp.get("stopping"))
-                    conn.sendall((json.dumps(resp, ensure_ascii=False) + "\n").encode("utf-8"))
-                except Exception:
-                    pass
+        daemon.run()
     finally:
+        daemon.stopping.set()
         try:
             session.close()
+        except Exception:
+            pass
         finally:
-            try:
-                if path.exists() and json.loads(path.read_text(encoding="utf-8")).get("pid") == os.getpid():
-                    path.unlink()
-            except (OSError, ValueError):
-                pass
+            remove_own_state()
             srv.close()
     return EXIT_OK
 
@@ -540,28 +891,36 @@ def send(cmd: str, args: dict[str, Any], timeout: float = 120.0) -> dict[str, An
     try:
         with socket.create_connection(("127.0.0.1", st["port"]), timeout=5) as s:
             s.settimeout(timeout)
-            s.sendall((json.dumps({"token": st["token"], "cmd": cmd, "args": args}, ensure_ascii=False) + "\n").encode("utf-8"))
+            s.sendall((json.dumps({"token": st.get("token"), "cmd": cmd, "args": args}, ensure_ascii=False) + "\n").encode("utf-8"))
             raw = b""
             while not raw.endswith(b"\n"):
                 chunk = s.recv(1 << 20)
                 if not chunk:
                     break
                 raw += chunk
+        if not raw.strip():
+            return {"ok": False, "code": EXIT_OTHER, "error": "the session closed the connection without answering (it may be stopping); `status` to check"}
         return json.loads(raw.decode("utf-8"))
-    except (ConnectionRefusedError, OSError):
-        try:
-            state_path().unlink()
-        except OSError:
-            pass
-        return {"ok": False, "code": EXIT_BAD_INPUT, "error": "the browser session is gone (idle timeout or crash); run `start` again"}
+    except (socket.timeout, TimeoutError):
+        return {"ok": False, "code": EXIT_OTHER, "error": "session still busy (the command exceeded the client wait); retry `status` in a moment"}
+    except ConnectionRefusedError:
+        if not pid_alive(st.get("pid")):
+            try:
+                state_path().unlink()
+            except OSError:
+                pass
+            return {"ok": False, "code": EXIT_BAD_INPUT, "error": "the browser session is gone (idle timeout or crash); run `start` again"}
+        return {"ok": False, "code": EXIT_BAD_INPUT, "error": f"the browser session (pid {st.get('pid')}) does not accept connections; run `start` again"}
+    except OSError as e:
+        return {"ok": False, "code": EXIT_OTHER, "error": f"cannot reach the browser session: {e}"}
     except ValueError:
         return {"ok": False, "code": EXIT_OTHER, "error": "garbled reply from the session"}
 
 
 def start(args: argparse.Namespace) -> int:
     st = read_state()
-    if st and "port" in st:
-        probe = send("ping", {})
+    if st and "port" in st and pid_alive(st.get("pid")):
+        probe = send("ping", {}, timeout=3)
         if probe.get("ok"):
             print_state("session already running", probe, args)
             return EXIT_OK
@@ -600,7 +959,7 @@ def start(args: argparse.Namespace) -> int:
                 pass
             return EXIT_BAD_INPUT
         if st and "port" in st:
-            probe = send("ping", {})
+            probe = send("ping", {}, timeout=3)
             if probe.get("ok"):
                 print_state(f"session started (pid {st['pid']}, {'headful' if args.headful else 'headless'}"
                             f"{', profile ' + args.profile if args.profile else ''}, idle timeout {args.idle_timeout:g} min)", probe, args)
@@ -617,24 +976,25 @@ def print_state(prefix: str, r: dict[str, Any], args: argparse.Namespace) -> Non
         sys.stdout.write(json.dumps({"note": prefix, **{k: v for k, v in r.items() if k != "ok"}}, ensure_ascii=False, indent=2) + "\n")
         return
     status = f" · HTTP {r['status']}" if r.get("status") else ""
-    tabs = f" · tab {r.get('tab')}/{r.get('tabs')}" if r.get("tabs", 1) > 1 else ""
-    sys.stdout.write(f"{prefix}\nurl: {r.get('url')}\ntitle: {r.get('title') or '—'}{status}{tabs}\n")
+    tabs = f" · tab {r.get('tab')}/{r.get('tabs')}" if (r.get("tabs") or 1) > 1 else ""
+    busy = f" · {UNRESPONSIVE}" if r.get("unresponsive") else ""
+    sys.stdout.write(f"{prefix}\nurl: {clean(r.get('url'))}\ntitle: {clean(r.get('title') or '—')}{status}{tabs}{busy}\n")
 
 
 def fmt_item(it: dict[str, Any]) -> str:
-    bits = [f"[{it['ref']}]", it["role"]]
+    bits = [f"[{it['ref']}]", clean(it["role"])]
     if it.get("text"):
         bits.append(json.dumps(it["text"], ensure_ascii=False))
     extra = []
     for k in ("href", "type", "name", "placeholder", "value"):
-        if it.get(k):
-            extra.append(f"{k}={it[k]}" if k != "href" else f"→ {it[k]}")
+        if it.get(k):  # page-controlled: quoted (escapes newlines and quotes) so it cannot pose as another line or field
+            extra.append(f"{k}={json.dumps(str(it[k]), ensure_ascii=False)}" if k != "href" else f"→ {clean(it[k])}")
     if "checked" in it:
         extra.append("checked" if it["checked"] else "unchecked")
     if "expanded" in it:
         extra.append("expanded" if it["expanded"] else "collapsed")
     if it.get("options"):
-        extra.append("options: " + " | ".join(it["options"][:8]) + (" …" if len(it["options"]) > 8 else ""))
+        extra.append("options: " + " | ".join(clean(o) for o in it["options"][:8]) + (" …" if len(it["options"]) > 8 else ""))
     for k in ("disabled", "required", "hidden"):
         if it.get(k):
             extra.append(k)
@@ -650,9 +1010,9 @@ def print_snapshot(r: dict[str, Any], args: argparse.Namespace) -> None:
     status = f" · HTTP {r['status']}" if r.get("status") else ""
     sc = r.get("scroll") or {}
     where = f" · scrolled {sc.get('y', 0)}/{max(0, sc.get('height', 0) - sc.get('viewport', 0))}" if sc else ""
-    sys.stdout.write(f"url: {r['url']}\ntitle: {r.get('title') or '—'}{status}{where}\n")
+    sys.stdout.write(f"url: {clean(r['url'])}\ntitle: {clean(r.get('title') or '—')}{status}{where}\n")
     if r.get("headings"):
-        sys.stdout.write("headings: " + " · ".join(("#" * h["level"]) + " " + h["text"] for h in r["headings"][:12]) + "\n")
+        sys.stdout.write("headings: " + " · ".join(("#" * h["level"]) + " " + clean(h["text"]) for h in r["headings"][:12]) + "\n")
     items = r.get("items", [])
     sys.stdout.write(f"interactive elements: {len(items)} shown of {r.get('total', len(items))}" + (f" · {r['frames']} iframe(s) not inspected" if r.get("frames") else "") + "\n")
     for it in items:
@@ -666,7 +1026,7 @@ def main(argv: list[str] | None = None) -> int:
         except (AttributeError, ValueError):
             pass
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--json", action="store_true", help="machine-readable output for every command (before or after the command)")
+    p.add_argument("--json", action="store_true", help="machine-readable JSON output for every command (before or after the command)")
     p.add_argument("--timeout", type=float, default=20.0, metavar="S", help="per action/navigation (default 20; before or after the command)")
     common = argparse.ArgumentParser(add_help=False)  # the same two flags after the command; SUPPRESS keeps the global value when absent
     common.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
@@ -743,9 +1103,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "start":
         return start(args)
     if args.cmd == "stop":
-        r = send("stop", {})
+        r = send("stop", {}, timeout=10)
         if r.get("ok"):
-            for _ in range(40):  # wait for the state file to disappear
+            for _ in range(int(STOP_GRACE * 10) + 20):  # wait for the state file to disappear (a stuck page is killed after STOP_GRACE)
                 if read_state() is None:
                     break
                 time.sleep(0.1)
@@ -784,7 +1144,7 @@ def main(argv: list[str] | None = None) -> int:
         a["js"] = args.js
     elif cmd == "tab":
         a.update(which=args.which, url=args.url)
-    r = send(cmd, a, timeout=max(args.timeout * 3, 60))
+    r = send(cmd, a, timeout=budget(cmd, a) + 15)  # the daemon answers "unresponsive" at budget(); never give up before it
     if not r.get("ok"):
         sys.stderr.write(f"error: {r.get('error')}\n")
         if args.json:
@@ -798,24 +1158,33 @@ def main(argv: list[str] | None = None) -> int:
         content = r.get("content") or ""
         if args.out:
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-            body = ("\n".join([f"# title: {r.get('title') or '—'}", f"# url: {r['url']}",
-                               f"# source: browser session · {r.get('words', 0)} words", f"# date: {r.get('date') or '—'} · author: {r.get('author') or '—'}"]
-                              + [f"# warning: {w}" for w in r.get("warnings", [])]) + "\n\n" + content + "\n") if args.format != "text" or True else content
+            body = "\n".join([f"# title: {clean(r.get('title') or '—')}", f"# url: {clean(r['url'])}",
+                              f"# source: browser session · {r.get('words', 0)} words",
+                              f"# date: {clean(r.get('date') or '—')} · author: {clean(r.get('author') or '—')}"]
+                             + [f"# warning: {w}" for w in r.get("warnings") or []]) + "\n\n" + content + "\n"
             Path(args.out).write_text(body, encoding="utf-8", newline="\n")
-            sys.stdout.write(f"saved: {args.out} ({r.get('words', 0)} words)\n")
+            if args.json:
+                sys.stdout.write(json.dumps({"saved": args.out, "words": r.get("words", 0), "url": r.get("url"), "title": r.get("title"),
+                                             "warnings": r.get("warnings") or []}, ensure_ascii=False, indent=2) + "\n")
+            else:
+                sys.stdout.write(f"saved: {args.out} ({r.get('words', 0)} words)\n")
             return EXIT_OK
         if args.json:
             sys.stdout.write(json.dumps({k: v for k, v in r.items() if k != "ok"}, ensure_ascii=False, indent=2) + "\n")
             return EXIT_OK
         cut = len(content) > args.max_chars
-        head = [f"# title: {r.get('title') or '—'}", f"# url: {r['url']}", f"# source: browser session · {r.get('words', 0)} words",
-                f"# date: {r.get('date') or '—'} · author: {r.get('author') or '—'}"] + [f"# warning: {w}" for w in r.get("warnings", [])]
+        head = [f"# title: {clean(r.get('title') or '—')}", f"# url: {clean(r['url'])}", f"# source: browser session · {r.get('words', 0)} words",
+                f"# date: {clean(r.get('date') or '—')} · author: {clean(r.get('author') or '—')}"] + [f"# warning: {w}" for w in r.get("warnings") or []]
         sys.stdout.write("\n".join(head) + "\n\n" + content[: args.max_chars] + (f"\n\n[truncated: showed {args.max_chars} of {len(content)} chars — rerun with -o FILE]\n" if cut else "\n"))
         return EXIT_OK
     if cmd == "html":
         if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
             Path(args.out).write_text(r["html"], encoding="utf-8", newline="\n")
-            sys.stdout.write(f"saved: {args.out} ({len(r['html'])} chars)\n")
+            sys.stdout.write(json.dumps({"saved": args.out, "chars": len(r["html"]), "url": r.get("url")}) + "\n" if args.json
+                             else f"saved: {args.out} ({len(r['html'])} chars)\n")
+        elif args.json:
+            sys.stdout.write(json.dumps({k: v for k, v in r.items() if k != "ok"}, ensure_ascii=False) + "\n")
         else:
             sys.stdout.write(r["html"] + "\n")
         return EXIT_OK
@@ -830,13 +1199,16 @@ def main(argv: list[str] | None = None) -> int:
                 sys.stdout.write(f"session: {'headful' if r.get('headful') else 'headless'}{' · profile ' + r['profile'] if r.get('profile') else ''}"
                                  f" · web-extract {'available' if r.get('web_extract') else 'missing (read falls back to plain text)'}\n")
             for pg in r["pages"]:
-                sys.stdout.write(f"{'*' if pg['current'] else ' '} [{pg['index']}] {pg['title'] or '—'} — {pg['url']}\n")
+                sys.stdout.write(f"{'*' if pg['current'] else ' '} [{pg['index']}] {clean(pg['title'] or '—')} — {clean(pg['url'])}\n")
             if cmd == "status" and r.get("recent"):
                 sys.stdout.write("recent: " + " | ".join(r["recent"][-5:]) + "\n")
         return EXIT_OK
     note = {"open": "opened", "click": "clicked", "type": "typed", "select": f"selected {r.get('selected')}", "press": "pressed", "scroll": "scrolled",
             "back": "went back", "forward": "went forward", "reload": "reloaded", "wait": "ready", "hover": "hovered", "check": "checked",
-            "uncheck": "unchecked", "focus": "focused", "screenshot": f"saved {r.get('path')}", "tab": "switched tab"}.get(cmd, cmd)
+            "uncheck": "unchecked", "focus": "focused", "screenshot": f"saved {r.get('path')}",
+            "tab": {"close": "closed tab", "new": "opened tab"}.get(str(getattr(args, "which", "")), "switched tab")}.get(cmd, cmd)
+    if r.get("replaced_tab"):
+        note += " (the unresponsive tab was closed and replaced by a new one)"
     if r.get("blocked"):
         note += f" — BLOCKED: {r['blocked']['kind']} ({r['blocked'].get('vendor') or 'bot check'}); use --headful so the user can pass it, do not retry"
     elif r.get("http_error"):
