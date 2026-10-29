@@ -1,10 +1,11 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["pytest>=8", "curl_cffi>=0.17,<1", "trafilatura>=2.3,<3", "lxml_html_clean"]
+# dependencies = ["pytest>=8", "curl_cffi>=0.17,<1", "trafilatura>=2.3,<3", "lxml_html_clean", "pypdf>=5,<7"]
 # ///
 """Smoke tests for skills/web-extract/scripts/extract.py.
 
-Run:  uv run --python 3.12 --with pytest --with trafilatura --with curl_cffi --with lxml_html_clean pytest test/test_web_extract.py
+Run:  uv run --python 3.12 --with pytest --with trafilatura --with curl_cffi --with lxml_html_clean --with pypdf pytest test/test_web_extract.py
+      (add --with playwright to run the browser cases; they need `playwright install chromium-headless-shell`)
   or: uv run test/test_web_extract.py
 
 Offline cases import the script as a module. Network cases run it as a subprocess
@@ -13,8 +14,10 @@ limit, outage) are reported as skips, not failures. Jina cases run only with
 WEB_EXTRACT_TEST_JINA=1 (they send URLs to a third party).
 """
 
+import http.server
 import io
 import json
+import threading
 import os
 import re
 import subprocess
@@ -281,6 +284,16 @@ def test_pdf_text_layer_is_read_with_metadata():
     assert wx.pdf_date("D:20240315120000Z") == "2024-03-15" and wx.pdf_date("garbage") is None
 
 
+def test_pdf_over_body_cap_is_too_large_not_corrupt(capfd):
+    body = _pdf("Quarterly revenue grew twelve percent on strong demand.")
+    cut = body[: len(body) * 2 // 3]
+    r = wx.new_result("https://x.example/big.pdf")
+    d = wx.handle_body(wx.Fetched(200, {"content-type": "application/pdf"}, "https://x.example/big.pdf", cut, True), r, ns(), "live")
+    assert isinstance(d, wx.Diag) and d.code == 5 and d.kind == "too_large" and "body cap" in d.message and d.status == 200
+    wx.pdf_extract(cut, "https://x.example/big.pdf")  # pypdf's own logger stays quiet on a cut file
+    assert "EOF marker" not in capfd.readouterr().err
+
+
 def test_pdf_without_text_layer_is_exit1_not_5():
     r = wx.new_result("https://x.example/scan.pdf")
     d = wx.handle_body(wx.Fetched(200, {"content-type": "application/pdf"}, "https://x.example/scan.pdf", _pdf("", title=None)), r, ns(), "live")
@@ -357,6 +370,33 @@ def test_track_changes_new_same_changed(tmp_path, monkeypatch):
     assert wx.finish(bad, ns(track=True))["change"] is None and len(list((tmp_path / "track").iterdir())) == 1
 
 
+def test_structured_meta_matches_citation_and_dc_prefixes():
+    st = wx.structured_data(b'<html><head><meta name="citation_journal_title" content="J. Tests"><meta name="DC.Publisher" content="Pub">'
+                            b'<meta name="viewport" content="x"></head><body><p>x</p></body></html>', "https://x.example/")
+    assert st["meta"] == {"citation_journal_title": "J. Tests", "dc.publisher": "Pub"}
+
+
+def test_track_store_is_private(tmp_path, monkeypatch):
+    if os.name == "nt":
+        pytest.skip("POSIX modes")
+    monkeypatch.setenv("WEB_EXTRACT_CACHE", str(tmp_path))
+    r = wx.new_result("https://x.example/secret")
+    r.update(ok=True, source="live", final_url="https://x.example/secret", content="logged-in text")
+    wx.track_changes(r)
+    store = Path(r["change"]["store"])
+    assert store.stat().st_mode & 0o777 == 0o600 and store.parent.stat().st_mode & 0o777 == 0o700
+    store.chmod(0o644)  # a store left by an older version is tightened on the next write
+    store.parent.chmod(0o755)
+    wx.track_changes(r)
+    assert store.stat().st_mode & 0o777 == 0o600 and store.parent.stat().st_mode & 0o777 == 0o700
+
+
+def test_browser_proxy_keeps_netloc_and_splits_credentials():
+    assert wx.browser_proxy("127.0.0.1:3128") == {"server": "http://127.0.0.1:3128"}
+    assert wx.browser_proxy("http://[::1]:3128") == {"server": "http://[::1]:3128"}
+    assert wx.browser_proxy("socks5://u:p%3Aw@[::1]:1080") == {"server": "socks5://[::1]:1080", "username": "u", "password": "p:w"}
+
+
 def test_browser_error_mapping_and_action_validation():
     be = wx.browser_error
     assert be(Exception("Page.goto: net::ERR_NAME_NOT_RESOLVED at https://nope.example/"), "https://nope.example/", 30).kind == "dns"
@@ -367,6 +407,11 @@ def test_browser_error_mapping_and_action_validation():
     d = be(Exception("BrowserType.launch: Executable doesn't exist at /x/chrome\n╔═══╗ Looks like Playwright was just installed"), "https://x.example/", 30)
     assert d.code == 2 and "chromium-headless-shell" in d.message
     assert be(Exception("Page.goto: net::ERR_ABORTED"), "https://x.example/a.pdf", 30).code == 5
+    assert be(Exception("Page.goto: Download is starting"), "https://x.example/a.pdf", 30).kind == "non_html"
+    d = be(Exception("BrowserType.launch: Executable doesn't exist at /x/chrome"), "https://x.example/", 30, headful=True)
+    assert d.code == 2 and "playwright install chromium`" in d.message and "headless-shell" not in d.message
+    d = be(Exception("BrowserType.launch: Executable doesn't exist at /ms-playwright/chromium-1248/chrome-linux/chrome"), "https://x.example/", 30)
+    assert "playwright install chromium`" in d.message
     assert be(RuntimeError("weird"), "https://x.example/", 30).code == 7
     assert wx.parse_actions('[{"wait": 2}, {"scroll": 1}]') == [{"wait": 2}, {"scroll": 1}]
     assert wx.parse_actions('[{"type": "input", "text": "hi"}]') == [{"type": "input", "text": "hi"}]
@@ -394,6 +439,7 @@ def test_main_browser_flags_are_validated():
     assert wx.main(["https://example.com/", "--render", "always", "--wayback"]) == 2
     assert wx.main(["https://example.com/", "--actions", "[{\"zap\": 1}]"]) == 2
     assert wx.main(["https://example.com/", "--render-wait", "-1"]) == 2
+    assert wx.main(["https://a.example/", "https://b.example/", "--render", "always", "--screenshot", "x.png"]) == 2
 
 
 def test_header_lines_wayback_variant():
@@ -948,9 +994,17 @@ def _browser_ready() -> bool:
 browser = pytest.mark.skipif(OFFLINE or not _browser_ready(), reason="needs network and an installed Playwright Chromium")
 
 
+def skip_if_site_down(data, err):
+    """toscrape.com trouble (outage, DNS, timeout) is a SKIP, not a FAIL."""
+    r = data["results"][0]
+    if r.get("error") and r["error"].get("code") in (3, 4, 6) and r.get("source") != "browser":
+        pytest.skip(f"toscrape.com unavailable: {r['error'].get('message', '')[:200]}")
+
+
 @browser
 def test_n24_auto_render_fills_a_javascript_page():
     rc, data, err = run_json("https://quotes.toscrape.com/js/")
+    skip_if_site_down(data, err)
     r = data["results"][0]
     assert rc == 0 and r["source"] == "browser" and r["words"] > 100 and "rendering the page in a headless browser" in err
     rc, data, err = run_json("https://quotes.toscrape.com/js/", "--render", "off")
@@ -962,6 +1016,7 @@ def test_n25_render_always_with_actions_and_screenshot(tmp_path):
     shot = tmp_path / "page.png"
     rc, data, err = run_json("https://quotes.toscrape.com/scroll", "--render", "always", "--actions", '[{"scroll": 2}, {"click": "#nope-missing"}]',
                              "--screenshot", str(shot), "--timeout", "20")
+    skip_if_site_down(data, err)
     r = data["results"][0]
     assert rc == 0 and r["source"] == "browser" and r["words"] > 300 and r["screenshot"] == str(shot) and shot.stat().st_size > 1000
     assert "action_failed" in r["warnings"] and "browser action failed" in err
@@ -1084,3 +1139,96 @@ def test_n23_jina_unresolvable_host():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ---------------------------------------------------------- loopback browser
+
+SHELL_FILLED = (b"""<!DOCTYPE html><html lang="en"><head><title>App</title></head><body><div id="root"></div>
+<noscript>You need to enable JavaScript to run this app.</noscript><script>
+const p = "The rendered application writes this paragraph about loopback testing of headless rendering paths. ";
+document.getElementById("root").innerHTML = "<article><h1>Rendered</h1>" + Array.from({length: 30}, (_, i) => "<p>" + p + i + "</p>").join("") + "</article>";
+</script></body></html>""")
+SCRIPT_HEAVY = b"<html><head><title>Heavy</title><script>/*" + b"x" * 6000 + b"*/</script></head><body><p>Login</p> <p>Next</p></body></html>"
+LOCAL_PAGES = {"/shell": ("text/html", SHELL_FILLED), "/heavy": ("text/html", SCRIPT_HEAVY),
+               "/data.json": ("application/json", b'{"a": 1, "items": [1, 2, 3]}\n')}
+
+
+class _Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        ctype, body = LOCAL_PAGES.get(self.path, ("text/plain", b"missing"))
+        self.send_response(200 if self.path in LOCAL_PAGES else 404)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+@pytest.fixture(scope="module")
+def local():
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.server_address[1]}"
+    srv.shutdown()
+
+
+local_browser = pytest.mark.skipif(not _browser_ready(), reason="needs an installed Playwright Chromium")
+
+
+@pytest.fixture
+def loud(monkeypatch):
+    monkeypatch.setattr(wx, "QUIET", False)
+
+
+def test_auto_render_without_playwright_notes_and_keeps_live_error(local, monkeypatch, capsys, loud):
+    monkeypatch.setattr(wx, "playwright_api", lambda: (None, "PLAYWRIGHT MISSING"))
+    args = ns(render="auto")
+    r = wx.process(wx.make_session(args), f"{local}/shell", args)
+    assert not r["ok"] and r["error"]["kind"] == "js_shell" and not r["fallback_errors"]
+    assert "a headless browser could render this page; PLAYWRIGHT MISSING" in capsys.readouterr().err
+
+
+@local_browser
+def test_auto_render_replaces_a_js_shell(local, capsys, loud):
+    args = ns(render="auto")
+    r = wx.process(wx.make_session(args), f"{local}/shell", args)
+    assert r["ok"] and r["source"] == "browser" and r["words"] > 100 and r["live_error"]["kind"] == "js_shell"
+    assert "rendering the page in a headless browser" in capsys.readouterr().err
+
+
+@local_browser
+def test_auto_render_that_adds_no_text_keeps_the_http_result(local, capsys, loud):
+    args = ns(render="auto")
+    r = wx.process(wx.make_session(args), f"{local}/heavy", args)
+    err = capsys.readouterr().err
+    assert r["ok"] and r["source"] == "live" and "browser render did not add text" in err
+
+
+@local_browser
+def test_render_always_on_json_returns_the_server_bytes(local):
+    args = ns(render="always")
+    r = wx.process(wx.make_session(args), f"{local}/data.json", args)
+    assert r["ok"] and r["source"] == "browser" and r["content"].strip() == '{"a": 1, "items": [1, 2, 3]}'
+
+
+@local_browser
+def test_failed_type_action_does_not_echo_text(local, capsys, loud):
+    args = ns(render="always", timeout=5.0, action_steps=[{"type": "#nope", "text": "hunter2-SECRET"}])
+    r = wx.process(wx.make_session(args), f"{local}/shell", args)
+    err = capsys.readouterr().err
+    assert "browser action failed" in err and "hunter2" not in err and "<14 chars>" in err
+    assert "action_failed" in r["warnings"]
+
+
+LOCAL_PAGES["/text"] = ("text/html", LINKS_PAGE)
+
+
+@pytest.mark.parametrize("path, why", [("/text", "the page had server-rendered text"), ("/missing", "the page was not rendered (")])
+def test_skipped_browser_flags_note_matches_the_reason(local, capsys, loud, path, why):
+    args = ns(render="auto", screenshot="never.png")
+    wx.process(wx.make_session(args), f"{local}{path}", args)
+    err = capsys.readouterr().err
+    assert f"--screenshot not applied: {why}" in err
+    assert path == "/text" or "server-rendered" not in err
