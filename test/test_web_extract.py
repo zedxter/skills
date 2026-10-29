@@ -13,6 +13,7 @@ limit, outage) are reported as skips, not failures. Jina cases run only with
 WEB_EXTRACT_TEST_JINA=1 (they send URLs to a third party).
 """
 
+import io
 import json
 import os
 import re
@@ -65,7 +66,8 @@ LINKS_PAGE = ("<html><head><title>Links</title></head><body><article><h1>Heading
 def ns(**kw):
     base = dict(format="markdown", out=None, links=False, raw=False, no_header=False, max_chars=0, comments=False,
                 recall=False, precision=False, timeout=30.0, impersonate="chrome", proxy=None, wayback=False,
-                no_wayback=True, jina=False, quiet=True)
+                no_wayback=True, jina=False, quiet=True, render="off", headful=False, profile=None, actions=None,
+                action_steps=[], render_wait=0.0, screenshot=None, structured=False, track=False)
     base.update(kw)
     return wx.argparse.Namespace(**base)
 
@@ -211,7 +213,7 @@ def test_memento_and_truncate():
 
 
 def _check_shape(r):
-    assert set(r) - {"saved_to"} == set(wx.RESULT_KEYS)
+    assert set(r) - {"saved_to", "screenshot"} == set(wx.RESULT_KEYS)
     assert isinstance(r["ok"], bool) and isinstance(r["content"], str) and isinstance(r["warnings"], list)
     assert isinstance(r["words"], int) and isinstance(r["chars"], int) and isinstance(r["fallback_errors"], list)
     assert isinstance(r["partial"], bool) and isinstance(r["truncated"], bool)
@@ -237,9 +239,161 @@ def test_result_shape_ok_and_failed():
 
 
 def test_binary_body_without_raw_is_exit5():
-    r = wx.new_result("https://x.example/f.pdf")
+    r = wx.new_result("https://x.example/f.png")
+    d = wx.handle_body(wx.Fetched(200, {"content-type": "image/png"}, "https://x.example/f.png", b"\x89PNG\r\n\x1a\n x"), r, ns(), "live")
+    assert isinstance(d, wx.Diag) and d.code == 5 and d.kind == "non_html" and "image/png" in d.message
+    r = wx.new_result("https://x.example/f.pdf")  # a PDF that is not a PDF: exit 5 with a save hint, never exit 7
     d = wx.handle_body(wx.Fetched(200, {"content-type": "application/pdf; qs=0.001"}, "https://x.example/f.pdf", b"%PDF-1.4 x"), r, ns(), "live")
-    assert isinstance(d, wx.Diag) and d.code == 5 and d.kind == "non_html" and "application/pdf" in d.message
+    assert isinstance(d, wx.Diag) and d.code == 5 and d.kind == "non_html" and "could not be parsed" in d.message
+
+
+def _pdf(text: str, title: str | None = "Report Q3") -> bytes:
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+    w = PdfWriter()
+    page = w.add_blank_page(300, 300)
+    font = DictionaryObject({NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"),
+                             NameObject("/BaseFont"): NameObject("/Helvetica")})
+    page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): w._add_object(font)})})
+    stream = DecodedStreamObject()
+    stream.set_data(f"BT /F1 12 Tf 20 150 Td ({text}) Tj ET".encode("latin-1"))
+    page[NameObject("/Contents")] = w._add_object(stream)
+    if title:
+        w.add_metadata({"/Title": title, "/Author": "Ada Lovelace", "/CreationDate": "D:20240315120000Z"})
+    buf = io.BytesIO()
+    w.write(buf)
+    return buf.getvalue()
+
+
+def test_pdf_text_layer_is_read_with_metadata():
+    body = _pdf("Quarterly revenue grew twelve percent on strong demand.")
+    assert body.startswith(b"%PDF-")
+    r = wx.new_result("https://x.example/q3.pdf")
+    f = wx.Fetched(200, {"content-type": "application/octet-stream"}, "https://x.example/q3.pdf", body)  # sniffed by magic, not by type
+    assert wx.handle_body(f, r, ns(), "live") is None
+    assert r["ok"] and r["content_format"] == "text" and r["pages"] == 1 and r["words"] == 8
+    assert r["title"] == "Report Q3" and r["author"] == "Ada Lovelace" and r["date"] == "2024-03-15"
+    assert "Quarterly revenue" in r["content"] and "--- page" not in r["content"]  # single page: no markers
+    r = wx.finish(r, ns())
+    _check_shape(r)
+    hdr = "\n".join(wx.header_lines(r))
+    assert "application/pdf" not in hdr and "· 1 page" in hdr and "# warning: short" in hdr
+    assert wx.pdf_date("D:20240315120000Z") == "2024-03-15" and wx.pdf_date("garbage") is None
+
+
+def test_pdf_without_text_layer_is_exit1_not_5():
+    r = wx.new_result("https://x.example/scan.pdf")
+    d = wx.handle_body(wx.Fetched(200, {"content-type": "application/pdf"}, "https://x.example/scan.pdf", _pdf("", title=None)), r, ns(), "live")
+    assert isinstance(d, wx.Diag) and d.code == 1 and d.kind == "nothing_extracted" and "no text layer" in d.message
+    r = wx.new_result("https://x.example/scan.pdf")  # --raw still passes the bytes through untouched
+    d = wx.handle_body(wx.Fetched(200, {"content-type": "application/pdf"}, "https://x.example/scan.pdf", _pdf("x", title=None)), r, ns(raw=True), "live")
+    assert isinstance(d, wx.Diag) and d.code == 5
+
+
+STRUCTURED_PAGE = b"""<html lang="en"><head><title>Widget 3000 - Shop</title>
+<meta property="og:title" content="Widget 3000"><meta property="og:type" content="product"><meta name="twitter:card" content="summary">
+<meta name="description" content="A fine widget."><meta name="robots" content="index"><link rel="canonical" href="/p/widget-3000">
+<link rel="alternate" type="application/rss+xml" href="/feed.xml">
+<script type="application/ld+json"><!--
+{"@context":"https://schema.org","@type":"Product","name":"Widget 3000","offers":{"@type":"Offer","price":"19.99"}}
+--></script>
+<script type="application/ld+json">[{"@type":"BreadcrumbList"},{"@type":"WebSite"}]</script>
+<script type="application/ld+json">not json at all</script>
+</head><body><article><h1>Widget 3000</h1>""" + b"<p>A fine widget with many useful properties and a long description paragraph.</p>" * 6 + b"""
+<table><caption>Specs</caption><tr><th>Property</th><th>Value</th></tr><tr><td>Weight</td><td>1.2 kg</td></tr><tr><td>Colour</td><td>Teal</td></tr></table>
+<table><tr><td>layout only</td></tr></table>
+<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>
+</article></body></html>"""
+
+
+def test_structured_data_collects_json_ld_opengraph_meta_and_tables():
+    st = wx.structured_data(STRUCTURED_PAGE, "https://shop.example/p/widget-3000?ref=1")
+    assert [x["@type"] for x in st["json_ld"]] == ["Product", "BreadcrumbList", "WebSite"]  # HTML-comment wrapper and list form handled, bad JSON skipped
+    assert st["opengraph"] == {"og:title": "Widget 3000", "og:type": "product", "twitter:card": "summary"}
+    assert st["meta"]["canonical"] == "https://shop.example/p/widget-3000" and st["meta"]["feeds"] == ["https://shop.example/feed.xml"]
+    assert st["meta"]["description"] == "A fine widget." and st["meta"]["robots"] == "index"
+    assert len(st["tables"]) == 2 and st["tables"][0] == {"caption": "Specs", "headers": ["Property", "Value"],
+                                                          "rows": [["Weight", "1.2 kg"], ["Colour", "Teal"]], "row_count": 2, "truncated": False}
+    assert st["tables"][1]["headers"] is None and st["tables"][1]["row_count"] == 2 and not st["truncated"]
+    assert wx.structured_data(b"", "https://x.example/")["json_ld"] == []
+    # flows through handle_body into the result and the markdown appendix (tables stay out: already pipe tables)
+    r = wx.new_result("https://shop.example/p/widget-3000")
+    assert wx.handle_body(wx.Fetched(200, {"content-type": "text/html"}, "https://shop.example/p/widget-3000", STRUCTURED_PAGE), r, ns(structured=True), "live") is None
+    r = wx.finish(r, ns(structured=True))
+    _check_shape(r)
+    out = wx.render(r, ns(structured=True))
+    assert "## Structured data" in out and '"@type": "Product"' in out and '"rows"' not in out
+    assert "## Structured data" not in wx.render(r, ns(structured=True, format="html"))
+    # a JavaScript shell still yields its JSON-LD / OpenGraph
+    shell = STRUCTURED_PAGE.replace(b"<article>", b"<div id='root'></div><article style='display:none'>").split(b"<p>")[0] + b"</article></body></html>"
+    r = wx.new_result("https://shop.example/p/widget-3000")
+    d = wx.handle_body(wx.Fetched(200, {"content-type": "text/html"}, "https://shop.example/p/widget-3000", shell), r, ns(structured=True), "live")
+    assert isinstance(d, wx.Diag) and d.code == 1 and r["structured"]["opengraph"]["og:title"] == "Widget 3000"
+
+
+def test_track_changes_new_same_changed(tmp_path, monkeypatch):
+    monkeypatch.setenv("WEB_EXTRACT_CACHE", str(tmp_path))
+    def result(text):
+        r = wx.new_result("https://x.example/page")
+        r.update(ok=True, source="live", status=200, final_url="https://x.example/page", content=text, words=len(text.split()), chars=len(text))
+        return r
+    r1 = wx.finish(result("line one\nline two\nline three"), ns(track=True))
+    assert r1["change"]["status"] == "new" and r1["change"]["previous"] is None and r1["change"]["diff"] is None
+    assert (tmp_path / "track").is_dir() and "# change: new (first tracked fetch)" in wx.header_lines(r1)
+    r2 = wx.finish(result("line one\nline two\nline three"), ns(track=True))
+    assert r2["change"]["status"] == "same" and r2["change"]["previous"] == json.loads(next((tmp_path / "track").iterdir()).read_text("utf-8"))["fetched_at"]
+    r3 = wx.finish(result("line one\nline 2\nline three\nline four"), ns(track=True))
+    ch = r3["change"]
+    assert ch["status"] == "changed" and ch["added"] == 2 and ch["removed"] == 1 and "-line two" in ch["diff"] and "+line four" in ch["diff"]
+    out = wx.render(r3, ns(track=True))
+    assert "# change: changed since" in out and "## Changes since" in out and "```diff" in out
+    _check_shape(r3)
+    # the stored copy is the full content, even when stdout is truncated afterwards
+    r4 = wx.finish(result("x " * 500), ns(track=True, max_chars=100))
+    assert r4["truncated"] and json.loads(next((tmp_path / "track").iterdir()).read_text("utf-8"))["content"] == "x " * 500
+    # a different URL has its own store; failed results are never stored
+    bad = wx.new_result("https://x.example/other")
+    bad["error"] = wx.classify(404, {}, b"").error.as_dict()
+    assert wx.finish(bad, ns(track=True))["change"] is None and len(list((tmp_path / "track").iterdir())) == 1
+
+
+def test_browser_error_mapping_and_action_validation():
+    be = wx.browser_error
+    assert be(Exception("Page.goto: net::ERR_NAME_NOT_RESOLVED at https://nope.example/"), "https://nope.example/", 30).kind == "dns"
+    assert be(Exception("Page.goto: net::ERR_CERT_AUTHORITY_INVALID"), "https://x.example/", 30).kind == "tls"
+    assert be(Exception("Page.goto: net::ERR_CONNECTION_REFUSED"), "https://x.example/", 30).kind == "connection"
+    d = be(Exception("Page.goto: Timeout 30000ms exceeded."), "https://x.example/", 30)
+    assert d.code == 6 and d.kind == "timeout" and "30s" in d.message
+    d = be(Exception("BrowserType.launch: Executable doesn't exist at /x/chrome\n╔═══╗ Looks like Playwright was just installed"), "https://x.example/", 30)
+    assert d.code == 2 and "chromium-headless-shell" in d.message
+    assert be(Exception("Page.goto: net::ERR_ABORTED"), "https://x.example/a.pdf", 30).code == 5
+    assert be(RuntimeError("weird"), "https://x.example/", 30).code == 7
+    assert wx.parse_actions('[{"wait": 2}, {"scroll": 1}]') == [{"wait": 2}, {"scroll": 1}]
+    assert wx.parse_actions('[{"type": "input", "text": "hi"}]') == [{"type": "input", "text": "hi"}]
+    assert "between 0 and 120" in wx.parse_actions('[{"wait": 999}]') and "non-empty object" in wx.parse_actions("[{}]")
+    assert "must be a JSON list" in wx.parse_actions("5") and "selector/key string" in wx.parse_actions('[{"click": ""}]')
+
+
+def test_signals_dynamic_and_header_browser_source():
+    sig = wx.page_signals(b"<html><head><script>" + b"x" * 5000 + b"</script></head><body><p>Login</p> <p>Next</p></body></html>")
+    assert sig.body_words == 2 and sig.script_ratio > 0.5 and sig.dynamic and not sig.shell
+    assert not wx.page_signals(b"<html><body>" + b"<p>Plain words here.</p>" * 30 + b"</body></html>").dynamic
+    r = wx.new_result("https://x.example/")
+    r.update(ok=True, source="browser", status=200, words=190, title="T", final_url="https://x.example/",
+             live_error={"code": 1, "kind": "js_shell", "status": 200, "vendor": None, "message": "m"}, screenshot="/tmp/s.png")
+    hdr = wx.header_lines(r)
+    assert hdr[2] == "# source: browser · HTTP 200 (live: 200 js_shell) · 190 words" and "# screenshot: /tmp/s.png" in hdr
+    f = wx.Fetched(200, {"content-type": "text/html"}, "https://x.example/", LINKS_PAGE, action_errors=["{\"click\": \"#x\"}: not found"], screenshot="/tmp/s.png")
+    r = wx.new_result("https://x.example/")
+    assert wx.handle_body(f, r, ns(), "browser") is None
+    assert "action_failed" in r["warnings"] and r["screenshot"] == "/tmp/s.png" and r["source"] == "browser"
+
+
+def test_main_browser_flags_are_validated():
+    assert wx.main(["https://example.com/", "--render", "off", "--screenshot", "x.png"]) == 2
+    assert wx.main(["https://example.com/", "--render", "always", "--wayback"]) == 2
+    assert wx.main(["https://example.com/", "--actions", "[{\"zap\": 1}]"]) == 2
+    assert wx.main(["https://example.com/", "--render-wait", "-1"]) == 2
 
 
 def test_header_lines_wayback_variant():
@@ -580,8 +734,10 @@ def test_binary_hint_depends_on_media_type():
     def diag(ctype, head):
         return wx.handle_body(wx.Fetched(200, {"content-type": ctype}, "https://x.example/f", head + b"x" * 20), wx.new_result("u"), ns(), "live")
     assert "an image has no text" in diag("image/png", b"\x89PNG").message
-    assert "PDF/document tool" in diag("application/pdf", b"%PDF-1.4").message
-    assert "PDF/document tool" in diag("text/html", b"%PDF-1.4").message
+    # a PDF body is read by pypdf now, whatever the declared type; a corrupt one is exit 5 with a save hint
+    assert "could not be parsed" in diag("application/pdf", b"%PDF-1.4").message
+    assert "could not be parsed" in diag("text/html", b"%PDF-1.4").message
+    assert "document tool" in wx.binary_hint("application/pdf", b"%PDF-1.4") and "document tool" in wx.binary_hint("application/msword", b"")
     assert "if the bytes are needed" in diag("application/zip", b"PK\x03\x04").message
     assert all(diag(c, h).code == 5 for c, h in (("image/png", b"\x89PNG"), ("application/zip", b"PK\x03\x04")))
 
@@ -772,9 +928,49 @@ def test_n9b_png_raw_save_with_json_keeps_binary():
 
 
 @network
-def test_n10_pdf_exit5():
-    rc, _, err = run("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", "--no-wayback")
-    assert rc == 5 and "application/pdf" in err
+def test_n10_pdf_is_read():
+    rc, data, _ = run_json("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", "--no-wayback")
+    r = data["results"][0]
+    assert rc == 0 and r["ok"] and r["content_type"] == "application/pdf" and r["pages"] == 1 and "Dummy PDF" in r["content"]
+    assert r["content_format"] == "text" and r["date"] == "2007-02-23" and "short" in r["warnings"]
+
+
+def _browser_ready() -> bool:
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            p.chromium.launch(headless=True).close()
+        return True
+    except Exception:
+        return False
+
+
+browser = pytest.mark.skipif(OFFLINE or not _browser_ready(), reason="needs network and an installed Playwright Chromium")
+
+
+@browser
+def test_n24_auto_render_fills_a_javascript_page():
+    rc, data, err = run_json("https://quotes.toscrape.com/js/")
+    r = data["results"][0]
+    assert rc == 0 and r["source"] == "browser" and r["words"] > 100 and "rendering the page in a headless browser" in err
+    rc, data, err = run_json("https://quotes.toscrape.com/js/", "--render", "off")
+    assert rc == 0 and data["results"][0]["source"] == "live" and data["results"][0]["words"] < 20 and "browser" not in err
+
+
+@browser
+def test_n25_render_always_with_actions_and_screenshot(tmp_path):
+    shot = tmp_path / "page.png"
+    rc, data, err = run_json("https://quotes.toscrape.com/scroll", "--render", "always", "--actions", '[{"scroll": 2}, {"click": "#nope-missing"}]',
+                             "--screenshot", str(shot), "--timeout", "20")
+    r = data["results"][0]
+    assert rc == 0 and r["source"] == "browser" and r["words"] > 300 and r["screenshot"] == str(shot) and shot.stat().st_size > 1000
+    assert "action_failed" in r["warnings"] and "browser action failed" in err
+
+
+@browser
+def test_n26_render_always_maps_network_errors():
+    rc, data, _ = run_json("https://nxdomain-web-extract-test.invalid/", "--render", "always", "--no-wayback")
+    assert rc == 6 and data["results"][0]["error"]["kind"] == "dns"
 
 
 @network
