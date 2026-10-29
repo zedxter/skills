@@ -65,10 +65,11 @@ failures, and at the end the sitemap and stop reasons. `-q` silences them.
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `URL …` | — | Start URL(s). The crawl stays on their site: same host (`www.` ignored), or the same registrable domain with `--allow-subdomains`. |
+| `URL …` | — | Start URL(s). The crawl stays on their site: same host (`www.` ignored) and same port (or the port the start URL redirected to), or the same registrable domain with `--allow-subdomains`. From a public start URL, private/loopback hosts are never followed. |
 | `--depth N` | `2` | Link depth from the start (start = 0). Sitemap URLs enter at depth 1. `--depth 0` = only the start URL(s). |
 | `--max-pages N` | `50` | Stop after N collected pages; still-queued URLs are counted in the final `stopped:` note. Failed/duplicate pages do not count. |
-| `--max-time S` | `300` | Wall-clock budget; the crawl stops cleanly when it runs out. |
+| `--max-requests N` | 3 × `--max-pages` | Request budget: stop after N page requests, failed and duplicate ones included (URLs blocked by robots.txt, robots.txt and sitemap fetches not counted). |
+| `--max-time S` | `300` | Wall-clock budget. Every request's timeout is capped to the time left, nothing new starts after it, and requests still running get at most one `--timeout` to finish; what finished is kept. |
 | `--include REGEX` | none | Only URLs matching one of the patterns (repeatable, searched in the full URL). The start URL is always fetched. |
 | `--exclude REGEX` | none | Skip URLs matching (repeatable, checked before include). |
 | `--allow-subdomains` | off | Follow `blog.example.com` from `example.com` (same registrable domain; `co.uk`-style suffixes handled). |
@@ -76,10 +77,10 @@ failures, and at the end the sitemap and stop reasons. `-q` silences them.
 | `--no-robots` | off | Ignore `robots.txt`. Only when the user owns the site or asked explicitly; say so in the reply. |
 | `--delay S` | `0` | Minimum seconds between requests to the site; a `Crawl-delay` in robots.txt raises it (capped at 10 s). |
 | `--concurrency N` | `4` | Parallel fetches. Lower it for small sites or when the site answers 429/5xx. |
-| `--map` | off | Discover URLs only: fetch pages just to find links, no extraction. Text = one URL per line; `-f json` adds `titles`, `failed`, `stats`. |
+| `--map` | off | Discover URLs only: fetch pages just to find links, no extraction. Text = one URL per line; `-f json` = `{start, count, urls, titles, failed, stats}`; `-f jsonl` = one `{url, title}` per line, last line `{stats, failed}`. `--out-dir` is rejected (exit 2): use `-o`. |
 | `-f markdown\|text\|json\|jsonl` | `markdown` | `markdown`: index + per-page sections (below). `text`: same with plain-text bodies. `json`: one object `{start, count, pages[], failed[], stats}`. `jsonl`: one page per line, last line `{stats, failed}`. |
 | `-o FILE` | stdout | Write to one file. stdout is capped at 60 000 chars for markdown/text (loud `[truncated…]` trailer): use `-o` for anything real. |
-| `--out-dir DIR` | — | One `.md` per page (`web-extract` header + content, name from the URL path) plus `index.json` (file, url, title, date, words, depth, parent, warnings; `failed`; `stats`). |
+| `--out-dir DIR` | — | One `.md` per page (`web-extract` header + content, name from the URL path, unique without regard to case) plus `index.json` (`start`; `pages[]` with file, url, final_url, title, date, words, depth, parent, source, warnings; `failed`; `stats`). A page file that cannot be written goes to `failed` as `write_error`. |
 | `--links` | off | Keep in-content links in each page's Markdown (`content_links` in JSON). |
 | `--structured` | off | Add `web-extract`'s `structured` (JSON-LD, OpenGraph, tables) to every page in JSON/JSONL output. |
 | `--render off\|auto\|always` | `off` | Headless Chromium through `web-extract` (needs Playwright installed, see that skill). `auto` renders only JavaScript shells, `always` every page (seconds per page). |
@@ -87,13 +88,17 @@ failures, and at the end the sitemap and stop reasons. `-q` silences them.
 | `-q` | off | No progress lines. |
 
 Fixed rules: only `http(s)` links from `<a href>`, `<area href>` and
-`<link rel=next/prev>`; fragments and tracking parameters (`utm_*`, `fbclid`,
+`<link rel=next/prev>` (not `rel=alternate` language variants); links with an
+invalid port are dropped; fragments and tracking parameters (`utm_*`, `fbclid`,
 `gclid`, …) are stripped and `index.html` folded before deduplication;
 URLs ending in media/archive/script/style/office extensions are skipped
 without a request (`binary_extension`); pages whose extracted text equals an
 earlier page's are dropped (`duplicate_content`); `robots.txt` answering
-401/403 means disallow-all (RFC 9309); Wayback and Jina fallbacks are off
-during a crawl (a dead page is just `failed`).
+401/403 means disallow-all, and one that is unreachable (5xx or network error,
+after one retry) also means disallow-all (`robots_unreachable`, RFC 9309);
+sitemaps are fetched only from the start URL's site (others are noted as
+`off-site, skipped`), at most 50 MB decompressed each; Wayback and Jina
+fallbacks are off during a crawl (a dead page is just `failed`).
 
 ## Output
 
@@ -102,7 +107,7 @@ Markdown (`-f markdown`, the default):
 ```
 # Crawl of https://docs.example.com/
 
-<!-- 37 pages · 48 210 words · 2 failed · skipped {"external": 51, "too_deep": 12, ...} -->
+<!-- 37 pages · 48210 words · 2 failed · skipped {"external": 51, "too_deep": 12, ...} -->
 
 ## Pages
 
@@ -126,17 +131,20 @@ Markdown (`-f markdown`, the default):
 ## …
 ```
 
-JSON page records carry `web-extract`'s fields (`url`, `final_url`, `status`,
-`source`, `title`, `author`, `date`, `description`, `language`, `content`,
-`content_format`, `words`, `pages`, `coverage`, `warnings`) plus `depth` and
-`parent` (the page that linked to it, or `"sitemap"`). `failed[]` has `url`,
-`depth`, `parent`, `status`, `error` (`web-extract`'s `{code, kind, status,
-vendor, message}`; extra kinds `robots_disallow`). `stats` has `pages`,
-`failed`, `words`, `skipped` (counts per reason: `external`,
-`binary_extension`, `excluded`, `not_included`, `too_deep`,
-`duplicate_content`), `skipped_examples` (up to three URLs per reason),
-`notes` (sitemap summary, `stopped: max_pages|max_time (N URLs still
-queued)`), `elapsed_s`, `exit_code`.
+JSON page records carry `ok` plus `web-extract`'s fields (`url`, `final_url`,
+`status`, `source`, `content_type`, `title`, `author`, `date`, `description`,
+`language`, `content`, `content_format`, `words`, `pages`, `coverage`,
+`warnings`) plus `depth` and `parent` (the page that linked to it, or
+`"sitemap"`); `content_links` with `--links`, `structured` with
+`--structured`. `failed[]` has `url`, `depth`, `parent`, `status`, `error`
+(`web-extract`'s `{code, kind, status, vendor, message}`; extra kinds
+`robots_disallow`, `robots_unreachable`, `max_time`, `write_error`). `stats` has `pages`,
+`failed`, `words`, `requests`, `skipped` (counts per reason: `external`,
+`other_port`, `invalid_url`, `binary_extension`, `excluded`, `not_included`,
+`too_deep`, `duplicate_content`), `skipped_examples` (up to three URLs per
+reason), `notes` (robots.txt and sitemap summary, `stopped:
+max_pages|max_requests|max_time|interrupted (N URLs still queued)`),
+`elapsed_s`, `exit_code`.
 
 ## Exit codes
 
@@ -146,11 +154,12 @@ The **start URL** decides; later pages only land in `failed`.
 |------|---------|------------|
 | 0 | At least one page collected (or mapped). Check `stats.failed`, `stats.skipped` and the `stopped:` note: if `max_pages` stopped it with many URLs queued, say the crawl is partial and offer a narrower `--include` or a higher limit. | Use it. |
 | 1 | Start URL fetched but nothing could be collected (JavaScript shell without `--render`, empty pages). | `--render auto` with Playwright installed, or `web-extract --raw` on the start URL to see what it is. |
-| 2 | Bad input: not an http(s) URL, bad regex, `-o` together with `--out-dir`, non-positive limits, `--render` without Playwright, `web-extract` not found. | Fix the argument; install `web-extract` next to this skill or set `WEB_EXTRACT_SCRIPT`. |
+| 2 | Bad input: not an http(s) URL (or an invalid port), bad regex, `-o` together with `--out-dir`, `--out-dir` with `--map`, non-positive limits, `--render` without Playwright, `web-extract` not found, `-o`/`--out-dir` not writable. | Fix the argument; install `web-extract` next to this skill or set `WEB_EXTRACT_SCRIPT`. |
 | 3 | Start URL answered an HTTP error (404, 500, …). | Check the URL; try the site root. |
-| 4 | Start URL is blocked (bot wall, 429) or disallowed by robots.txt. | Stop. Tell the user; a bot wall will block every page the same way. robots.txt: ask the user whether they own the site before `--no-robots`. |
-| 6 | Start URL unreachable (DNS, timeout, TLS). | Check connectivity; `--timeout 60`. |
-| 7 | Unexpected error. | Report it. |
+| 4 | Start URL is blocked (bot wall, 429), disallowed by robots.txt, or robots.txt answered 5xx (`robots_unreachable`). | Stop. Tell the user; a bot wall will block every page the same way. robots.txt: ask the user whether they own the site before `--no-robots`. |
+| 5 | Start URL is not an HTML/PDF page (image, archive, unparsable or password-protected PDF). | Check the URL; crawl the page that links to it, or save it with `web-extract --raw -o`. |
+| 6 | Start URL unreachable (DNS, timeout, TLS), robots.txt unreachable for the same reason, or `--max-time` spent on robots.txt/sitemaps before the start URL was fetched (`max_time`). | Check connectivity; `--timeout 60`; a higher `--max-time` or `--no-sitemap`. |
+| 7 | Unexpected error, or interrupted (Ctrl-C; what was collected is still written). | Report it. |
 
 ## Workflow for the agent
 
@@ -186,6 +195,7 @@ The **start URL** decides; later pages only land in `failed`.
   followed. Content served only to logged-in users, behind forms, or by
   infinite scroll is not reached (one GET per URL; `--render` runs the page
   but performs no actions).
+- Links to the same host on another port are skipped (`other_port`).
 - Page discovery is from HTML links, `rel=next/prev` and sitemaps: menus
   built by JavaScript are invisible without `--render`; pagination behind
   `?page=N` query strings is followed only when linked.

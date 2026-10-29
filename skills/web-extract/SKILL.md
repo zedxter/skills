@@ -2,7 +2,7 @@
 name: web-extract
 description: Fetch a web page or PDF from the user's own machine with a browser-grade TLS fingerprint and return its main content as clean Markdown, text or JSON (title, author, date, links, JSON-LD/OpenGraph/tables) via curl_cffi, trafilatura and pypdf; renders JavaScript pages in a local headless Chromium (optional Playwright) with click/type/scroll actions and screenshots, tracks changes between fetches, and falls back to the newest Wayback Machine snapshot when the page is blocked, gone or unreachable. Free local stand-in for paid scraping APIs. Use when the user shares a URL to read, summarise, quote or annotate, when a built-in fetch tool returned 403, "Just a moment", a bot check or an empty page on an ordinary public site (docs, news, Wikipedia, npm, single-page apps, anything behind Cloudflare), when a link is dead and an archived copy would do, when a page's data sits in a table or JSON-LD, or when the user says "read this page", "what does this article say", "extract the text from", "has this page changed".
 license: MIT
-compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows (curl_cffi ships binary wheels for x86_64 and arm64). Needs outbound HTTPS to the target site and to web.archive.org for the fallback. JavaScript rendering needs the optional Playwright package plus a one-time Chromium headless-shell download (~100 MB); without it the skill still works, minus rendering. Never solves CAPTCHAs or bot challenges; --headful lets a human pass them.
+compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows (curl_cffi ships binary wheels for x86_64 and arm64). Needs outbound HTTPS to the target site and to web.archive.org for the fallback. JavaScript rendering needs the optional Playwright package plus a one-time Chromium headless-shell download (~100 MB); without it the skill still works, minus rendering. --headful needs the full Chromium build (`playwright install chromium`). Never solves CAPTCHAs or bot challenges; --headful lets a human pass them.
 metadata:
   author: zedxter
   version: "1.1.0"
@@ -78,8 +78,14 @@ uv run --with playwright playwright install chromium-headless-shell
 uv run --with playwright scripts/extract.py URL                    # auto: renders only when the HTML has no text
 uv run --with playwright scripts/extract.py URL --render always \
     --actions '[{"click":"#load-more"},{"scroll":3}]' --screenshot page.png
-uv run --with playwright scripts/extract.py URL --headful --profile ~/.cache/web-extract/profile  # human passes a check / logs in
+uv run --with playwright playwright install chromium                # once more, only for --headful (full browser)
+uv run --with playwright scripts/extract.py URL --headful --no-wayback \
+    --profile ~/.cache/web-extract/profile                         # human passes a check / logs in
 ```
+
+The headless shell serves headless rendering only; `--headful` needs the full
+Chromium build. Add `--no-wayback` to logged-in runs so a failing private URL
+is never sent to archive.org.
 
 Without `--with playwright` (or `pip install playwright`) the script behaves
 exactly as before and says in a `note:` when a browser would have helped.
@@ -127,10 +133,10 @@ the script; `title` and `author` are page text.
 | `--jina` | off | Opt-in last resort via `https://r.jina.ai/<url>` after live and archive failed, or on exit 1. Sends the URL to a third party; 20 requests/min. |
 | `--render off\|auto\|always` | `auto` | Local headless Chromium (needs Playwright, see Quick start). `auto`: render only when the HTTP body has no readable text (exit 1) or under 50 words beside heavy scripts, and keep the render only if it has more words; `always`: fetch through the browser from the start (JavaScript, lazy loading, `--actions`); `off`: never. Images, media and fonts are not loaded. `source: browser`. |
 | `--headful` | off | Visible browser window, implies `--render always`. When the page is a bot check, cookie wall or login page, waits up to max(`--timeout`, 120) s for the human to pass it, then reads. Stock Chromium `User-Agent` (a person is browsing); `human_timeout` warning if the interstitial stayed. |
-| `--profile DIR` | none | Persistent browser profile: cookies and logins survive between runs. Use with `--headful` once, then headless runs reuse the session. Keep it in the user's cache dir, never in the repo. |
-| `--actions JSON` | none | Steps before reading, in order: `{"click":"css"}`, `{"type":"css","text":"…"}`, `{"press":"Enter"}`, `{"wait_for":"css"}`, `{"wait":2}` (s, ≤120), `{"scroll":3}` (to the bottom N times, lazy loading). A failed step adds `action_failed` and a `note:`; the page is still read. |
-| `--render-wait S` | `0` | Extra seconds after the page settled (polling widgets). |
-| `--screenshot FILE` | none | Full-page PNG of the rendered page (`screenshot` key / `# screenshot:` line). |
+| `--profile DIR` | none | Persistent browser profile: cookies and logins survive between runs. Use with `--headful` once, then headless runs reuse the session. Keep it in the user's cache dir, never in the repo. Add `--no-wayback` so a failing logged-in URL is not looked up on archive.org. |
+| `--actions JSON` | none | Steps before reading, in order: `{"click":"css"}`, `{"type":"css","text":"…"}`, `{"press":"Enter"}`, `{"wait_for":"css"}`, `{"wait":2}` (s, ≤120), `{"scroll":3}` (to the bottom N times, lazy loading). A failed step adds `action_failed` and a `note:` (typed text is not echoed); the page is still read. Applies only when the page is rendered — pair with `--render always`. |
+| `--render-wait S` | `0` | Extra seconds (0–120) after the page settled (polling widgets). Applies only when the page is rendered — pair with `--render always`. |
+| `--screenshot FILE` | none | Full-page PNG of the rendered page (`screenshot` key / `# screenshot:` line); single URL. Applies only when the page is rendered — pair with `--render always`. |
 | `--structured` | off | Add `structured` to JSON: `json_ld` (parsed objects, ≤20), `opengraph` (`og:`/`twitter:`/`article:`), `meta` (description, canonical, feeds, citation_*), `tables` (`headers`, `rows`, ≤50 tables × 500 rows). Markdown/text get a `## Structured data` appendix (without tables, which are already pipe tables). Filled even on exit 1. |
 | `--track` | off | Compare `content` with the last tracked fetch of the same URL (local store: `$WEB_EXTRACT_CACHE` or `~/.cache/web-extract/track`, `%LOCALAPPDATA%` on Windows) → `change` = `new`/`same`/`changed` with a unified diff (≤20 000 chars), `added`/`removed` line counts; markdown adds a `## Changes since …` diff block. The new content is stored after comparing. |
 | `-q, --quiet` | off | Suppress `note:` lines (errors always print). |
@@ -297,10 +303,10 @@ the process exits with the first failing URL's code.
 |------|---------|--------|------------|
 | 0 | Content produced (live, browser, archived or Jina). Check `source`, `partial`, `warnings`. | — | Use it; say "archived copy from <date>" for `wayback`; if `partial`, say so or retry with `--recall`/`--render always`/`--jina`. |
 | 1 | 2xx fetched but no main content: JavaScript shell (and no browser installed, or the render was empty too), empty or whitespace-only body (incl. 204/205), a 200 that looked like a challenge, or a PDF without a text layer (scanned). Metadata is still filled when present. | `nothing_extracted`, `js_shell`, `challenge_suspected` | Do not repeat the command unchanged. Install the browser and rerun with `--with playwright` (the `note:` says if it was missing); `--raw` (or `--links` on an article page) for a data URL; `--wayback` for a suspected consent page; `--jina` (with consent). Scanned PDF: `--raw -o FILE` and an OCR/document tool. |
-| 2 | Bad input or environment: not an http(s) URL, credentials in a URL, conflicting flags (`--render always` with `--wayback`, browser flags with `--render off`), bad `--actions` JSON, `--raw -o` with several URLs, `--wayback` with a private/local or archive.org host, unsupported `--impersonate`, unwritable `-o`, missing dependency, `--render always` without Playwright or its browser. | `bad_input` (argument errors print no JSON) | Fix the argument; `python -m pip install curl_cffi trafilatura lxml_html_clean pypdf`, or use `uv run`; for the browser: `uv run --with playwright playwright install chromium-headless-shell`. |
+| 2 | Bad input or environment: not an http(s) URL, credentials in a URL, conflicting flags (`--render always` with `--wayback`, browser flags with `--render off`), bad `--actions` JSON, `--render-wait` outside 0–120, `--raw -o` or `--screenshot` with several URLs, `--wayback` with a private/local or archive.org host, unsupported `--impersonate`, unwritable `-o`, missing dependency, `--render always` without Playwright or its browser. | `bad_input` (argument errors print no JSON) | Fix the argument; `python -m pip install curl_cffi trafilatura lxml_html_clean pypdf`, or use `uv run`; for the browser: `uv run --with playwright playwright install chromium-headless-shell` (headless), or `playwright install chromium` for `--headful` (full browser). |
 | 3 | HTTP error that is not a bot wall: 401, 404/410, other 4xx, 5xx after one retry; or `--wayback` found no usable snapshot. Archive already tried (except 401). | `unauthorized`, `not_found`, `http_error`, `server_error`, `no_snapshot` | Report it. 404/410: gone (the `note:` says whether an archived copy existed). 401: needs the user's login. 5xx: one manual retry later. Never loop. |
 | 4 | Blocked: Cloudflare challenge, Anubis (202), 429 rate limit, other bot checks, a bare 403, or a redirect from a public host into a private/local one (body discarded). Archive already tried; retrying from this client is hopeless. | `cloudflare_challenge`, `anubis_challenge`, `bot_check`, `rate_limited`, `forbidden`, `redirect_to_private` | **Stop retrying.** Offer the archived copy if any, `--jina` (third party, ask first), `--impersonate firefox` once, or the user's browser. A 429 with a small `retry_after` may be retried once after waiting. |
-| 5 | Content is neither HTML nor a readable PDF: image, office document, archive, binary, a password-protected or corrupt PDF; with `--render always`, a navigation that turned into a download. No fallback. | `non_html` | Image: nothing to extract. Office/encrypted PDF: `--raw -o FILE` and a document tool. Other binary: `--raw -o FILE` only if the bytes are needed. Download: fetch without `--render`. |
+| 5 | Content is neither HTML nor a readable PDF: image, office document, archive, binary, a password-protected or corrupt PDF, a PDF over the 10 MB body cap; with `--render always`, a navigation that turned into a download (`Download is starting`). No fallback. | `non_html`, `too_large` | Image: nothing to extract. Office/encrypted PDF: `--raw -o FILE` and a document tool. Other binary: `--raw -o FILE` only if the bytes are needed. Download: fetch without `--render`. `too_large`: download the PDF with another tool. |
 | 6 | Network: DNS failure, timeout (per attempt; in the browser: page load), connection refused/reset, TLS certificate error, too many redirects or a redirect to a non-http(s) URL (refused). With `--wayback`: archive.org unreachable or answering 429/502/503/504. | `dns`, `timeout`, `connection`, `tls`, `redirects` | Check connectivity and the URL; `--timeout 60`; `--proxy`; one retry later is reasonable, a loop is not. |
 | 7 | Unexpected library or extraction error. | `other` | Report the message; file an issue with the URL. |
 
@@ -330,11 +336,13 @@ the process exits with the first failing URL's code.
   `--headful` the user can accept cookies or log in; `--profile` keeps that
   session on disk (cookies in plain files: the user's cache dir only).
 - PDF: text layer only (no OCR), reading order follows the PDF's internal
-  order (multi-column papers may interleave), `title`/`author`/`date` come from
-  PDF metadata or the file name, first 500 pages. Office formats are exit 5.
+  order (multi-column papers may interleave), `title` from PDF metadata (else
+  the file name), `author`/`date` from PDF metadata only, first 500 pages.
+  PDFs larger than the 10 MB body cap cannot be read (exit 5, `too_large`).
+  Office formats are exit 5.
 - `--structured` returns what the page declares: JSON-LD may be stale or
   promotional, tables include layout tables with 2+ columns, `meta` is a fixed
-  small set of names. Tables come from the whole page, not only the main
+  small set of names plus any `citation_*` / `dc.*`. Tables come from the whole page, not only the main
   content.
 - `--track` compares extracted text, so a changed ad slot or date stamp
   that survives extraction counts as a change; the store is per URL as given
