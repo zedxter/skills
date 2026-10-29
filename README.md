@@ -23,6 +23,7 @@ everywhere.
 | [`web-crawl`](skills/web-crawl) | Crawls a site breadth-first from the user's machine and collects every page's **main content into one Markdown file**, a folder of pages with `index.json`, or JSON/JSONL; `--map` lists the URLs. Bounded by depth, page count and time, include/exclude patterns, same site only, robots.txt honoured, sitemap.xml as seed; each page goes through `web-extract` (PDF text, optional headless rendering). Free stand-in for Firecrawl crawl/map. Triggers when the user wants a whole documentation site, blog or section read, summarised or turned into notes, or asks which pages a site has. |
 | [`web-scrape`](skills/web-scrape) | Scrapes **structured records** into JSON, JSONL, CSV or a Markdown table: one record per repeating element (CSS/XPath `--item`), fields by selector with `@attr` and `\|number`/`\|date`/`\|list` modifiers, or records from schema.org JSON-LD and HTML tables; walks next-page links, opens each record's detail page for more fields, and `--probe` shows a page's repeating blocks. Fetching via `web-extract` (bot-wall detection, optional headless rendering). Free stand-in for Apify actors and Firecrawl extract. Triggers when the user wants a list, catalogue, table or search-result page turned into rows. |
 | [`web-search`](skills/web-search) | Searches the web **without an API key** via the `ddgs` metasearch library (DuckDuckGo, Bing, Brave, Google, Yahoo, Wikipedia backends) or the user's own SearXNG: title, URL, snippet, news date/source; filters by time window, region and site; `--read N` fetches the top results through `web-extract` and returns what the pages say. Free stand-in for Tavily, Serper and Firecrawl search. Triggers when the user asks to look something up, find sources, recent news or docs, or when the built-in search tool is missing or thin. |
+| [`web-browse`](skills/web-browse) | Drives a **real Chromium step by step** from the CLI: a background session that persists between commands, `open`, `snapshot` of interactive elements with numbered refs, `click`, `type`, `select`, `press`, `scroll`, `wait`, tabs, `read` as Markdown (via `web-extract`), `screenshot`, `eval`; `--profile` keeps logins, `--headful` lets a human log in or pass a check. Free stand-in for Browser Use, Browserbase and Playwright MCP. Triggers when a task needs several dependent steps in a browser: log in and read, search a site and open a result, fill a form, click through an app. |
 
 They chain naturally: search → pick a video by date/views/length → transcript →
 summary; the links in a video's `--details` description go to `web-extract`;
@@ -37,9 +38,11 @@ the right section through `web-extract`'s engine.
   suitable Python if none is installed.
 - Without `uv`: install the dependency named in the script header with `pip`
   and run `python scripts/<name>.py …`.
-- Optional, for JavaScript-rendered pages (`web-extract --render`): Playwright
-  and its Chromium headless shell, installed once per machine (~100 MB, no
-  admin rights on macOS/Windows):
+- Optional, for JavaScript-rendered pages (`web-extract --render`,
+  `web-scrape --render`) and for `web-browse`: Playwright and its Chromium
+  headless shell, installed once per machine (~100 MB, no admin rights on
+  macOS/Windows; `playwright install chromium` for a visible `--headful`
+  window):
 
   ```bash
   uv run --with playwright playwright install chromium-headless-shell
@@ -145,9 +148,11 @@ skills/
 test/                   # pytest suites for the scripts (uv run --with pytest python -m pytest test)
 ```
 
-`web-crawl`, `web-scrape` and `web-search --read` import `web-extract`'s script
-at run time, so install the web skills together (the install commands above
-copy every skill).
+`web-crawl`, `web-scrape`, `web-search --read` and `web-browse read` import
+`web-extract`'s script at run time, so install the web skills together (the
+install commands above copy every skill). `web-browse` and `web-extract
+--render` need Playwright's Chromium once: `uv run --with playwright playwright
+install chromium-headless-shell`.
 
 `SKILL.md` follows the [Agent Skills specification](https://agentskills.io/specification):
 `name` matches the folder name, `description` says both what the skill does and
