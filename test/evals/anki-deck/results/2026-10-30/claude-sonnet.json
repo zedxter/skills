@@ -1,0 +1,100 @@
+[
+  {
+    "id": "t1-from-notes",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "anki-deck"
+    ]
+  },
+  {
+    "id": "t2-vocab-csv",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "anki-deck"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "anki-deck"
+    ]
+  },
+  {
+    "id": "t4-cloze",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "anki-deck"
+    ]
+  },
+  {
+    "id": "t5-update",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "anki-deck"
+    ]
+  },
+  {
+    "id": "t6-spaced",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "anki-deck"
+    ]
+  },
+  {
+    "id": "t7-inspect",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "anki-deck"
+    ]
+  },
+  {
+    "id": "n1-quiz-me",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-ankiconnect",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-summary",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-quizlet",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-pdf",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]
