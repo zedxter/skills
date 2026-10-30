@@ -1,0 +1,94 @@
+name: Liveness
+
+# Once a week, run each skill against its real source and keep one issue (label "liveness") up to date: opened or
+# commented when a source is broken, closed when everything answers again.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe (${{ matrix.skill }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        skill:
+          - cite-check
+          - hackernews
+          - podcast-search
+          - scholar-search
+          - telegram-channel
+          - wayback
+          - weather
+          - wiki-lookup
+          - web-search
+          - web-extract
+          - web-scrape
+          - web-crawl
+          - youtube-search
+          - youtube-transcript
+          - youtube-audio
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10
+      - name: Install ffmpeg
+        if: matrix.skill == 'youtube-audio'
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Probe
+        continue-on-error: true
+        run: python3 test/ops.py probe ${{ matrix.skill }} --json probe-${{ matrix.skill }}.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: probe-${{ matrix.skill }}
+          path: probe-${{ matrix.skill }}.json
+          if-no-files-found: warn
+
+  report:
+    name: Report
+    needs: probe
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: probe-*
+          merge-multiple: true
+          path: results
+      - name: Write the report
+        run: |
+          shopt -s nullglob
+          # Probes that left no result file are reported as broken.
+          python3 test/ops.py report results/*.json -o report.md || true
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Open, update or close the liveness issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number=$(gh issue list --label liveness --state open --json number --jq '.[0].number // empty')
+          if grep -q '^## Broken' report.md; then
+            gh label create liveness --color FBCA04 --description "Weekly source liveness probe" 2>/dev/null || true
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body-file report.md
+            else
+              gh issue create --title "Liveness probe: a source is broken" --label liveness --body-file report.md
+            fi
+          elif [ -n "$number" ]; then
+            { echo "Nothing is broken in the probe of $(date -u +%F)."; echo; cat report.md; } > close.md
+            gh issue comment "$number" --body-file close.md
+            gh issue close "$number"
+          fi

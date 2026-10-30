@@ -1,6 +1,6 @@
 ---
 name: web-scrape
-description: Scrape structured records from web pages into JSON, JSONL, CSV or a Markdown table from the user's own machine: one record per repeating element (CSS or XPath --item), fields by selector with attribute and type modifiers (number, int, date, list), or records straight from schema.org JSON-LD objects or HTML tables; follows next-page links, opens each record's detail page for more fields, and --probe lists a page's repeating blocks so the right selectors can be chosen. Fetching, bot-wall detection and optional headless rendering come from the web-extract skill. Free local stand-in for Apify actors, Firecrawl extract and similar paid scrapers. Use when the user wants a list, table, catalogue, directory, price list, job board, search-result page or any repeated data turned into rows ("get all products with prices", "collect the links and dates of these posts", "pull this table as CSV", "scrape this listing and each item's page").
+description: Scrape structured records from web pages into JSON, JSONL, CSV or a Markdown table from the user's own machine - one record per repeating element (CSS or XPath --item), fields by selector with attribute and type modifiers (number, int, date, list), or records straight from schema.org JSON-LD objects or HTML tables; follows next-page links, opens each record's detail page for more fields, and --probe lists a page's repeating blocks so the right selectors can be chosen. Fetching, bot-wall detection and optional headless rendering come from the web-extract skill. Free local stand-in for Apify actors, Firecrawl extract and similar paid scrapers. Use when the user wants a list, table, catalogue, directory, price list, job board, search-result page or any repeated data turned into rows ("get all products with prices", "collect the links and dates of these posts", "pull this table as CSV", "scrape this listing and each item's page").
 license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. Requires the web-extract skill installed alongside (same skills directory) or WEB_EXTRACT_SCRIPT pointing at its extract.py. Optional Playwright for client-rendered pages. Respects the site's rules — not for logged-in areas, personal data or sites whose terms forbid scraping.
 metadata:
@@ -39,8 +39,8 @@ or bulk extraction against a site's terms.
 ## Quick start
 
 The script is `scripts/scrape.py` relative to this skill; it imports
-`web-extract`'s `scripts/extract.py` from the sibling skill folder,
-`~/.claude/skills/web-extract`, other agents' skill dirs, or
+`web-extract`'s `scripts/extract.py` from the sibling skill folder, the
+usual agent skill folders (`.agents/skills/` and others), or
 `$WEB_EXTRACT_SCRIPT` (exit 2 with a message when missing).
 
 ```bash

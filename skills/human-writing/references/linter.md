@@ -33,7 +33,7 @@ It skips code blocks, inline code, front matter, URLs, tables, HTML and block qu
 Measured on the corpora in `test/data/prose/` (2026-10-30):
 
 - It passes all 40 human-written texts: 18F, Go and Rust blog posts, 18F guides and Rust RFCs.
-- It fails about two thirds of the articles and posts that Sonnet, Haiku and Codex wrote with no style instructions.
+- It fails about two thirds of the articles and posts that three current chat models wrote with no style instructions.
 - It fails almost none of their docs. A model's README is often just a README; the linter looks for tells, not authorship.
 - It almost never fails model text written under an instruction to avoid AI clichés.
 

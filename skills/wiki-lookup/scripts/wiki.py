@@ -40,7 +40,7 @@ from typing import Any
 EXIT_OK, EXIT_NOT_FOUND, EXIT_BAD_INPUT, EXIT_DISAMBIG, EXIT_RATE, EXIT_NETWORK, EXIT_OTHER = 0, 1, 2, 3, 4, 6, 7
 
 # Wikimedia's User-Agent policy: identify the tool and give a way to contact its maintainers; never a browser's.
-UA = "zedxter-skills-wiki-lookup/1.0 (https://github.com/zedxter/skills)"
+UA = "zedxter-skills-wiki-lookup/1.0 (+https://github.com/zedxter/skills)"
 WIKIDATA = "https://www.wikidata.org/w/api.php"
 INTERVAL = 0.1  # seconds between requests: one at a time, as the API etiquette asks
 LANG_RE = re.compile(r"[a-z]{2,3}(?:-[a-z0-9]{2,12})*|simple")

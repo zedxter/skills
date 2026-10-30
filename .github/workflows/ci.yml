@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10
+      # agentskills validate, frontmatter fields, SKILL.md under 500 lines, agent neutrality, README rows
+      - run: python3 test/ops.py validate
+
+  tests:
+    name: Tests (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - anki-deck
+          - cite-check
+          - hackernews
+          - human-writing
+          - pdf-typeset
+          - podcast-search
+          - scholar-search
+          - telegram-channel
+          - transcribe-audio
+          - wayback
+          - weather
+          - web-browse
+          - web-crawl
+          - web-extract
+          - web-scrape
+          - web-search
+          - wiki-lookup
+          - youtube-audio
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10
+      - name: Install ffmpeg
+        if: matrix.suite == 'youtube-audio' || matrix.suite == 'transcribe-audio'
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      # Offline: network cases are switched off or run against local servers; the weekly liveness probe covers the
+      # real sources.
+      - run: python3 test/ops.py test ${{ matrix.suite }}

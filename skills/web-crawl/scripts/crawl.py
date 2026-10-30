@@ -56,13 +56,16 @@ TRACKING_PARAMS = re.compile(r"^(?:utm_\w+|fbclid|gclid|yclid|mc_[ce]id|ref_src|
 
 
 def load_web_extract() -> Any:
-    """Import the web-extract skill's extract.py as a module (sibling skill, ~/.claude/skills, or $WEB_EXTRACT_SCRIPT)."""
+    """Import the web-extract skill's extract.py as a module (sibling skill, an agent skill folder, or $WEB_EXTRACT_SCRIPT)."""
     here = Path(__file__).resolve()
     candidates = [Path(os.environ["WEB_EXTRACT_SCRIPT"])] if os.environ.get("WEB_EXTRACT_SCRIPT") else []
     candidates += [here.parent.parent.parent / "web-extract" / "scripts" / "extract.py",  # skills/<name>/scripts layout
                    here.parent / "extract.py"]
-    for root in (Path.home() / ".claude" / "skills", Path.cwd() / ".claude" / "skills", Path.home() / ".codex" / "skills",
-                 Path.home() / ".gemini" / "skills", Path.home() / ".config" / "opencode" / "skills", Path.cwd() / ".agents" / "skills"):
+    # The skill folders agents install into: the agentskills.io layout first, then agents' own folders.
+    for root in (Path.cwd() / ".agents" / "skills", Path.home() / ".agents" / "skills",
+                 Path.home() / ".claude" / "skills", Path.cwd() / ".claude" / "skills",  # agent-dirs
+                 Path.home() / ".codex" / "skills", Path.home() / ".gemini" / "skills",  # agent-dirs
+                 Path.home() / ".config" / "opencode" / "skills"):  # agent-dirs
         candidates.append(root / "web-extract" / "scripts" / "extract.py")
     for path in candidates:
         if path.is_file():
@@ -71,7 +74,7 @@ def load_web_extract() -> Any:
             sys.modules["web_extract"] = mod
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
             return mod
-    sys.stderr.write("error: the web-extract skill was not found (looked next to this skill, in ~/.claude/skills and other agent skill dirs); "
+    sys.stderr.write("error: the web-extract skill was not found (looked next to this skill and in the usual agent skill folders); "
                      "install it from the same repository or set WEB_EXTRACT_SCRIPT=/path/to/extract.py\n")
     sys.exit(EXIT_BAD_INPUT)
 

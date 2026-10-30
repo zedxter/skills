@@ -220,8 +220,11 @@ def load_web_extract() -> Any | None:
     here = Path(__file__).resolve()
     candidates = [Path(os.environ["WEB_EXTRACT_SCRIPT"])] if os.environ.get("WEB_EXTRACT_SCRIPT") else []
     candidates += [here.parent.parent.parent / "web-extract" / "scripts" / "extract.py", here.parent / "extract.py"]
-    for root in (Path.home() / ".claude" / "skills", Path.cwd() / ".claude" / "skills", Path.home() / ".codex" / "skills",
-                 Path.home() / ".gemini" / "skills", Path.home() / ".config" / "opencode" / "skills", Path.cwd() / ".agents" / "skills"):
+    # The skill folders agents install into: the agentskills.io layout first, then agents' own folders.
+    for root in (Path.cwd() / ".agents" / "skills", Path.home() / ".agents" / "skills",
+                 Path.home() / ".claude" / "skills", Path.cwd() / ".claude" / "skills",  # agent-dirs
+                 Path.home() / ".codex" / "skills", Path.home() / ".gemini" / "skills",  # agent-dirs
+                 Path.home() / ".config" / "opencode" / "skills"):  # agent-dirs
         candidates.append(root / "web-extract" / "scripts" / "extract.py")
     for path in candidates:
         if path.is_file():
