@@ -370,15 +370,22 @@ def load_audio(path: Path, start: float | None, end: float | None) -> np.ndarray
             raise Failure(EXIT_DECODE, f"{path.name} has no audio track", "pass a file with sound")
         stream = container.streams.audio[0]
         resampler = av.AudioResampler(format="flt", layout="mono", rate=SAMPLE_RATE)
+        # Timestamps need not start at 0 (MPEG-TS, HLS, broadcast recordings start at 1.4 s or anywhere);
+        # `start`/`end` are positions in the audio, so shift by the stream's first timestamp.
+        if stream.start_time is not None and stream.time_base is not None:
+            base = float(stream.start_time * stream.time_base)
+        else:
+            base = container.start_time / av.time_base if container.start_time else 0.0
         if start:
-            container.seek(int(start * av.time_base))  # lands on or before `start`; trimmed below
+            container.seek(int((start + base) * av.time_base))  # lands on or before `start`; trimmed below
         chunks: list[np.ndarray] = []
         first: float | None = None
         try:
             for frame in container.decode(stream):
+                t = frame.time - base if frame.time is not None else None
                 if first is None:
-                    first = frame.time if frame.time is not None else 0.0
-                if end is not None and frame.time is not None and frame.time >= end:
+                    first = t if t is not None else 0.0
+                if end is not None and t is not None and t >= end:
                     break
                 chunks.extend(f.to_ndarray().reshape(-1) for f in resampler.resample(frame))
         except av.error.FFmpegError as e:
@@ -441,6 +448,10 @@ def is_oom(e: BaseException) -> bool:
     return isinstance(e, MemoryError) or bool(re.search(r"out of memory|bad_alloc|cannot allocate", str(e), re.I))
 
 
+def is_compute_problem(e: BaseException) -> bool:
+    return bool(re.search(r"compute type", str(e), re.I))
+
+
 def is_gpu_problem(e: BaseException) -> bool:
     return bool(re.search(r"cuda|cudnn|cublas|libcu|no gpu|gpu", str(e), re.I))
 
@@ -449,7 +460,30 @@ def load_model(args: argparse.Namespace, device: str) -> Any:
     compute = args.compute_type
     if compute == "auto":
         compute = "int8" if device == "cpu" else "float16"
-    return WhisperModel(args.model, device=device, compute_type=compute, cpu_threads=args.threads)
+    # The model is already in the cache (checked or downloaded in main); without local_files_only faster-whisper
+    # asks the Hugging Face hub again and hangs for minutes on a network that silently drops packets.
+    return WhisperModel(args.model, device=device, compute_type=compute, cpu_threads=args.threads,
+                        local_files_only=not Path(args.model).is_dir())
+
+
+def cuda_usable() -> bool:
+    """A GPU is visible and the CUDA 12 cuBLAS and cuDNN 9 libraries load. Without cuDNN, CTranslate2 aborts the
+    whole process (not a Python exception), so `--device auto` must not pick the GPU on a hunch."""
+    import ctypes
+    import ctranslate2
+    if ctranslate2.get_cuda_device_count() == 0:
+        return False
+    names = {"cublas": ["libcublas.so.12", "cublas64_12.dll"], "cudnn": ["libcudnn_ops.so.9", "cudnn_ops64_9.dll", "libcudnn.so.9"]}
+    for candidates in names.values():
+        for name in candidates:
+            try:
+                ctypes.CDLL(name)
+                break
+            except OSError:
+                continue
+        else:
+            return False
+    return True
 
 
 def transcribe(model: Any, audio: np.ndarray, args: argparse.Namespace, language: str | None, offset: float,
@@ -536,7 +570,8 @@ def main(argv: list[str] | None = None) -> int:
     if url is None and not Path(args.source).expanduser().is_file():
         return fail(EXIT_BAD_INPUT, f"file not found: {args.source}", "pass an existing audio/video file or an http(s) URL")
     if args.quiet:
-        os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+        from huggingface_hub.utils import disable_progress_bars
+        disable_progress_bars()
 
     if args.info:
         try:
@@ -545,10 +580,10 @@ def main(argv: list[str] | None = None) -> int:
         except Failure as e:
             return fail(e.code, str(e), e.hint)
         length = meta["duration"]
-        if length:
+        if length is not None:
             length = max(0.0, min(end or length, length) - (start or 0.0))
         speed = CPU_SPEED.get(args.model.removesuffix(".en"))
-        lines = [f"title: {meta['title'] or Path(args.source).name}", f"duration: {fmt_clock(length) if length else 'unknown'}",
+        lines = [f"title: {meta['title'] or Path(args.source).name}", f"duration: {'unknown' if length is None else fmt_clock(length)}",
                  f"model: {args.model} ({'cached' if model_cached(args.model) else 'not downloaded: ~%s MB' % MODEL_INFO.get(args.model, ('?',))[0]})"]
         if length and speed:
             lines.append(f"estimate on CPU: ~{fmt_clock(length / speed)} (much faster on an NVIDIA GPU; varies by CPU 2-3x)")
@@ -584,8 +619,7 @@ def main(argv: list[str] | None = None) -> int:
 
     device = args.device
     if device == "auto":
-        import ctranslate2
-        device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+        device = "cuda" if cuda_usable() else "cpu"
     segments: list[dict[str, Any]] = []
     info = None
     duration = 0.0
@@ -608,12 +642,12 @@ def main(argv: list[str] | None = None) -> int:
             language = args.language
             for offset, audio in windows(path, start, end):
                 duration += audio.size / SAMPLE_RATE
-                if model is None:
-                    model = load_model(args, device)
                 try:
+                    if model is None:
+                        model = load_model(args, device)
                     win_info, win_segments = transcribe(model, audio, args, language, offset, progress)
                 except (RuntimeError, ValueError, OSError) as e:
-                    if args.device != "auto" or device == "cpu" or not is_gpu_problem(e) or is_oom(e):
+                    if args.device != "auto" or device == "cpu" or not (is_gpu_problem(e) or is_compute_problem(e)) or is_oom(e):
                         raise
                     note(f"GPU unusable ({(str(e).splitlines() or [''])[0][:120]}); falling back to CPU")
                     device = "cpu"
@@ -632,8 +666,12 @@ def main(argv: list[str] | None = None) -> int:
             if is_oom(e):
                 return fail(EXIT_MODEL, f"out of memory running model {args.model}: {msg}",
                             "use a smaller --model, --compute-type int8, or --device cpu")
+            if is_compute_problem(e):
+                return fail(EXIT_BAD_INPUT, msg, "use --compute-type auto (int8 on CPU, float16 on GPU) or int8")
             if is_gpu_problem(e):
                 return fail(EXIT_BAD_INPUT, f"GPU unusable: {msg}", "install CUDA 12 cuBLAS + cuDNN 9, or use --device cpu")
+            if isinstance(e, ImportError):
+                return fail(EXIT_BAD_INPUT, f"missing dependency: {msg}", "run with uv, or pip install faster-whisper")
             if isinstance(e, OSError) and model is None:
                 return fail(EXIT_BAD_INPUT, msg)
             return fail(EXIT_MODEL, msg, "the model files may be damaged; re-run with --download-model after deleting the cache entry")
@@ -660,7 +698,8 @@ def main(argv: list[str] | None = None) -> int:
             out.write_text(output, encoding="utf-8")
         except OSError as e:
             return fail(EXIT_BAD_INPUT, f"cannot write {out}: {e}")
-        sys.stderr.write(f"wrote {out}\n")
+        if not args.quiet:
+            sys.stderr.write(f"wrote {out}\n")
     else:
         sys.stdout.write(output)
     return EXIT_OK

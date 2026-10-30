@@ -1,6 +1,6 @@
 ---
 name: transcribe-audio
-description: Transcribe speech in an audio or video file or URL locally and offline with faster-whisper (no API key, no upload, no PyTorch, no ffmpeg install) into plain text, timestamped lines, SRT, VTT or JSON in the same shapes as youtube-transcript; downloads YouTube videos, podcast episodes and other yt-dlp sources first; auto-detects the language (~100 languages) or translates speech to English. Use when a YouTube video has no captions (youtube-transcript exit 3), when the user has a podcast episode, voice memo, lecture recording, meeting or interview file to transcribe, summarise or quote, or wants subtitles (.srt/.vtt) for a video ("transcribe this mp3", "make subtitles for this video", "what is said in this recording", "this video has no transcript").
+description: Transcribe speech in an audio or video file or URL locally and offline with faster-whisper (no API key, no upload, no PyTorch, no ffmpeg install) into plain text paragraphs, timestamped lines or SRT like youtube-transcript, plus VTT and JSON; downloads YouTube videos, podcast episodes and other yt-dlp sources first; auto-detects the language (~100 languages) or translates speech to English. Use when a YouTube video has no captions (youtube-transcript exit 3), when the user has a podcast episode, voice memo, lecture recording, meeting or interview file to transcribe, summarise or quote, or wants subtitles (.srt/.vtt) for a video ("transcribe this mp3", "make subtitles for this video", "what is said in this recording", "this video has no transcript").
 license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. CPU works everywhere; an NVIDIA GPU is used when CUDA 12 + cuDNN 9 are installed. The first use of each model downloads it from Hugging Face (78 MB tiny … 486 MB small … 3.1 GB large-v3), then it works offline. URLs need network access; YouTube bot-checks some IPs (cloud/VPN).
 metadata:
@@ -20,7 +20,7 @@ with `yt-dlp`. Nothing is uploaded; no key, no account, no paid API.
 
 - `youtube-transcript` returned exit 3 / `--list` is empty: the video has no
   captions. Pass the same URL here.
-- A podcast episode (a direct mp3 link from an RSS feed or `podcast-search`), a
+- A podcast episode (a direct mp3 link from its RSS feed), a
   voice memo, an interview, a meeting or a lecture recording to transcribe,
   summarise, search or quote.
 - Subtitles for a video file: `-f srt` / `-f vtt`.
@@ -76,8 +76,8 @@ formats; `--no-header` drops it):
 [10:05] оказалось, что вот не совсем окружность, …
 ```
 
-Progress, the download notes and a final `note: transcribed 5:00 in 0:59 (5.1x
-real time, device cpu)` go to stderr; `-q` hides them.
+Progress, the download notes, a final `note: transcribed 5:00 in 0:59 (5.1x
+real time, device cpu)` and `wrote FILE` go to stderr; `-q` hides them.
 
 ## Options
 
@@ -87,7 +87,7 @@ real time, device cpu)` go to stderr; `-q` hides them.
 | `-m, --model` | `small` | `tiny`, `base`, `small`, `medium`, `large-v3`, `large-v3-turbo`, `distil-large-v3` (English), `*.en` variants, or a local CTranslate2 model folder. |
 | `--download-model` | off | Allow fetching a model that is not cached. Only after the user agreed to the size. |
 | `--models` | — | List models with download size and whether they are cached; exit. |
-| `--info` | — | Print title, duration (of the `--start/--end` section if given), whether the model is cached and a CPU time estimate; download and transcribe nothing. |
+| `--info` | — | Print title, duration (of the `--start/--end` section if given), whether the model is cached and a CPU time estimate; download and transcribe nothing. Direct media links often show `duration: unknown`; raw `.aac` and mp3 without a header may show an inflated estimate. |
 | `-l, --language` | detect | Spoken language code (`en`, `ru`, `de`, `uk`, …). Set it when known: detection reads only the first 30 s and can pick the wrong language for music intros or mixed speech. |
 | `--task translate` | transcribe | Whisper's own speech→English translation (rough; `large-v3-turbo` cannot translate). Usually better: transcribe, then translate yourself. |
 | `--prompt TEXT` | — | Names, jargon and spellings to bias towards. |
@@ -97,7 +97,7 @@ real time, device cpu)` go to stderr; `-q` hides them.
 | `--no-header` | off | Drop the `#` header. |
 | `-o, --out FILE` | stdout | Write the transcript to FILE (folders created). |
 | `--keep-audio DIR` | temp | URL sources: keep the downloaded audio in DIR instead of deleting it. |
-| `--device auto\|cpu\|cuda` | `auto` | `auto` uses an NVIDIA GPU when one is visible and falls back to CPU if CUDA libraries are missing. |
+| `--device auto\|cpu\|cuda` | `auto` | `auto` uses an NVIDIA GPU only when CUDA 12 cuBLAS and cuDNN 9 load, and falls back to CPU if the GPU then fails. `cuda` forces it. |
 | `--compute-type` | `auto` | int8 on CPU, float16 on GPU; `int8_float16` saves GPU memory. |
 | `--threads N`, `--beam-size N` | 0 (auto), 5 | CPU threads; beam 1 is a little faster and slightly less accurate. |
 | `--no-vad` | off | Do not skip silence. The default Silero VAD filter prevents Whisper from inventing text in pauses; turn it off only when quiet speech is being dropped. |
@@ -114,8 +114,9 @@ JSON (`-f json`):
 
 ## Speed and memory
 
-Measured on a 6-core laptop CPU (Ryzen 5 6600HS, int8): `tiny` ≈ 24× real
-time, `small` ≈ 3–5× (a 1-hour podcast in 12–20 min). Expect `medium` around
+Measured on a 6-core laptop CPU (Ryzen 5 6600HS, int8): `tiny` ≈ 24–30× real
+time, `small` ≈ 3–5× (a 1-hour podcast in 12–20 min); `base` sits between
+them, `large-v3-turbo` near real time (estimates). Expect `medium` around
 real time and `large-v3` slower than real time on CPU; on a recent NVIDIA GPU
 every model runs many times faster than real time. Long recordings are
 processed in ~10-minute windows cut at pauses, so memory does not grow with
@@ -134,7 +135,7 @@ One `error:` line on stderr with a hint after `—`.
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | 0 | Transcript written. | Use it (workflow below). |
-| 2 | Bad input: file not found, bad time or language code, unknown model, a playlist URL, missing dependency, or `--device cuda` without working CUDA. | Fix the argument; for the GPU, use `--device cpu`. |
+| 2 | Bad input: file not found, bad time or language code, unknown model, unsupported `--compute-type`, a playlist URL, unwritable `-o`, missing dependency, `--device cuda` without working CUDA, or interrupted (Ctrl-C). | Fix the argument; for the GPU, use `--device cpu`. |
 | 3 | No speech detected (silence, music only), or the section is empty. | Tell the user; try `-l` with the right language or `--no-vad` for very quiet speech. |
 | 4 | Download blocked: YouTube bot check, HTTP 429, geo-block. | **Do not retry in a loop.** Ask the user before using `--cookies-from-browser BROWSER` (chrome, firefox, edge, safari, brave, chromium, opera, vivaldi; their own signed-in session, read locally by yt-dlp), or ask them to download the file and pass it. |
 | 5 | Media unavailable: private, removed, 404, members-only, age-restricted, login required, not started, DRM. | Report it. |
@@ -174,7 +175,9 @@ One `error:` line on stderr with a hint after `—`.
 ## Limitations
 
 - No speaker labels (diarisation) and no word-level timestamps; segment
-  times are accurate to roughly a second.
+  times are accurate to roughly a second. Sound descriptions for SDH
+  subtitles ("[applause]", "[door slams]") are not produced
+  ([whisper discussion #458](https://github.com/openai/whisper/discussions/458)).
 - Overlapping speech, heavy noise, music and sung lyrics transcribe poorly;
   Whisper may occasionally repeat or invent a phrase, mostly around long
   pauses or music (the VAD filter reduces this).
@@ -191,6 +194,6 @@ One `error:` line on stderr with a hint after `—`.
 
 - `youtube-search` → video → `youtube-transcript`; exit 3 → `transcribe-audio`
   with the same URL.
-- `podcast-search` → episode mp3 URL → `transcribe-audio` → notes / summary.
+- A podcast's RSS feed → episode mp3 URL → `transcribe-audio` → notes / summary.
 - The user also wants the audio file: `--keep-audio DIR`, or save it with
   `youtube-audio` (mp3, tags, chapters) and pass the file here.

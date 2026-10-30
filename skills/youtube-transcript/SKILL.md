@@ -147,8 +147,9 @@ transcript is retrievable from the current IP.
 If a video genuinely has no captions (exit 3 and `--list` is empty), use the
 `transcribe-audio` skill from the same collection with the same URL: it
 downloads the audio and runs Whisper locally (no key, no upload) and prints
-the same text/timestamps/SRT/JSON shapes. It needs a one-time model download
-(486 MB for the default `small`) and takes minutes for long videos on a CPU,
+the same text/timestamps/SRT formats (plus VTT and its own JSON). It needs a
+one-time model download (486 MB for the default `small`) and takes minutes
+for long videos on a CPU,
 so tell the user and let them decide before proceeding.
 
 ## Finding the video first

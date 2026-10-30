@@ -1,6 +1,7 @@
 """Tests for skills/transcribe-audio/scripts/transcribe.py.
 
-Run: uv run --with pytest --with faster-whisper --with 'yt-dlp[default]' python -I -m pytest test/test_transcribe_audio.py -q
+Run: uv run --no-project --with pytest --with faster-whisper --with 'yt-dlp[default]' python -I -m pytest \
+         test/test_transcribe_audio.py -q --doctest-modules skills/transcribe-audio/scripts/transcribe.py
 
 Speech tests need the `tiny` model (78 MB) in the Hugging Face cache and skip otherwise; fetch it once with
 `uv run skills/transcribe-audio/scripts/transcribe.py test/data/jfk.ogg -m tiny --download-model`.
@@ -13,6 +14,7 @@ import functools
 import http.server
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -48,8 +50,11 @@ def silence(path: Path, seconds: float = 4.0) -> Path:
 
 @pytest.fixture(scope="module")
 def server():
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(DATA))
-    handler.log_message = lambda *a, **k: None
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+    handler = functools.partial(Quiet, directory=str(DATA))
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_address[1]}"
@@ -133,6 +138,39 @@ def test_load_audio_decodes_and_cuts_sections(tmp_path):
     assert e.value.code == ta.EXIT_DECODE
 
 
+def test_windows_are_contiguous_and_cut_at_pauses(monkeypatch):
+    monkeypatch.setattr(ta, "WINDOW_SECONDS", 4)
+    monkeypatch.setattr(ta, "CUT_SLACK", 1)
+    full = ta.load_audio(JFK, None, None)
+    for start, end in ((None, None), (2.0, 9.5)):
+        parts = list(ta.windows(JFK, start, end))
+        assert len(parts) >= 2 and parts[0][0] == (start or 0.0)
+        for (o1, a1), (o2, _) in zip(parts, parts[1:]):
+            assert abs(o1 + a1.size / ta.SAMPLE_RATE - o2) < 1e-6  # no gap, no overlap
+        joined = ta.np.concatenate([a for _, a in parts])
+        first = int((start or 0) * ta.SAMPLE_RATE)
+        assert abs(joined.size - (int((end or 11.0) * ta.SAMPLE_RATE) - first)) < ta.SAMPLE_RATE // 20
+        # same samples as one full decode, past the first 0.1 s (resampler warm-up after a seek)
+        assert ta.np.allclose(joined[1600:], full[first + 1600:first + joined.size], atol=2e-3)
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")
+def test_timestamps_not_starting_at_zero(tmp_path):
+    # MPEG-TS (HLS downloads, broadcast recordings) starts its clock at 1.4 s or anywhere; positions must not shift
+    ts = tmp_path / "jfk.ts"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(JFK), "-c:a", "aac", "-f", "mpegts", "-output_ts_offset", "100", str(ts)],
+                   check=True)
+    full = ta.load_audio(ts, None, None)
+    assert abs(full.size / ta.SAMPLE_RATE - 11.0) < 0.2
+    ref, got = ta.load_audio(JFK, 3.0, 8.0), ta.load_audio(ts, 3.0, 8.0)
+    assert abs(got.size - ref.size) < ta.SAMPLE_RATE // 20
+    n = min(ref.size, got.size)
+    lag = max(range(-1600, 1601, 16), key=lambda k: float((ref[max(0, k):n + min(0, k)] * got[max(0, -k):n - max(0, k)]).sum()))
+    assert abs(lag) <= 1600  # aligned within 0.1 s (AAC priming), not shifted by the 100 s clock offset
+    [(offset, window)] = list(ta.windows(ts, None, None))
+    assert offset == 0.0 and abs(window.size / ta.SAMPLE_RATE - 11.0) < 0.2
+
+
 def test_cli_argument_errors_exit_2(tmp_path):
     for argv in ([], [str(tmp_path / "missing.mp3")], [str(JFK), "--start", "8", "--end", "3"], [str(JFK), "--start", "soon"],
                  [str(JFK), "-m", "huge"], [str(JFK), "-l", "xx"], [str(JFK), "--cookies", str(tmp_path / "c.txt")]):
@@ -171,7 +209,7 @@ def test_transcribes_speech_to_text_and_json():
 @needs_model
 def test_section_keeps_file_timestamps(tmp_path):
     out = tmp_path / "sub" / "jfk.srt"
-    rc, stdout, err = run(str(JFK), "-m", "tiny", "-f", "srt", "--start", "3", "--end", "8", "-o", str(out), "-q")
+    rc, stdout, err = run(str(JFK), "-m", "tiny", "-f", "srt", "--start", "3", "--end", "8", "-o", str(out))
     assert rc == 0 and stdout == "" and f"wrote {out}" in err
     first = out.read_text(encoding="utf-8").splitlines()[1]
     assert first.startswith("00:00:03,") or first.startswith("00:00:04,")  # offset by --start, not from 0
@@ -185,6 +223,10 @@ def test_silence_is_no_speech(tmp_path):
 
 @needs_model
 def test_url_source_is_downloaded_and_cleaned_up(server, tmp_path):
+    scratch = tmp_path / "tmp"
+    scratch.mkdir()
+    rc, out, err = run(f"{server}/jfk.ogg", "-m", "tiny", "-q", env={"TMPDIR": str(scratch), "TEMP": str(scratch), "TMP": str(scratch)})
+    assert rc == 0 and PHRASE in out.lower() and not list(scratch.glob("transcribe-audio-*"))  # temp download removed
     keep = tmp_path / "audio"
     rc, out, err = run(f"{server}/jfk.ogg", "-m", "tiny", "-f", "timestamps", "--keep-audio", str(keep))
     assert rc == 0, err
