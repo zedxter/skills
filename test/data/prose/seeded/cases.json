@@ -1,0 +1,475 @@
+{
+  "docs-01-lint-howto": {
+    "genre": "docs",
+    "type": "how-to guide",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "newcomer-tester",
+      "source-checker"
+    ],
+    "audience": "developers who write technical blog posts and want to check a draft before publishing; they know the command line and Markdown and have never used this tool",
+    "platform": "the tool's own documentation page in a public GitHub repository",
+    "field": "prose linting and AI-text detection",
+    "author": "an independent open-source maintainer",
+    "sources": [
+      "skills/human-writing/scripts/lint_prose.py",
+      "test/test_human_writing.py"
+    ],
+    "run_policy": "dry run only: do not run any commands",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "draft.md --strict",
+        "lenses": [
+          "source-checker",
+          "newcomer-tester",
+          "fact-checker"
+        ],
+        "what": "--strict flag does not exist"
+      },
+      {
+        "id": "D2",
+        "quote": "The default passing threshold is 80",
+        "lenses": [
+          "fact-checker",
+          "source-checker"
+        ],
+        "what": "threshold is 75; the ledger wrongly marks 80 verified"
+      },
+      {
+        "id": "D3",
+        "quote": "catches 97% of AI-generated text",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert"
+        ],
+        "what": "unsupported accuracy claim"
+      },
+      {
+        "id": "D4",
+        "quote": "--genre linkedin",
+        "lenses": [
+          "source-checker",
+          "newcomer-tester",
+          "fact-checker"
+        ],
+        "what": "invalid genre"
+      },
+      {
+        "id": "D5",
+        "quote": "ghp_8f3KqZ2vLw9XyT4mN7pR1sB6cD0eH5jA2uQx",
+        "lenses": [
+          "publication-safety"
+        ],
+        "what": "token in an example"
+      },
+      {
+        "id": "D6",
+        "quote": "In today's fast-paced world",
+        "lenses": [
+          "slop-hunter",
+          "cold-reader"
+        ],
+        "what": "slop section"
+      },
+      {
+        "id": "D7",
+        "quote": "1. Run the linter on your draft:",
+        "lenses": [
+          "newcomer-tester",
+          "cold-reader"
+        ],
+        "what": "no prerequisites (uv, script location)",
+        "keywords": [
+          "prerequisite",
+          "install uv",
+          "uv is",
+          "where to get"
+        ]
+      }
+    ]
+  },
+  "article-02-postgres-index": {
+    "genre": "article",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "platform-editor"
+    ],
+    "audience": "backend developers who use Postgres in production",
+    "platform": "dev.to, cross-posted from the company engineering blog",
+    "field": "Postgres query performance",
+    "author": "a backend engineer at an e-commerce company, writing with the company's approval",
+    "goal": "understanding; some readers try the technique",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "published: true",
+        "lenses": [
+          "platform-editor"
+        ],
+        "what": "front matter publishes the draft"
+      },
+      {
+        "id": "D2",
+        "quote": "tags: postgres, performance, sql, database, backend, devops",
+        "lenses": [
+          "platform-editor"
+        ],
+        "what": "six tags; dev.to allows four"
+      },
+      {
+        "id": "D3",
+        "quote": "This post first appeared on our company blog",
+        "lenses": [
+          "platform-editor"
+        ],
+        "what": "cross-post without canonical_url"
+      },
+      {
+        "id": "D4",
+        "quote": "p95 dropped from 820 ms to 90 ms",
+        "lenses": [
+          "fact-checker"
+        ],
+        "what": "ledger says 140 ms"
+      },
+      {
+        "id": "D5",
+        "quote": "a 5x improvement",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert"
+        ],
+        "what": "arithmetic does not match either number"
+      },
+      {
+        "id": "D6",
+        "quote": "db-prod-03.internal.acme.net",
+        "lenses": [
+          "publication-safety"
+        ],
+        "what": "internal production hostname"
+      },
+      {
+        "id": "D7",
+        "quote": "In today's fast-paced world of e-commerce",
+        "lenses": [
+          "slop-hunter",
+          "cold-reader"
+        ],
+        "what": "slop paragraph"
+      },
+      {
+        "id": "D8",
+        "quote": "This approach works for every Postgres workload",
+        "lenses": [
+          "hostile-expert"
+        ],
+        "what": "overclaim; index write cost ignored"
+      }
+    ]
+  },
+  "article-03-monolith": {
+    "genre": "article",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "platform-editor"
+    ],
+    "audience": "engineering managers and senior engineers at small and mid-size companies",
+    "platform": "the company's engineering blog",
+    "field": "software architecture",
+    "author": "a principal engineer writing on the company blog",
+    "goal": "discussion; hiring",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "Some say microservices are always the better architecture",
+        "lenses": [
+          "hostile-expert",
+          "slop-hunter"
+        ],
+        "what": "strawman"
+      },
+      {
+        "id": "D2",
+        "quote": "we had 31 production incidents",
+        "lenses": [
+          "fact-checker"
+        ],
+        "what": "ledger says 23"
+      },
+      {
+        "id": "D3",
+        "quote": "Studies show that monoliths are three times cheaper",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert",
+          "slop-hunter"
+        ],
+        "what": "unsourced statistic"
+      },
+      {
+        "id": "D4",
+        "quote": "Project Falcon, the usage-based pricing engine we launch in Q2",
+        "lenses": [
+          "publication-safety",
+          "fact-checker"
+        ],
+        "what": "unannounced project and date"
+      },
+      {
+        "id": "D5",
+        "quote": "small teams should build monoliths",
+        "lenses": [
+          "hostile-expert"
+        ],
+        "what": "overgeneralised from one case, no trade-offs"
+      },
+      {
+        "id": "D6",
+        "quote": "In conclusion, the monolith is back",
+        "lenses": [
+          "slop-hunter",
+          "cold-reader",
+          "platform-editor"
+        ],
+        "what": "recap ending and aphorism"
+      }
+    ]
+  },
+  "article-04-git-undo": {
+    "genre": "article",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "platform-editor"
+    ],
+    "audience": "beginner developers who use Git from the command line",
+    "platform": "a general how-to website",
+    "field": "Git",
+    "author": "a freelance technical writer",
+    "goal": "the reader undoes a commit safely",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "Have you ever committed something",
+        "lenses": [
+          "platform-editor",
+          "slop-hunter",
+          "cold-reader"
+        ],
+        "what": "question opener and padding"
+      },
+      {
+        "id": "D2",
+        "quote": "87% of developers",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert"
+        ],
+        "what": "unsourced statistic"
+      },
+      {
+        "id": "D3",
+        "quote": "git reset --hard HEAD~1",
+        "lenses": [
+          "hostile-expert"
+        ],
+        "what": "destroys uncommitted work without warning; --soft is the safe default"
+      },
+      {
+        "id": "D4",
+        "quote": "force-push your branch so the remote matches",
+        "lenses": [
+          "hostile-expert",
+          "platform-editor",
+          "cold-reader"
+        ],
+        "what": "several actions in one step; force-push danger"
+      },
+      {
+        "id": "D5",
+        "quote": "GitHub Desktop costs $10 a month",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert",
+          "platform-editor"
+        ],
+        "what": "false price, no date"
+      },
+      {
+        "id": "D6",
+        "quote": "simple, effortless ways",
+        "lenses": [
+          "slop-hunter"
+        ],
+        "what": "minimizers and AI vocabulary"
+      },
+      {
+        "id": "D7",
+        "quote": "That's it! Happy coding!",
+        "lenses": [
+          "slop-hunter"
+        ],
+        "what": "cheerleading sign-off"
+      }
+    ]
+  },
+  "post-01-team-growth": {
+    "genre": "post",
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "platform-editor"
+    ],
+    "audience": "startup founders and engineering leads",
+    "platform": "LinkedIn post",
+    "field": "engineering management",
+    "author": "the CTO of a startup",
+    "goal": "comments and profile visits",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "Want to know the secret to scaling an engineering team?",
+        "lenses": [
+          "platform-editor",
+          "slop-hunter"
+        ],
+        "what": "question opener"
+      },
+      {
+        "id": "D2",
+        "quote": "Today we are 40.",
+        "lenses": [
+          "fact-checker"
+        ],
+        "what": "ledger says 14"
+      },
+      {
+        "id": "D3",
+        "quote": "here's what nobody tells you",
+        "lenses": [
+          "slop-hunter"
+        ],
+        "what": "faux-insight and staged contrast"
+      },
+      {
+        "id": "D4",
+        "quote": "$2.4M contract",
+        "lenses": [
+          "publication-safety",
+          "fact-checker"
+        ],
+        "what": "confidential customer and value"
+      },
+      {
+        "id": "D5",
+        "quote": "https://example.com/decision-docs",
+        "lenses": [
+          "platform-editor"
+        ],
+        "what": "external link in the body"
+      },
+      {
+        "id": "D6",
+        "quote": "#engineering #leadership #startups #hiring #growth",
+        "lenses": [
+          "platform-editor",
+          "slop-hunter"
+        ],
+        "what": "five hashtags"
+      },
+      {
+        "id": "D7",
+        "quote": "We also changed our on-call rotation",
+        "lenses": [
+          "cold-reader",
+          "platform-editor"
+        ],
+        "what": "second idea dilutes the post"
+      }
+    ]
+  },
+  "post-02-oncall": {
+    "genre": "post",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "voice-keeper",
+      "platform-editor"
+    ],
+    "audience": "SREs and engineering managers",
+    "platform": "LinkedIn post",
+    "field": "on-call and alerting",
+    "author": "an engineering manager posting on their own account",
+    "goal": "saves and comments",
+    "voice": "post-02-oncall.voice.md",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "We cut on-call pages by half",
+        "lenses": [
+          "fact-checker"
+        ],
+        "what": "120 to 80 is a third, not half"
+      },
+      {
+        "id": "D2",
+        "quote": "who was off for six weeks with burnout",
+        "lenses": [
+          "publication-safety",
+          "voice-keeper"
+        ],
+        "what": "a colleague's health detail, named, no consent"
+      },
+      {
+        "id": "D3",
+        "quote": "I'm SO thrilled to share this!!!",
+        "lenses": [
+          "voice-keeper",
+          "slop-hunter"
+        ],
+        "what": "off-voice paragraph"
+      },
+      {
+        "id": "D4",
+        "quote": "As Steve Jobs said",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert"
+        ],
+        "what": "the quote is Kent Beck's"
+      },
+      {
+        "id": "D5",
+        "quote": "Comment \"ALERTS\" and I'll DM you",
+        "lenses": [
+          "platform-editor",
+          "slop-hunter",
+          "voice-keeper"
+        ],
+        "what": "comment-gate bait"
+      }
+    ]
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "D1": {
+    "line": 3,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "platform-editor",
+      "slop-hunter"
+    ]
+  },
+  "D2": {
+    "line": 5,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert",
+      "platform-editor",
+      "publication-safety",
+      "slop-hunter"
+    ]
+  },
+  "D3": {
+    "line": 12,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert",
+      "platform-editor",
+      "publication-safety",
+      "slop-hunter"
+    ]
+  },
+  "D4": {
+    "line": 19,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert",
+      "platform-editor",
+      "publication-safety"
+    ]
+  },
+  "D5": {
+    "line": 27,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert",
+      "platform-editor",
+      "publication-safety",
+      "slop-hunter"
+    ]
+  },
+  "D6": {
+    "line": 3,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "platform-editor",
+      "slop-hunter"
+    ]
+  },
+  "D7": {
+    "line": 29,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "platform-editor",
+      "slop-hunter"
+    ]
+  }
+}

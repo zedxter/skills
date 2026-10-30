@@ -1,0 +1,64 @@
+[
+  {
+    "topic": "o1-linkedin",
+    "run": "plain",
+    "cost_usd": 0.0751042,
+    "tools": {}
+  },
+  {
+    "topic": "o1-linkedin",
+    "run": "skill",
+    "cost_usd": 1.1310885000000002,
+    "tools": {
+      "Skill": 1,
+      "Bash": 4,
+      "Read": 26,
+      "Write": 3,
+      "Edit": 1,
+      "Agent": 9
+    }
+  },
+  {
+    "topic": "o2-devto",
+    "run": "plain",
+    "cost_usd": 0.1090666,
+    "tools": {}
+  },
+  {
+    "topic": "o2-devto",
+    "run": "skill",
+    "cost_usd": 2.6385461,
+    "tools": {
+      "Skill": 1,
+      "Bash": 11,
+      "Write": 4,
+      "Edit": 3,
+      "Agent": 10,
+      "Read": 24,
+      "ToolSearch": 2,
+      "WebFetch": 3
+    }
+  },
+  {
+    "topic": "o3-readme",
+    "run": "plain",
+    "cost_usd": 0.09344820000000001,
+    "tools": {}
+  },
+  {
+    "topic": "o3-readme",
+    "run": "skill",
+    "cost_usd": 1.0065702,
+    "tools": {
+      "Skill": 1,
+      "Grep": 1,
+      "Write": 2,
+      "Bash": 3,
+      "Edit": 16,
+      "Agent": 4,
+      "Read": 9,
+      "ToolSearch": 1,
+      "WebFetch": 1
+    }
+  }
+]

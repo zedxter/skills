@@ -1,6 +1,6 @@
 # Seeded-defect texts for the review panel
 
-Each text has defects planted on purpose, and a ledger that the fact checker receives. Run the panel from `references/review-orchestration.md` on a text and check that every planted defect is reported by the lens that owns it. The token below is fake.
+Each text has defects planted on purpose, and a ledger (`<name>.ledger.md`) that the fact checker receives. The panel from `references/review-orchestration.md` should report every planted defect from the lens that owns it. All names, numbers, hosts and tokens are made up; the GitHub token is fake.
 
 ## docs-01-lint-howto.md
 
@@ -16,12 +16,18 @@ A how-to for `lint_prose.py` itself, so the source checker and newcomer tester c
 | D6 | "Why it matters" section in stock AI phrasing | 37–39 | slop-hunter, cold-reader |
 | D7 | No prerequisites: uv, where the script lives, what the draft must be | 7 | newcomer-tester, cold-reader |
 
-### Result, 2026-10-30
+### Result
 
-Full docs panel (7 reviewers, one round, separate sub-agents on a mid-size model, each given only its brief, the text and its lens inputs):
+See `test/evals/human-writing/README.md`. The whole set of six texts and 40 defects was caught 40/40 by the panel and by the single-agent fallback on 2026-10-30.
 
-- **Planted defects:** all 7 were caught by an owning lens, and every reviewer returned valid JSON in the schema.
-- **Extra defect:** the source checker found one we didn't plant. `docs/*.md` expands to several files, but the script takes one, so the CI step exits 2.
-- **Lens overlap:** the cold reader, hostile expert and slop hunter also reported the token as a blocker, outside their lens. The merge step dedupes these; agreement across lenses raises priority.
+## The other texts
 
-Still to do for the acceptance criteria in issue #25: five more seeded texts (articles and posts) and a single-agent fallback run for comparison.
+`cases.json` lists every text: its genre, panel lenses, the inputs each lens gets (audience, platform, field, author, goal, sources, run policy, voice profile) and the planted defects, each with a unique quote and the lenses that own it. `test/test_human_writing.py` checks that file stays consistent; `test/evals/human-writing/run_panel.py` runs and scores the panel.
+
+| Text | Genre | Planted defects |
+|---|---|---|
+| `article-02-postgres-index` | dev.to article | publishes the draft, six tags, cross-post without canonical URL, a number that contradicts the ledger, wrong arithmetic, an internal hostname, a slop paragraph, an overclaim |
+| `article-03-monolith` | engineering-blog opinion | a strawman, a number that contradicts the ledger, an unsourced statistic, an unannounced project, an overgeneralisation, a recap ending |
+| `article-04-git-undo` | how-to site | a question opener, an unsourced statistic, a destructive command without warning, a multi-action step with force-push, a false price, minimizers, a cheerleading sign-off |
+| `post-01-team-growth` | LinkedIn post | a question opener, a wrong headcount, a faux-insight setup, a confidential contract value, a link in the body, five hashtags, a second idea |
+| `post-02-oncall` | LinkedIn post with a voice profile | "half" for a one-third cut, a colleague's health detail, an off-voice paragraph, a misattributed quote, comment-gate bait |
