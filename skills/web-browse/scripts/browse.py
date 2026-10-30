@@ -220,6 +220,10 @@ def load_web_extract() -> Any | None:
                  Path.home() / ".codex" / "skills", Path.home() / ".gemini" / "skills",  # agent-dirs
                  Path.home() / ".config" / "opencode" / "skills"):  # agent-dirs
         candidates.append(root / "web-extract" / "scripts" / "extract.py")
+    # An agent's plugin cache (<cache>/<marketplace>/web-extract/<version>/), newest install first.
+    plugin_cache = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude") / "plugins" / "cache"  # agent-dirs
+    candidates += sorted(plugin_cache.glob("*/web-extract/*/scripts/extract.py"),
+                         key=lambda p: p.stat().st_mtime, reverse=True)
     for path in candidates:
         if path.is_file():
             try:

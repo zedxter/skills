@@ -218,6 +218,16 @@ def check_repo() -> list[str]:
         if sorted(have) != sorted(want):
             problems.append(f".github/workflows/{workflow}: the {key} matrix {sorted(set(want) ^ set(have))} differs from "
                             "test/ops.py; keep them the same")
+    market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+    entries = {e["name"]: e for e in market["plugins"]}
+    skills = {d.name for d in SKILLS.iterdir() if (d / "SKILL.md").is_file()}
+    if set(entries) != skills:
+        problems.append(f".claude-plugin/marketplace.json: plugins {sorted(set(entries) ^ skills)} differ from the skill "
+                        "folders; keep one plugin per skill")
+    for name, e in sorted(entries.items()):
+        if e.get("source") != f"./skills/{name}":
+            problems.append(f".claude-plugin/marketplace.json: plugin {name} has source {e.get('source')!r}, "
+                            f"not './skills/{name}'")
     for f in sorted((ROOT / "test").glob("test_*.py")):
         name = f.stem[5:].replace("_", "-")
         if name not in SUITES:

@@ -70,3 +70,15 @@ jobs:
       # Offline: network cases are switched off or run against local servers; the weekly liveness probe covers the
       # real sources.
       - run: python3 test/ops.py test ${{ matrix.suite }}
+
+  # The one check the main-branch ruleset requires, so adding a suite never means editing the ruleset.
+  passed:
+    name: CI passed
+    if: ${{ always() }}
+    needs: [validate, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          VALIDATE: ${{ needs.validate.result }}
+          TESTS: ${{ needs.tests.result }}
+        run: test "$VALIDATE" = success && test "$TESTS" = success

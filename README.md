@@ -144,6 +144,20 @@ agent non-interactively:
 npx skills add zedxter/skills --all -a claude-code
 ```
 
+### As Claude Code plugins
+
+The repository is also a Claude Code plugin marketplace with one plugin per
+skill, so you install only what you need:
+
+```bash
+claude plugin marketplace add zedxter/skills
+claude plugin install web-search@zedxter-skills
+```
+
+`web-crawl`, `web-scrape`, `web-browse` and `web-search` install `web-extract`
+with them. Inside a session, `/plugin` lists the catalogue. A plugin's skill
+runs as `/<plugin>:<skill>`, for example `/web-search:web-search`.
+
 ### With OpenSkills
 
 ```bash

@@ -14,7 +14,8 @@ One folder under `skills/`:
 Each new skill also needs:
 - a test file `test/test_<name>.py`;
 - trigger evals in `test/evals/<name>/`;
-- a row in the README's skill table.
+- a row in the README's skill table;
+- an entry in `.claude-plugin/marketplace.json` (one Claude Code plugin per skill).
 
 ### `SKILL.md`
 
