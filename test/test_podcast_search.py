@@ -8,6 +8,7 @@ in-process HTTP server. PODCAST_LIVE=1 adds a smoke test against Apple and a lon
 """
 
 import functools
+import gzip
 import http.server
 import json
 import os
@@ -35,6 +36,19 @@ EPISODE = {"wrapperType": "podcastEpisode", "kind": "podcast-episode", "collecti
            "description": "Event horizons."}
 
 
+CP1251_FEED = ("<?xml version='1.0'?><rss version='2.0'><channel><title>Русский подкаст</title>"
+               "<item><title>Выпуск один</title><pubDate>Tue, 05 Mar 2024 18:00:00 -0800</pubDate>"
+               "<enclosure url='https://x/1.mp3' type='audio/mpeg' length='1'/></item>"
+               "<item><title>Утренний выпуск</title><pubDate>Tue, 05 Mar 2024 08:00:00 -0800</pubDate>"
+               "<enclosure url='https://x/0.mp3' type='audio/mpeg' length='1'/></item></channel></rss>").encode("cp1251")
+SPECIAL = {  # path → (status, headers, body)
+    "/cp1251.xml": (200, {"Content-Type": "application/rss+xml; charset=windows-1251"}, CP1251_FEED),
+    "/gzip.xml": (200, {"Content-Type": "application/rss+xml", "Content-Encoding": "gzip"},
+                  gzip.compress((DATA / "podcast_feed.xml").read_bytes())),
+    "/cut.xml": (200, {"Content-Type": "application/rss+xml", "Content-Length": "100000"}, b"<?xml version='1.0'?><rss"),
+}
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     calls: list[str] = []
 
@@ -44,10 +58,33 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         url = urllib.parse.urlsplit(self.path)
         q = dict(urllib.parse.parse_qsl(url.query))
+        if url.path in SPECIAL:
+            status, headers, body = SPECIAL[url.path]
+            self.send_response(status)
+            for k, v in {"Content-Length": str(len(body)), **headers}.items():
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if url.path in ("/search", "/lookup"):
             Handler.calls.append(self.path)
-            if q.get("term") == "blocked":
-                self.send_error(403)
+            if q.get("term") in ("blocked", "throttled"):
+                self.send_error(403 if q["term"] == "blocked" else 429)
+                return
+            if q.get("term") == "html":
+                body = b"<html>Service unavailable</html>"
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if q.get("term") == "nofeed":
+                results = [{k: v for k, v in SHOW.items() if k != "feedUrl"}]
+                body = json.dumps({"resultCount": 1, "results": results}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
                 return
             if url.path == "/lookup":
                 results = [SHOW] if q.get("id") == "111222333" else []
@@ -77,12 +114,13 @@ def server():
 
 @pytest.fixture
 def run(server, tmp_path):
-    """Run the CLI in-process against the fake directory, with a private throttle file."""
+    """Run the CLI in a subprocess against the fake directory, with a private throttle file and no proxy."""
     def go(*argv: str):
         code = subprocess.run(
             [sys.executable, "-c", "import sys, podcast as pc; pc.ITUNES = sys.argv[1]; sys.exit(pc.main(sys.argv[2:]))", server, *argv],
             capture_output=True, text=True, encoding="utf-8", cwd=SCRIPT.parent, timeout=60,
-            env={**os.environ, "XDG_CACHE_HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path)})
+            env={**{k: v for k, v in os.environ.items() if not k.lower().endswith("_proxy")},
+                 "XDG_CACHE_HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path), "NO_PROXY": "127.0.0.1,localhost"})
         return code.returncode, code.stdout, code.stderr
     return go
 
@@ -103,14 +141,37 @@ def test_feed_parsing_normalises_episodes():
     assert e3["duration"] == 6300 and e3["audio_url"] == "https://cdn.example.org/talks/3.mp3?src=rss" and e3["url"] is None
 
 
+def parse(*argv):
+    a = pc.make_parser().parse_args(list(argv))
+    a.after = pc.parse_date(a.after) if a.after else None
+    a.before = pc.parse_date(a.before) if a.before else None
+    return a
+
+
 def test_filters_and_sorting():
     _, eps = pc.parse_feed((DATA / "podcast_feed.xml").read_bytes(), "x")
-    args = pc.make_parser().parse_args(["episodes", "x"])
+    args = parse("episodes", "x")
     assert [e["guid"] for e in pc.filter_episodes(eps, args)] == ["talks-3", "talks-2", "talks-1"]
-    args = pc.make_parser().parse_args(["episodes", "x", "--oldest", "--after", "2023-01-01", "--min-minutes", "10"])
+    args = parse("episodes", "x", "--oldest", "--after", "2023-01-01", "--min-minutes", "10")
     assert [e["guid"] for e in pc.filter_episodes(eps, args)] == ["talks-2", "talks-3"]
-    args = pc.make_parser().parse_args(["episodes", "x", "--grep", "hawking|newton", "--max-minutes", "70", "--before", "2024-12-31"])
+    args = parse("episodes", "x", "--grep", "hawking|newton", "--max-minutes", "70", "--before", "2024-12-31")
     assert [e["guid"] for e in pc.filter_episodes(eps, args)] == ["talks-1"]
+    assert [e["guid"] for e in pc.filter_episodes(eps, parse("episodes", "x"), by_date=False)] == ["talks-1", "talks-2", "talks-3"]
+
+
+def test_media_selection_dates_and_charset():
+    item = ("<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><title>S</title>"
+            "<item><title>Cover only</title><enclosure url='http://x/cover.jpg' type='image/jpeg' length='1'/></item>"
+            "<item><title>Media RSS</title><media:content url='http://x/m.mp3' type='audio/mpeg' fileSize='9'/></item>"
+            "</channel></rss>").encode()
+    _, eps = pc.parse_feed(item, "u")
+    assert [(e["title"], e["audio_url"], e["audio_bytes"]) for e in eps] == [("Media RSS", "http://x/m.mp3", 9)]
+    show, eps = pc.parse_feed(CP1251_FEED, "u", {"content-type": "application/rss+xml; charset=windows-1251"})
+    assert show["title"] == "Русский подкаст" and eps[0]["title"] == "Выпуск один"
+    assert [e["published"] for e in eps] == ["2024-03-05", "2024-03-05"]  # the show's own day, not the UTC one
+    newest = pc.filter_episodes(eps, parse("episodes", "x"))
+    assert [e["audio_url"] for e in newest] == ["https://x/1.mp3", "https://x/0.mp3"]  # 18:00 before 08:00
+    assert [e["audio_url"] for e in pc.filter_episodes(eps, parse("episodes", "x", "--oldest"))] == ["https://x/0.mp3", "https://x/1.mp3"]
 
 
 def test_bad_feeds_are_classified():
@@ -123,12 +184,25 @@ def test_bad_feeds_are_classified():
     assert e.value.code == pc.EXIT_FEED and "no audio" in str(e.value)
 
 
+def test_throttle_holds_across_concurrent_processes(tmp_path):
+    # 24 processes call throttle() at once with a budget of 18/min: 18 go now, 6 get slots about a minute later
+    code = ("import json, sys, time; import podcast as pc; pc.time.sleep = lambda s: print(round(s)); pc.throttle(lambda m: None)")
+    procs = [subprocess.Popen([sys.executable, "-c", code], cwd=SCRIPT.parent, stdout=subprocess.PIPE, text=True,
+                              env={**os.environ, "XDG_CACHE_HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path)})
+             for _ in range(24)]
+    waits = sorted(int(p.communicate(timeout=60)[0].strip() or 0) for p in procs)
+    assert waits.count(0) == pc.ITUNES_PER_MINUTE and all(55 <= w <= 61 for w in waits[pc.ITUNES_PER_MINUTE:])
+    saved = json.loads((tmp_path / "zedxter-skills" / "itunes-calls.json").read_text())
+    assert len(saved) == 24  # no lost updates
+
+
 def test_throttle_waits_once_the_minute_budget_is_used(monkeypatch, tmp_path):
     path = tmp_path / "calls.json"
     monkeypatch.setattr(pc, "throttle_file", lambda: path)
     slept = []
     monkeypatch.setattr(pc.time, "sleep", slept.append)
     now = pc.time.time()
+    monkeypatch.setattr(pc, "locked", lambda p: __import__("contextlib").nullcontext())
     path.write_text(json.dumps([now - 30] * pc.ITUNES_PER_MINUTE + [now - 120]))
     notes = []
     pc.throttle(notes.append)
@@ -141,9 +215,9 @@ def test_throttle_waits_once_the_minute_budget_is_used(monkeypatch, tmp_path):
 
 def test_cli_argument_errors_exit_2(run):
     for argv in (["search", "ai", "-n", "0"], ["search", "ai", "--country", "usa"], ["episodes", "x", "--grep", "("],
-                 ["episodes", "x", "--after", "yesterday"]):
+                 ["episodes", "x", "--after", "yesterday"], ["search", "ai", "--after", "2024-01-01"], ["search", "ai", "--oldest"]):
         rc, out, err = run(*argv)
-        assert rc == 2 and out == "" and "error" in err, argv
+        assert rc == 2 and out == "" and err.startswith("error: ") and err.count("\n") == 1, argv  # one line, no usage dump
 
 
 # ------------------------------------------------------------------ CLI against the fake directory and feed
@@ -154,10 +228,10 @@ def test_search_shows_table_json_urls(run, server):
     assert f"feed: {server}/podcast_feed.xml" in out and "Test Host · 3 episodes · Science · latest 2024-03-02" in out
     rc, out, _ = run("search", "test", "-f", "json", "-n", "1")
     data = json.loads(out)
-    assert data["query"] == "test" and data["country"] == "us" and len(data["results"]) == 1
+    assert rc == 0 and data["query"] == "test" and data["country"] == "us" and len(data["results"]) == 1
     assert data["results"][0]["apple_url"].endswith("/id111222333")
     rc, out, _ = run("search", "test", "-f", "urls")
-    assert out.splitlines() == [f"{server}/podcast_feed.xml"] * 2
+    assert rc == 0 and out.splitlines() == [f"{server}/podcast_feed.xml"] * 2
 
 
 def test_search_episodes_across_shows(run):
@@ -194,6 +268,23 @@ def test_cli_failures(run, server):
     assert rc == 5
     rc, _, err = run("episodes", f"{server}/podcast_feed.xml".replace("podcast_feed.xml", ""))
     assert rc == 7  # a directory listing, not a feed
+    rc, _, err = run("search", "throttled")
+    assert rc == 4 and "HTTP 429" in err
+    rc, _, err = run("search", "html")
+    assert rc == 4 and "non-JSON" in err
+    rc, _, err = run("episodes", "nofeed")
+    assert rc == 5 and "no public RSS feed" in err
+    rc, _, err = run("episodes", f"{server}/cut.xml")
+    assert rc == 6 and "connection closed after" in err
+
+
+def test_feed_encodings_and_json_keys(run, server):
+    rc, out, err = run("episodes", f"{server}/cp1251.xml", "-q")
+    assert rc == 0 and err == "" and out.startswith("# Русский подкаст (2 episodes in feed)") and "Выпуск один" in out
+    rc, out, _ = run("episodes", f"{server}/gzip.xml", "-f", "json")
+    data = json.loads(out)
+    assert rc == 0 and data["total_episodes"] == 3
+    assert not any(k.startswith("_") for r in data["results"] for k in r)  # internal sort key stays internal
 
 
 @pytest.mark.skipif(os.environ.get("PODCAST_LIVE") != "1", reason="live network test; set PODCAST_LIVE=1")

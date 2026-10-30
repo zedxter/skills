@@ -19,6 +19,9 @@ Exit codes:
 """
 
 import argparse
+import contextlib
+import email.utils
+import gzip
 import html
 import json
 import os
@@ -115,7 +118,7 @@ def parse_date(value: str) -> date:
     try:
         return date.fromisoformat(value)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"bad date {value!r}; use YYYY-MM-DD")
+        raise ValueError(f"bad date {value!r}; use YYYY-MM-DD")
 
 
 def apple_id(value: str) -> str | None:
@@ -148,33 +151,71 @@ def throttle_file() -> Path:
     return Path(base or Path.home() / ".cache") / "zedxter-skills" / "itunes-calls.json"
 
 
+@contextlib.contextmanager
+def locked(path: Path):
+    """Exclusive lock on `path` (created) for the read-modify-write of the throttle file; POSIX and Windows."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a+b") as fh:
+        if os.name == "nt":
+            import msvcrt
+            fh.seek(0)
+            for _ in range(100):  # LK_NBLCK retries; msvcrt has no blocking lock without a 10 s timeout
+                try:
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                with contextlib.suppress(OSError):
+                    fh.seek(0)
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+
+
 def throttle(note) -> None:
-    """Keep this machine under ITUNES_PER_MINUTE calls to Apple, across runs (timestamps in a small cache file)."""
+    """Keep this machine under ITUNES_PER_MINUTE calls to Apple, across concurrent runs: each call reserves a
+    time slot in a small locked cache file (a slot may lie in the future), then waits for it."""
     path = throttle_file()
-    now = time.time()
     try:
-        calls = [t for t in json.loads(path.read_text()) if now - t < 60]
-    except (OSError, ValueError, TypeError):
-        calls = []
-    if len(calls) >= ITUNES_PER_MINUTE:
-        wait = 60 - (now - min(calls)) + 0.5
+        with locked(path.with_suffix(".lock")):
+            now = time.time()
+            try:
+                calls = sorted(t for t in json.loads(path.read_text()) if t > now - 60)
+            except (OSError, ValueError, TypeError):
+                calls = []
+            slot = now
+            if len(calls) >= ITUNES_PER_MINUTE:
+                # the N-th most recent call leaves the 60 s window at +60; from then on there is room again
+                slot = max(now, calls[-ITUNES_PER_MINUTE] + 60.5)
+            calls.append(slot)
+            path.write_text(json.dumps(calls))
+    except OSError:
+        slot = time.time()  # throttling is best effort; an unwritable cache must not block searching
+    wait = slot - time.time()
+    if wait > 0:
         note(f"pausing {wait:.0f} s to stay under Apple's ~20 requests/minute limit")
         time.sleep(wait)
-        now = time.time()
-        calls = [t for t in calls if now - t < 60]
-    calls.append(now)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(calls))
-    except OSError:
-        pass  # throttling is best effort
 
 
-def http_get(url: str, timeout: float, limit: int, what: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+def http_get(url: str, timeout: float, limit: int, what: str) -> tuple[bytes, dict[str, str]]:
+    """Body and lower-cased headers; the Content-Type charset matters for feeds without an XML encoding."""
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*", "Accept-Encoding": "gzip"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = resp.read(limit + 1)
+            headers = {k.lower(): v for k, v in resp.headers.items()}
+            expected = headers.get("content-length", "")
+            if expected.isdigit() and len(data) < int(expected) <= limit:
+                raise Failure(EXIT_NETWORK, f"{what}: connection closed after {len(data)} of {expected} bytes",
+                              "the download was cut off; one retry later is fine")
     except urllib.error.HTTPError as e:
         if e.code in (403, 429):
             raise Failure(EXIT_BLOCKED, f"{what}: HTTP {e.code}",
@@ -184,16 +225,28 @@ def http_get(url: str, timeout: float, limit: int, what: str) -> bytes:
         raise Failure(EXIT_NETWORK, f"{what}: HTTP {e.code}", "server error; one retry later is fine")
     except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
         reason = getattr(e, "reason", e)
+        if "CERTIFICATE_VERIFY_FAILED" in str(reason):
+            raise Failure(EXIT_NETWORK, f"{what}: TLS certificate verification failed ({reason})",
+                          "retrying will not help; on a python.org macOS build run 'Install Certificates.command', "
+                          "or run with uv's managed Python (uv run --python-preference only-managed); a proxy may be intercepting TLS")
         raise Failure(EXIT_NETWORK, f"{what}: {reason}", "check the connection (HTTPS_PROXY is honoured); one retry later is fine")
     if len(data) > limit:
         raise Failure(EXIT_FEED, f"{what}: larger than {limit // 1_000_000} MB", "not a normal podcast feed")
-    return data
+    if headers.get("content-encoding", "").lower() == "gzip" or data[:2] == b"\x1f\x8b":
+        try:
+            data = gzip.decompress(data)
+        except (OSError, EOFError) as e:
+            raise Failure(EXIT_FEED, f"{what}: broken gzip body ({e})")
+        headers.pop("content-encoding", None)
+        if len(data) > limit:
+            raise Failure(EXIT_FEED, f"{what}: larger than {limit // 1_000_000} MB", "not a normal podcast feed")
+    return data, headers
 
 
 def itunes(path: str, params: dict[str, Any], args: argparse.Namespace, note) -> list[dict[str, Any]]:
     throttle(note)
     url = f"{ITUNES}/{path}?{urllib.parse.urlencode(params)}"
-    data = http_get(url, args.timeout, 5_000_000, "Apple Podcasts directory")
+    data, _ = http_get(url, args.timeout, 5_000_000, "Apple Podcasts directory")
     try:
         return json.loads(data.decode("utf-8")).get("results", [])
     except ValueError:
@@ -220,30 +273,66 @@ def directory_episode(r: dict[str, Any]) -> dict[str, Any]:
             "transcript_url": None}
 
 
+MEDIA_EXT = re.compile(r"\.(mp3|m4a|aac|ogg|oga|opus|mp4|m4v|wav|flac|webm)(\?|$)", re.I)
+
+
+def pick_media(e: Any) -> dict[str, Any] | None:
+    """The episode's audio/video among its enclosures and <media:content> items; never an image or a page."""
+    candidates = [{"href": enc.get("href"), "type": enc.get("type") or "", "length": enc.get("length")}
+                  for enc in e.get("enclosures", [])]
+    candidates += [{"href": m.get("url"), "type": m.get("type") or "", "length": m.get("filesize") or m.get("fileSize")}
+                   for m in e.get("media_content", []) or []]
+    candidates = [c for c in candidates if c["href"]]
+    for c in candidates:
+        if c["type"].startswith(("audio", "video")) or (MEDIA_EXT.search(c["href"]) and not c["type"].startswith(("image", "text"))):
+            return c
+    return None
+
+
+def feed_date(e: Any) -> tuple[str | None, float]:
+    """(date as the show published it, in its own time zone; sortable timestamp).
+
+    >>> feed_date({"published": "Tue, 05 Mar 2024 18:00:00 -0800"})
+    ('2024-03-05', 1709690400.0)
+    """
+    raw = e.get("published") or e.get("updated")
+    if raw:
+        try:
+            moment = email.utils.parsedate_to_datetime(raw)
+            if moment.tzinfo is None:
+                moment = moment.replace(tzinfo=UTC)
+            return moment.date().isoformat(), moment.timestamp()
+        except (TypeError, ValueError, IndexError):
+            pass
+    parsed = e.get("published_parsed") or e.get("updated_parsed")  # Atom/ISO dates, normalised to UTC by feedparser
+    if parsed:
+        moment = datetime(*parsed[:6], tzinfo=UTC)
+        return moment.date().isoformat(), moment.timestamp()
+    return None, 0.0
+
+
 def feed_episode(e: Any, show: str) -> dict[str, Any] | None:
-    audio = next((enc for enc in e.get("enclosures", []) if str(enc.get("type", "")).startswith(("audio", "video"))
-                  or re.search(r"\.(mp3|m4a|aac|ogg|opus|mp4|m4v|wav)(\?|$)", str(enc.get("href", "")), re.I)), None)
-    if audio is None and not e.get("enclosures"):
-        return None  # a blog post or trailer page without media
-    audio = audio or e["enclosures"][0]
-    parsed = e.get("published_parsed") or e.get("updated_parsed")
-    published = datetime(*parsed[:6], tzinfo=UTC).date().isoformat() if parsed else None
+    audio = pick_media(e)
+    if audio is None:
+        return None  # a blog post, an announcement, or an item with only an image
+    published, stamp = feed_date(e)
     content = (e.get("content") or [{}])[0].get("value") if e.get("content") else None
     description = html_to_text(e.get("summary") or content)
     # <podcast:transcript url=… type=…/> (Podcasting 2.0); feedparser keeps the last one when there are several
     tag = e.get("podcast_transcript")
     transcript = tag.get("url") if isinstance(tag, dict) else None
     size = str(audio.get("length") or "")
+    # "_ts" orders same-day episodes; keys starting with "_" never reach the output
     return {"kind": "episode", "show": show, "title": clean(e.get("title")), "published": published,
             "duration": parse_duration(e.get("itunes_duration")), "audio_url": audio.get("href"),
             "audio_type": audio.get("type") or None, "audio_bytes": int(size) if size.isdigit() and int(size) > 0 else None,
             # feedparser copies a non-URL <guid> into link when there is no <link>
             "url": e.get("link") if is_url(e.get("link") or "") else None, "guid": e.get("id"), "season": e.get("itunes_season"), "episode": e.get("itunes_episode"),
-            "description": description[:DESCRIPTION_CHARS], "transcript_url": transcript}
+            "description": description[:DESCRIPTION_CHARS], "transcript_url": transcript, "_ts": stamp}
 
 
-def parse_feed(data: bytes, url: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    d = feedparser.parse(data)
+def parse_feed(data: bytes, url: str, headers: dict[str, str] | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    d = feedparser.parse(data, response_headers=headers or {})
     if not d.version:  # feedparser recognised no RSS/Atom flavour: an HTML page, JSON, an error page
         reason = clean(getattr(d, "bozo_exception", "")) or "no items"
         raise Failure(EXIT_FEED, f"not a readable RSS/Atom feed: {url} ({reason[:160]})",
@@ -254,14 +343,15 @@ def parse_feed(data: bytes, url: str) -> tuple[dict[str, Any], list[dict[str, An
             "description": html_to_text(d.feed.get("summary") or d.feed.get("subtitle"))[:1000]}
     episodes = [ep for ep in (feed_episode(e, title) for e in d.entries) if ep]
     if d.entries and not episodes:
-        raise Failure(EXIT_FEED, f"the feed has items but no audio enclosures: {url}", "this is a blog/news feed, not a podcast")
+        raise Failure(EXIT_FEED, f"the feed has items but no audio or video: {url}", "this is a blog/news feed, not a podcast")
     return show, episodes
 
 
 # ------------------------------------------------------------------ commands
 
-def filter_episodes(episodes: list[dict[str, Any]], args: argparse.Namespace) -> list[dict[str, Any]]:
-    """Apply --after/--before/--grep/--min-minutes/--max-minutes and sort by date (newest first unless --oldest)."""
+def filter_episodes(episodes: list[dict[str, Any]], args: argparse.Namespace, by_date: bool = True) -> list[dict[str, Any]]:
+    """Apply --after/--before/--grep/--min-minutes/--max-minutes; sort by date (newest first unless --oldest) when
+    `by_date`, else keep the incoming (relevance) order."""
     pattern = re.compile(args.grep, re.I) if args.grep else None
     out = []
     for ep in episodes:
@@ -278,7 +368,8 @@ def filter_episodes(episodes: list[dict[str, Any]], args: argparse.Namespace) ->
         if args.max_minutes is not None and (dur is None or dur > args.max_minutes * 60):
             continue
         out.append(ep)
-    out.sort(key=lambda ep: ep.get("published") or "", reverse=not args.oldest)
+    if by_date:
+        out.sort(key=lambda ep: (ep.get("published") or "", ep.get("_ts") or 0.0), reverse=not args.oldest)
     return out
 
 
@@ -313,15 +404,22 @@ def cmd_search(args: argparse.Namespace, note) -> dict[str, Any]:
     query = " ".join(args.query).strip()
     if not query:
         raise Failure(EXIT_BAD_INPUT, "empty query")
+    episode_filters = [flag for flag, v in (("--after", args.after), ("--before", args.before), ("--grep", args.grep),
+                       ("--min-minutes", args.min_minutes), ("--max-minutes", args.max_minutes), ("--oldest", args.oldest or None))
+                       if v is not None]
+    if episode_filters and not args.episodes:
+        raise Failure(EXIT_BAD_INPUT, f"{', '.join(episode_filters)} filter episodes, not shows",
+                      "add --episodes, or list a show's episodes with `episodes SHOW`")
     entity = "podcastEpisode" if args.episodes else "podcast"
     # The directory ranks by relevance and has no date sort; fetch more when filters will drop results.
-    filtering = any(v is not None for v in (args.after, args.before, args.grep, args.min_minutes, args.max_minutes)) or args.sort == "date"
+    filtering = any(v is not None for v in (args.after, args.before, args.grep, args.min_minutes, args.max_minutes)) \
+        or args.sort == "date" or args.oldest
     limit = min(200, max(args.limit * (4 if filtering else 1), args.limit))
     rows = itunes("search", {"term": query, "media": "podcast", "entity": entity, "limit": limit, "country": args.country}, args, note)
     if args.episodes:
         results = [directory_episode(r) for r in rows if r.get("kind") == "podcast-episode"]
         if filtering:
-            results = filter_episodes(results, args)
+            results = filter_episodes(results, args, by_date=args.sort == "date" or args.oldest)
     else:
         results = [show_record(r) for r in rows if r.get("kind") == "podcast" or r.get("wrapperType") == "track"]
         if args.sort == "date":
@@ -334,8 +432,8 @@ def cmd_episodes(args: argparse.Namespace, note) -> dict[str, Any]:
     if not target:
         raise Failure(EXIT_BAD_INPUT, "no show given", "pass a feed URL, an Apple Podcasts URL/id or a show name")
     feed_url, record = resolve_feed(target, args, note)
-    data = http_get(feed_url, args.timeout, MAX_FEED_BYTES, f"feed {feed_url}")
-    show, episodes = parse_feed(data, feed_url)
+    data, headers = http_get(feed_url, args.timeout, MAX_FEED_BYTES, f"feed {feed_url}")
+    show, episodes = parse_feed(data, feed_url, headers)
     if record:
         show.update({"apple_id": record["id"], "apple_url": record["apple_url"], "genre": record["genre"]})
     total = len(episodes)
@@ -348,7 +446,8 @@ def cmd_episodes(args: argparse.Namespace, note) -> dict[str, Any]:
 def render(payload: dict[str, Any], fmt: str) -> str:
     results = payload["results"]
     if fmt == "json":
-        return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+        public = {**payload, "results": [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]}
+        return json.dumps(public, ensure_ascii=False, indent=2) + "\n"
     if fmt == "urls":
         key = "audio_url" if results and results[0]["kind"] == "episode" else "feed_url"
         return "".join(f"{r[key]}\n" for r in results if r.get(key))
@@ -384,8 +483,8 @@ def make_parser() -> argparse.ArgumentParser:
     common.add_argument("-f", "--format", choices=["table", "json", "urls"], default="table",
                         help="table (default), json (every field), urls (audio URLs for episodes, feed URLs for shows)")
     common.add_argument("--country", default="us", help="Apple store country, 2 letters (default us); e.g. ru, de, gb for local shows")
-    common.add_argument("--after", type=parse_date, metavar="YYYY-MM-DD", help="episodes published on or after this date")
-    common.add_argument("--before", type=parse_date, metavar="YYYY-MM-DD", help="episodes published on or before this date")
+    common.add_argument("--after", metavar="YYYY-MM-DD", help="episodes published on or after this date")
+    common.add_argument("--before", metavar="YYYY-MM-DD", help="episodes published on or before this date")
     common.add_argument("--grep", metavar="REGEX", help="episodes whose title or description matches (case-insensitive)")
     common.add_argument("--min-minutes", type=float, help="episodes at least this long")
     common.add_argument("--max-minutes", type=float, help="episodes at most this long")
@@ -414,6 +513,11 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"error: {message}" + (f" — {hint}" if hint else "") + "\n")
         return code
 
+    try:
+        args.after = parse_date(args.after) if args.after else None
+        args.before = parse_date(args.before) if args.before else None
+    except ValueError as e:
+        return fail(EXIT_BAD_INPUT, str(e))
     if not 1 <= args.limit <= 200:
         return fail(EXIT_BAD_INPUT, "--limit must be between 1 and 200")
     if not re.fullmatch(r"[A-Za-z]{2}", args.country):

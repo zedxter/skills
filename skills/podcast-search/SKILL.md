@@ -75,14 +75,18 @@ URL and the Apple URL.
 |------|---------|---------|
 | `search QUERY…` | — | Shows matching the terms (title, author, description), in Apple's relevance order. |
 | `search … --episodes` | off | Episodes across all shows instead (title and description match). |
-| `search … --sort date` | relevance | Shows: newest latest-episode first. Episodes: newest first. |
+| `search … --sort date` | relevance | Shows: newest latest-episode first. Episodes: newest first. Without it (and without `--oldest`) Apple's relevance order is kept, filters included. |
 | `episodes SHOW…` | — | A show's episodes from its RSS feed, newest first. SHOW: feed URL, Apple URL/id, or name. |
 | `-n, --limit N` | 10 | Results to print (1–200). |
 | `--country CC` | `us` | Apple store country (`gb`, `de`, `ru`, `fr`, …). Local shows rank much better in their own store. |
-| `--after`, `--before YYYY-MM-DD` | — | Published on/after, on/before (inclusive). Undated episodes are dropped. |
+| `--after`, `--before YYYY-MM-DD` | — | Published on/after, on/before (inclusive), in the show's own time zone. Undated episodes are dropped. |
 | `--grep REGEX` | — | Title or description matches, case-insensitive (`"tao|riemann"`). |
 | `--min-minutes`, `--max-minutes` | — | Length bounds; episodes without a duration are dropped. |
 | `--oldest` | off | Oldest first (e.g. "the first episodes"). |
+
+`--after`, `--before`, `--grep`, `--min/--max-minutes` and `--oldest` filter
+**episodes**: they work with `episodes` and `search --episodes`; on a show
+`search` they are refused (exit 2) rather than silently ignored.
 | `-f table\|json\|urls` | `table` | `urls` prints audio URLs for episodes, feed URLs for shows, one per line. |
 | `--timeout S`, `-q` | 30, off | Network timeout; `-q` hides `note:` lines. |
 
@@ -92,7 +96,10 @@ max 200) because the directory itself cannot filter.
 ## JSON output
 
 `search` → `{"query", "country", "results": [...]}`; `episodes` →
-`{"show": {...}, "total_episodes", "results": [...]}`.
+`{"show": {...}, "total_episodes", "results": [...]}`, where `show` has
+`title`, `author`, `language`, `link`, `feed_url`, `description` (plain
+text, ≤1000 chars) and, when resolved through Apple, `apple_id`,
+`apple_url`, `genre`.
 
 ```json
 {"kind": "show", "id": 1434243584, "title": "Lex Fridman Podcast", "author": "Lex Fridman",
@@ -109,15 +116,14 @@ max 200) because the directory itself cannot filter.
  "season": null, "episode": null, "description": "Ankur Moitra, Steven Brunton …", "transcript_url": null}
 ```
 
-- `duration` is in seconds, `published` is the UTC date. Either can be
-  `null` when the feed omits it.
+- `duration` is in seconds; `published` is the date as the show published
+  it (its own time zone). Either can be `null` when the feed omits it.
 - `description` is the show notes as plain text, capped at 4000 characters.
 - `transcript_url` comes from `<podcast:transcript>` when the feed has it.
 - Feed episodes also carry `audio_bytes`, `season` and `episode`.
-- Directory episodes (`search --episodes`) carry `feed_url`, and their `url`
-  is the Apple episode page.
-- `episodes` adds `apple_id`, `apple_url` and `genre` to `show` when the show
-  was resolved through Apple.
+- Directory episodes (`search --episodes`) carry `feed_url`; their `url` is
+  the Apple episode page, `audio_type` is Apple's bare `"audio"`/`"video"`,
+  and `published` is Apple's UTC date.
 
 ## Workflow for the agent
 
@@ -140,17 +146,19 @@ max 200) because the directory itself cannot filter.
 
 ## Exit codes
 
-One `error:` line on stderr with a hint after `—`.
+One `error:` line on stderr with a hint after `—`. Items whose only
+attachment is an image or a page are skipped; audio in `<media:content>`
+counts.
 
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | 0 | Results printed. | — |
-| 1 | No results after filters (or no show for that name). | Loosen `--after`/`--grep`/minutes, broaden the query, try `--country`. With `-f json` the empty payload is still printed. |
-| 2 | Bad input: empty query, bad date, regex, `--country` or `--limit`; missing dependency. | Fix the argument. |
+| 1 | No results after filters (or no show for that name). | Loosen `--after`/`--grep`/minutes, broaden the query, try `--country`. With `-f json` an empty result list is still printed (not when no show matched a name). |
+| 2 | Bad input: empty query, bad date, regex, `--country` or `--limit`, episode filters on a show search; missing dependency. | Fix the argument. |
 | 4 | Rate-limited or blocked (HTTP 403/429) by Apple or the feed host. | Wait a few minutes; do not retry in a loop. |
 | 5 | Not found: feed URL 404/410, unknown Apple id, or the show has no public feed. | Search the show again; its feed may have moved. |
-| 6 | Network error (DNS, timeout, TLS, 5xx). | Check the connection; one retry later. |
-| 7 | Not a podcast feed: an HTML page, a blog feed without audio, or larger than 40 MB. | Pass the RSS URL from `search` or the Apple URL. |
+| 6 | Network error (DNS, timeout, 5xx, a download cut off), or a TLS certificate failure. | Check the connection; one retry later. A certificate failure does not go away by retrying: on a python.org macOS build run "Install Certificates.command", or use uv's managed Python. |
+| 7 | Not a podcast feed: an HTML page, a blog feed without audio or video, or larger than 40 MB. | Pass the RSS URL from `search` or the Apple URL. |
 
 ## Limitations
 
