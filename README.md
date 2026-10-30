@@ -20,6 +20,7 @@ everywhere.
 | [`youtube-search`](skills/youtube-search) | Searches YouTube without an API key and returns title, channel, **publish date, view count, duration** and URL. Sort by date/views, filter by period, duration, min views, channel. Triggers when the user wants to find videos on a topic or needs a video to summarise but has no link. |
 | [`youtube-transcript`](skills/youtube-transcript) | Fetches a YouTube video's transcript (captions) as text, timestamps, SRT or JSON via the free, key-less `youtube-transcript-api`. Triggers on YouTube links when the user wants a transcript, summary, notes or translation. |
 | [`youtube-audio`](skills/youtube-audio) | Saves a YouTube video's, playlist's or channel's **audio as a file** with the free, key-less `yt-dlp`: the original stream by default (m4a/opus, no re-encoding) or **mp3**/opus/flac/wav via ffmpeg at a chosen bitrate; embeds title, channel, date, chapters and cover art; cuts a section by timestamps and splits chapters into tracks; `--info` lists chapters and formats. Triggers when the user wants a YouTube link as mp3/audio, a lecture or podcast for offline listening, or audio to transcribe when there are no captions. |
+| [`transcribe-audio`](skills/transcribe-audio) | Transcribes speech in an audio/video **file or URL locally and offline** with `faster-whisper` (no key, no upload, no PyTorch, no ffmpeg install): text, timestamps, SRT, VTT or JSON in `youtube-transcript`'s shapes; downloads YouTube videos and podcast episodes with `yt-dlp`; language auto-detection, `--start/--end`, name hints, `--info` with a time estimate, flat memory on hour-long recordings. Never downloads a model without `--download-model`. Triggers when a video has no captions, or the user has a podcast, lecture, meeting or voice memo to transcribe or subtitle. |
 | [`web-extract`](skills/web-extract) | Fetches a web page or PDF from the user's own machine with a browser-grade TLS fingerprint (`curl_cffi`) and returns its **main content as Markdown, text or JSON** (title, author, date, links, JSON-LD/OpenGraph/tables) via `trafilatura` and `pypdf`; renders JavaScript pages in a **local headless Chromium** (optional Playwright) with click/type/scroll actions and screenshots, tracks changes between fetches, and falls back to the newest **Wayback Machine** snapshot when the page is blocked, gone or unreachable. A free local stand-in for paid scraping APIs. Triggers when the user shares a URL to read, summarise or quote, or when the built-in fetch tool got 403, "Just a moment" or an empty page. |
 | [`web-crawl`](skills/web-crawl) | Crawls a site breadth-first from the user's machine and collects every page's **main content into one Markdown file**, a folder of pages with `index.json`, or JSON/JSONL; `--map` lists the URLs. Bounded by depth, page count and time, include/exclude patterns, same site only, robots.txt honoured, sitemap.xml as seed; each page goes through `web-extract` (PDF text, optional headless rendering). Free stand-in for Firecrawl crawl/map. Triggers when the user wants a whole documentation site, blog or section read, summarised or turned into notes, or asks which pages a site has. |
 | [`web-scrape`](skills/web-scrape) | Scrapes **structured records** into JSON, JSONL, CSV or a Markdown table: one record per repeating element (CSS/XPath `--item`), fields by selector with `@attr` and `\|number`/`\|date`/`\|list` modifiers, or records from schema.org JSON-LD and HTML tables; walks next-page links, opens each record's detail page for more fields, and `--probe` shows a page's repeating blocks. Fetching via `web-extract` (bot-wall detection, optional headless rendering). Free stand-in for Apify actors and Firecrawl extract. Triggers when the user wants a list, catalogue, table or search-result page turned into rows. |
@@ -27,7 +28,7 @@ everywhere.
 | [`web-browse`](skills/web-browse) | Drives a **real Chromium step by step** from the CLI: a background session that persists between commands, `open`, `snapshot` of interactive elements with numbered refs, `click`, `type`, `select`, `press`, `scroll`, `wait`, tabs, `read` as Markdown (via `web-extract`), `screenshot`, `eval`; `--profile` keeps logins, `--headful` lets a human log in or pass a check. Free stand-in for Browser Use, Browserbase and Playwright MCP. Triggers when a task needs several dependent steps in a browser: log in and read, search a site and open a result, fill a form, click through an app. |
 
 They chain naturally: search → pick a video by date/views/length → transcript →
-summary (or `youtube-audio` for the sound itself, e.g. when there are no captions); the links in a video's `--details` description go to `web-extract`;
+summary (or `transcribe-audio` when there are no captions, and `youtube-audio` for the sound itself); the links in a video's `--details` description go to `web-extract`;
 `web-crawl --map` shows a site's structure, then `web-crawl --include` collects
 the right section through `web-extract`'s engine.
 
@@ -39,6 +40,9 @@ the right section through `web-extract`'s engine.
   suitable Python if none is installed.
 - Without `uv`: install the dependency named in the script header with `pip`
   and run `python scripts/<name>.py …`.
+- `transcribe-audio` downloads each Whisper model once from Hugging Face on
+  first use (78 MB `tiny` … 486 MB default `small` … 3.1 GB `large-v3`), only
+  when run with `--download-model`; it needs no ffmpeg.
 - `youtube-audio` also needs [ffmpeg](https://ffmpeg.org/) on PATH
   (`brew install ffmpeg`, `sudo apt install ffmpeg`, `winget install ffmpeg`).
 - Optional, for JavaScript-rendered pages (`web-extract --render`,
@@ -153,12 +157,14 @@ test/                   # pytest suites for the scripts
 
 Run the test suites with every script dependency available (browser tests skip
 when Playwright's Chromium is not installed; network tests skip with
-`WEB_EXTRACT_OFFLINE=1`):
+`WEB_EXTRACT_OFFLINE=1`; speech tests skip until the 78 MB `tiny` Whisper model
+is cached: `uv run skills/transcribe-audio/scripts/transcribe.py test/data/jfk.ogg
+-m tiny --download-model`):
 
 ```bash
 uv run --with pytest --with curl_cffi --with trafilatura --with lxml_html_clean \
     --with pypdf --with cssselect --with 'ddgs>=9,<10' --with playwright \
-    --with 'yt-dlp[default]' --with mutagen python -I -m pytest test -q
+    --with 'yt-dlp[default]' --with mutagen --with faster-whisper python -I -m pytest test -q
 ```
 
 `web-crawl`, `web-scrape`, `web-search --read` and `web-browse read` import

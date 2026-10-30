@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. Needs network access to youtube.com; requests from cloud/datacenter IPs are frequently blocked by YouTube (use --proxy).
 metadata:
   author: zedxter
-  version: "1.1.0"
+  version: "1.1.1"
   source: https://github.com/zedxter/skills
 ---
 
@@ -132,7 +132,7 @@ code rather than guessing:
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | 2 | Bad input (not a YouTube URL/id) or missing dependency | Ask for a correct link; or install `youtube-transcript-api` / use `uv run`. |
-| 3 | No transcript: captions disabled, none in any language, or not translatable | Run `--list` to show what exists. If nothing exists, tell the user the video has no captions. Offer the Whisper fallback (below). |
+| 3 | No transcript: captions disabled, none in any language, or not translatable | Run `--list` to show what exists. If nothing exists, tell the user the video has no captions. Offer `transcribe-audio` (below). |
 | 4 | Blocked by YouTube (`RequestBlocked` / `IpBlocked`) | If you used `--translate`, drop it and fetch the original captions instead — that is the usual cause. Otherwise typical on cloud/datacenter IPs or after many rapid requests: wait a minute and retry once; then suggest `--proxy` with a residential proxy or running from the user's own machine. Do not hammer with retries — it extends the block. |
 | 5 | Video unavailable: private, deleted, region-locked, age-restricted | Nothing to fetch; report it. Age-restricted videos require a signed-in session, which this tool does not support. |
 | 6 | Network failure | Check connectivity and retry. |
@@ -142,14 +142,14 @@ Note that `--list` can succeed while the actual fetch is blocked (the two use
 different YouTube endpoints), so a successful listing does not guarantee the
 transcript is retrievable from the current IP.
 
-## No captions? Whisper fallback (not included)
+## No captions? Transcribe the audio
 
-If a video genuinely has no captions (exit 3 and `--list` is empty), the only
-way to get a transcript is speech-to-text: download the audio with `yt-dlp`
-and transcribe it with Whisper (`openai-whisper`, `faster-whisper`, or the
-OpenAI/Groq audio API). This is **outside this skill** — it needs a large model
-download or a paid API, takes minutes for long videos and requires `ffmpeg`.
-Offer it as an option and let the user decide before proceeding.
+If a video genuinely has no captions (exit 3 and `--list` is empty), use the
+`transcribe-audio` skill from the same collection with the same URL: it
+downloads the audio and runs Whisper locally (no key, no upload) and prints
+the same text/timestamps/SRT/JSON shapes. It needs a one-time model download
+(486 MB for the default `small`) and takes minutes for long videos on a CPU,
+so tell the user and let them decide before proceeding.
 
 ## Finding the video first
 
