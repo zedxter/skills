@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-bib",
+    "expect": true,
+    "prompt": "Check the references in refs.bib in this folder - are they all real and correctly cited?"
+  },
+  {
+    "id": "t2-doi-real",
+    "expect": true,
+    "prompt": "Is DOI 10.1038/s42256-023-99999-9 a real paper? My co-author put it in our draft."
+  },
+  {
+    "id": "t3-hallucinated",
+    "expect": true,
+    "prompt": "I asked a chatbot for sources on sleep and memory and got this list. Verify which of these papers actually exist:\n1. Walker MP, Stickgold R. Sleep-dependent learning and memory consolidation. Neuron. 2004.\n2. Hart J, Lin Q. Dream rehearsal and long-term recall in adolescents. Nature Neuroscience. 2019."
+  },
+  {
+    "id": "t4-ru",
+    "expect": true,
+    "prompt": "Проверь список литературы в моей курсовой: все ли статьи существуют и правильно ли указаны годы? Файл references.md рядом."
+  },
+  {
+    "id": "t5-before-submit",
+    "expect": true,
+    "prompt": "Before I submit my thesis, verify the bibliography for wrong years, authors or DOIs."
+  },
+  {
+    "id": "t6-one-paper",
+    "expect": true,
+    "prompt": "Does the paper 'Attention Is All You Need' by Vaswani et al. 2017 really exist, and what is its arXiv id?"
+  },
+  {
+    "id": "t7-add-dois",
+    "expect": true,
+    "prompt": "Find the missing DOIs for the entries in refs.bib in this folder and tell me which ones are wrong."
+  },
+  {
+    "id": "n1-find-papers",
+    "expect": false,
+    "prompt": "Find recent papers on sleep and memory consolidation and list five of them."
+  },
+  {
+    "id": "n2-apa",
+    "expect": false,
+    "prompt": "Format these three references in APA 7 style: LeCun Y, Bengio Y, Hinton G. Deep learning. Nature 2015;521:436-444."
+  },
+  {
+    "id": "n3-summarise",
+    "expect": false,
+    "prompt": "Summarise this paper for me in five bullet points: https://arxiv.org/abs/1706.03762"
+  },
+  {
+    "id": "n4-bibtex-gen",
+    "expect": false,
+    "prompt": "Write a Python function that parses a BibTeX author field into (family, given) tuples."
+  },
+  {
+    "id": "n5-grammar",
+    "expect": false,
+    "prompt": "Proofread this sentence for grammar only: 'The results was significant across all three trials.'"
+  }
+]
