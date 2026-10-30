@@ -21,7 +21,8 @@ Exit codes:
     0 ok · 2 bad input / missing dependency / GPU unusable · 3 no speech detected
     · 4 download blocked (bot check, rate limit, geo-block) · 5 media unavailable
     · 6 network error · 7 decoder error (no audio track, corrupt file) · 8 model not
-    downloaded yet, model download failed, or out of memory
+    downloaded yet, model download failed, or out of memory · 7 also an unexpected error (a bug)
+    · 130 interrupted
 """
 
 import argparse
@@ -38,6 +39,7 @@ from urllib.parse import urlsplit
 
 (EXIT_OK, EXIT_BAD_INPUT, EXIT_NO_SPEECH, EXIT_BLOCKED, EXIT_UNAVAILABLE, EXIT_NETWORK, EXIT_DECODE,
  EXIT_MODEL) = 0, 2, 3, 4, 5, 6, 7, 8
+EXIT_BUG = 7  # an unexpected error; shares 7 with the documented code, never 1
 
 try:
     import av
@@ -661,7 +663,7 @@ def main(argv: list[str] | None = None) -> int:
         except Failure as e:
             return fail(e.code, str(e), e.hint)
         except KeyboardInterrupt:
-            return fail(EXIT_BAD_INPUT, "interrupted")
+            return fail(130, "interrupted")
         except Exception as e:  # CTranslate2/onnxruntime raise RuntimeError/ValueError with free-form text
             msg = f"{type(e).__name__}: {(str(e).splitlines() or [''])[0][:240]}"
             if is_oom(e):
@@ -707,4 +709,23 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.stderr.write("error: interrupted\n")
+        sys.exit(130)
+    except BrokenPipeError as e:
+        try:
+            sys.stdout.flush()
+        except BrokenPipeError:  # the reader closed stdout (`| head`): stop quietly, as a pipe expects
+            try:
+                os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+            except OSError:
+                pass
+            sys.exit(0)
+        sys.stderr.write(f"error: unexpected BrokenPipeError: {e} — a bug; report it with the command line\n")
+        sys.exit(EXIT_BUG)
+    except Exception as e:  # noqa: BLE001 - a crash exits 7, never 1 or another code that has a meaning
+        sys.stderr.write(f"error: unexpected {type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]} "
+                         "— a bug; report it with the command line\n")
+        sys.exit(EXIT_BUG)

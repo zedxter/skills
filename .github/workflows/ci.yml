@@ -53,6 +53,8 @@ jobs:
           - web-search
           - wiki-lookup
           - youtube-audio
+          - youtube-search
+          - youtube-transcript
     steps:
       - uses: actions/checkout@v7
         with:

@@ -180,7 +180,8 @@ Typical flow for "summarise the latest talk on X":
 | 2 | Bad input (empty query, unparsable channel) or `yt-dlp` missing | Fix the argument; or `pip install yt-dlp` / use `uv run`. |
 | 4 | Blocked by YouTube (bot check, 429) | Rare for plain search; common for `--details` on cloud IPs. Retry without `--details`, wait a minute, or pass `--proxy`. Don't retry in a tight loop. |
 | 6 | Network failure | Check connectivity, retry. |
-| 7 | Other yt-dlp error | Usually a YouTube-side change; `uv` fetches the newest `yt-dlp` on a fresh cache, otherwise `pip install -U yt-dlp`. |
+| 7 | Other yt-dlp error, or an unexpected error in the script (the message says `unexpected`) | Usually a YouTube-side change; `uv` fetches the newest `yt-dlp` on a fresh cache, otherwise `pip install -U yt-dlp`. Report an `unexpected` error with the command line. |
+| 130 | Interrupted | — |
 
 With `--details`, a per-video failure does not abort: the result keeps its
 basic fields and gains a `details_error` line.

@@ -158,7 +158,8 @@ counts.
 | 4 | Rate-limited or blocked (HTTP 403/429) by Apple or the feed host. | Wait a few minutes; do not retry in a loop. |
 | 5 | Not found: feed URL 404/410, unknown Apple id, or the show has no public feed. | Search the show again; its feed may have moved. |
 | 6 | Network error (DNS, timeout, 5xx, a download cut off), or a TLS certificate failure. | Check the connection; one retry later. A certificate failure does not go away by retrying: on a python.org macOS build run "Install Certificates.command", or use uv's managed Python. |
-| 7 | Not a podcast feed: an HTML page, a blog feed without audio or video, or larger than 40 MB. | Pass the RSS URL from `search` or the Apple URL. |
+| 7 | Not a podcast feed: an HTML page, a blog feed without audio or video, or larger than 40 MB. Also an unexpected error (the message says `unexpected`): a bug. | Pass the RSS URL from `search` or the Apple URL. Report an `unexpected` error with the command line. |
+| 130 | Interrupted. | — |
 
 ## Limitations
 

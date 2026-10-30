@@ -226,6 +226,7 @@ One `error:` line on stderr with a hint after `—`.
 | 3 | Typst compile error (with file:line:column for `.typ` input), or a `.typ` that tried to import a package. | Fix the `.typ`. With Markdown or JSON input it is a converter bug: simplify the construct named in the error, then report it. |
 | 5 | An image, font folder or file the document names was not found. | Fix the path. |
 | 7 | Anything else. | Report it with the command line. |
+| 130 | Interrupted. | — |
 
 ## Limitations
 

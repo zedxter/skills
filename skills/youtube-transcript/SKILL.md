@@ -136,7 +136,8 @@ code rather than guessing:
 | 4 | Blocked by YouTube (`RequestBlocked` / `IpBlocked`) | If you used `--translate`, drop it and fetch the original captions instead — that is the usual cause. Otherwise typical on cloud/datacenter IPs or after many rapid requests: wait a minute and retry once; then suggest `--proxy` with a residential proxy or running from the user's own machine. Do not hammer with retries — it extends the block. |
 | 5 | Video unavailable: private, deleted, region-locked, age-restricted | Nothing to fetch; report it. Age-restricted videos require a signed-in session, which this tool does not support. |
 | 6 | Network failure | Check connectivity and retry. |
-| 7 | Other YouTube error (unparsable page, consent cookie, etc.) | Usually transient or a YouTube-side change; retry, then report with the message. Upgrading `youtube-transcript-api` often fixes parser breakage. |
+| 7 | Other YouTube error (unparsable page, consent cookie, etc.), or an unexpected error in the script (the message says `unexpected`) | Usually transient or a YouTube-side change; retry, then report with the message. Upgrading `youtube-transcript-api` often fixes parser breakage. |
+| 130 | Interrupted | — |
 
 Note that `--list` can succeed while the actual fetch is blocked (the two use
 different YouTube endpoints), so a successful listing does not guarantee the

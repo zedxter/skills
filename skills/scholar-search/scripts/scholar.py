@@ -1299,6 +1299,18 @@ if __name__ == "__main__":
         sys.stderr.write("error: interrupted\n")
         sys.stderr.flush()
         os._exit(130)  # source threads may still be sleeping between requests
+    except BrokenPipeError as e:
+        try:
+            sys.stdout.flush()
+        except BrokenPipeError:  # the reader closed stdout (`| head`): stop quietly, as a pipe expects
+            try:
+                os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+            except OSError:
+                pass
+            sys.exit(0)
+        sys.stderr.write(f"error: unexpected BrokenPipeError: {e} — a bug; report it with the command line\n")
+        sys.exit(EXIT_SOURCE)
     except Exception as e:  # noqa: BLE001 - exit 1 means "no results"; a crash must not look like that
-        sys.stderr.write(f"error: unexpected {type(e).__name__}: {e} — a bug; report it with the command line\n")
+        sys.stderr.write(f"error: unexpected {type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]} "
+                         "— a bug; report it with the command line\n")
         sys.exit(EXIT_SOURCE)

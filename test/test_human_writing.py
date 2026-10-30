@@ -359,3 +359,33 @@ def test_cli_list_rules():
     r = run("--list-rules", "-f", "json")
     assert r.returncode == 0
     assert {x["id"] for x in json.loads(r.stdout)} == set(lp.RULES)
+
+
+def test_crash_exits_7_not_1():
+    """An unexpected exception in main() exits 7 with one error line, never 1, which has its own meaning."""
+    code = ("import argparse, runpy, sys\n"
+            "def boom(*a, **k): raise RuntimeError('boom\\nsecond line')\n"
+            "argparse.ArgumentParser.parse_args = boom\n"
+            f"sys.argv = [{str(SCRIPT)!r}, 'x']\n"
+            f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n")
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+    assert p.returncode == 7, p.stderr
+    assert p.stderr.count("error:") == 1 and "unexpected RuntimeError: boom" in p.stderr
+    assert "second line" not in p.stderr and "Traceback" not in p.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a closed pipe is not EPIPE on Windows")
+def test_closed_stdout_pipe_exits_0_quietly():
+    """`| head` closing the pipe early is not a bug: exit 0 and no error line."""
+    code = ("import argparse, runpy, sys\n"
+            "def flood(*a, **k):\n"
+            "    while True:\n"
+            "        sys.stdout.write('x' * 65536)\n"
+            "argparse.ArgumentParser.parse_args = flood\n"
+            f"sys.argv = [{str(SCRIPT)!r}, 'x']\n"
+            f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n")
+    p = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p.stdout.close()
+    err = p.stderr.read()
+    assert p.wait(timeout=60) == 0 and b"error" not in err, err

@@ -15,7 +15,7 @@ own RSS feed for the episode list (title, date, duration, audio URL, description
 Exit codes:
     0 ok · 1 no results after filters · 2 bad input / missing dependency · 4 rate-limited or blocked by
     Apple or the feed host · 5 feed or show not found (404/410, unknown id) · 6 network error · 7 feed
-    unparsable or not a podcast feed
+    unparsable or not a podcast feed, or an unexpected error (a bug) · 130 interrupted
 """
 
 import argparse
@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 EXIT_OK, EXIT_EMPTY, EXIT_BAD_INPUT, EXIT_BLOCKED, EXIT_NOT_FOUND, EXIT_NETWORK, EXIT_FEED = 0, 1, 2, 4, 5, 6, 7
+EXIT_BUG = 7  # an unexpected error; shares 7 with the documented code, never 1
 
 try:
     import feedparser
@@ -533,7 +534,7 @@ def main(argv: list[str] | None = None) -> int:
     except Failure as e:
         return fail(e.code, str(e), e.hint)
     except KeyboardInterrupt:
-        return fail(EXIT_BAD_INPUT, "interrupted")
+        return fail(130, "interrupted")
     if not payload["results"]:
         what = "episodes" if args.command == "episodes" or getattr(args, "episodes", False) else "shows"
         if args.format == "json":
@@ -544,4 +545,23 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.stderr.write("error: interrupted\n")
+        sys.exit(130)
+    except BrokenPipeError as e:
+        try:
+            sys.stdout.flush()
+        except BrokenPipeError:  # the reader closed stdout (`| head`): stop quietly, as a pipe expects
+            try:
+                os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+            except OSError:
+                pass
+            sys.exit(0)
+        sys.stderr.write(f"error: unexpected BrokenPipeError: {e} — a bug; report it with the command line\n")
+        sys.exit(EXIT_BUG)
+    except Exception as e:  # noqa: BLE001 - a crash exits 7, never 1 or another code that has a meaning
+        sys.stderr.write(f"error: unexpected {type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]} "
+                         "— a bug; report it with the command line\n")
+        sys.exit(EXIT_BUG)
