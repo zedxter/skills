@@ -1,0 +1,14 @@
+[
+  {"id": "t1-from-notes", "expect": true, "prompt": "Turn my lecture notes in notes.md into Anki flashcards I can import."},
+  {"id": "t2-vocab-csv", "expect": true, "prompt": "I have a spreadsheet words.csv with Spanish words and English translations. Make a deck that drills both directions."},
+  {"id": "t3-ru", "expect": true, "prompt": "Сделай колоду карточек Anki по этой статье про фотосинтез, чтобы учить к экзамену: фотосинтез идёт в хлоропластах, световая фаза даёт АТФ и НАДФН, цикл Кальвина фиксирует CO2."},
+  {"id": "t4-cloze", "expect": true, "prompt": "Create cloze deletion cards for the Krebs cycle steps so I can memorise them in AnkiDroid."},
+  {"id": "t5-update", "expect": true, "prompt": "Last week you made me an Anki deck from cards.md. I fixed some answers in that file - rebuild it so importing doesn't create duplicates."},
+  {"id": "t6-spaced", "expect": true, "prompt": "Make spaced-repetition flashcards from the key facts in this transcript: the French Revolution began in 1789; the Bastille fell on 14 July 1789; Louis XVI was executed in 1793."},
+  {"id": "t7-inspect", "expect": true, "prompt": "What's inside the file biology.apkg? How many cards and which decks?"},
+  {"id": "n1-quiz-me", "expect": false, "prompt": "Quiz me on the capitals of South American countries, one question at a time."},
+  {"id": "n2-ankiconnect", "expect": false, "prompt": "Write a Python function that calls the AnkiConnect API on localhost:8765 to list my decks."},
+  {"id": "n3-summary", "expect": false, "prompt": "Summarise the main ideas of spaced repetition research in three paragraphs."},
+  {"id": "n4-quizlet", "expect": false, "prompt": "How do I share a Quizlet set with my classmates?"},
+  {"id": "n5-pdf", "expect": false, "prompt": "Make a one-page printable PDF study sheet about the water cycle."}
+]
