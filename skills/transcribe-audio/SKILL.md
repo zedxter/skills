@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. CPU works everywhere; an NVIDIA GPU is used when CUDA 12 + cuDNN 9 are installed. The first use of each model downloads it from Hugging Face (78 MB tiny … 486 MB small … 3.1 GB large-v3), then it works offline. URLs need network access; YouTube bot-checks some IPs (cloud/VPN).
 metadata:
   author: zedxter
-  version: "1.0.0"
+  version: "1.0.1"
   source: https://github.com/zedxter/skills
 ---
 
@@ -20,7 +20,8 @@ with `yt-dlp`. Nothing is uploaded; no key, no account, no paid API.
 
 - `youtube-transcript` returned exit 3 / `--list` is empty: the video has no
   captions. Pass the same URL here.
-- A podcast episode (a direct mp3 link from its RSS feed), a
+- A podcast episode (its `audio_url` from `podcast-search`, or any direct
+  mp3 link), a
   voice memo, an interview, a meeting or a lecture recording to transcribe,
   summarise, search or quote.
 - Subtitles for a video file: `-f srt` / `-f vtt`.
@@ -194,6 +195,7 @@ One `error:` line on stderr with a hint after `—`.
 
 - `youtube-search` → video → `youtube-transcript`; exit 3 → `transcribe-audio`
   with the same URL.
-- A podcast's RSS feed → episode mp3 URL → `transcribe-audio` → notes / summary.
+- `podcast-search` → episode `audio_url` (`-f urls -n 1`) → `transcribe-audio`
+  → notes / summary.
 - The user also wants the audio file: `--keep-audio DIR`, or save it with
   `youtube-audio` (mp3, tags, chapters) and pass the file here.

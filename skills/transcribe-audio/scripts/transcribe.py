@@ -288,7 +288,7 @@ def ydl_opts(args: argparse.Namespace, out_dir: Path) -> dict[str, Any]:
     opts: dict[str, Any] = {
         # ~50-70 kbps Opus/AAC is plenty for speech recognition and 2-3x smaller than the best stream
         "format": "bestaudio[abr<=96]/worstaudio[abr>=40]/bestaudio/best",
-        "outtmpl": {"default": str(out_dir / "%(title).120B [%(id)s].%(ext)s")},
+        "outtmpl": {"default": str(out_dir / "%(title).100B [%(id).40B].%(ext)s")},  # ids of direct links can carry a long query
         # playlistend is a backstop: a URL that only turns into a playlist while processing fetches one item at most
         "windowsfilenames": True, "noplaylist": True, "playlistend": 1, "fixup": "never", "postprocessors": [],
         "quiet": True, "no_warnings": True, "noprogress": True, "logger": QuietLogger(),
