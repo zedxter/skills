@@ -1,0 +1,14 @@
+[
+  {"id": "t1-opinion", "expect": true, "prompt": "What does Hacker News think about Bun as a Node.js replacement?"},
+  {"id": "t2-front", "expect": true, "prompt": "What's on the HN front page right now?"},
+  {"id": "t3-thread", "expect": true, "prompt": "Summarise the discussion at https://news.ycombinator.com/item?id=8863 - what were the main objections?"},
+  {"id": "t4-ru", "expect": true, "prompt": "Что сейчас обсуждают на Hacker News про Rust? Найди самые обсуждаемые треды за месяц."},
+  {"id": "t5-show", "expect": true, "prompt": "Find recent Show HN posts about local-first apps."},
+  {"id": "t6-user", "expect": true, "prompt": "Who is the HN user patio11 and what has he posted lately?"},
+  {"id": "t7-discussed", "expect": true, "prompt": "Was the paper 'Attention Is All You Need' ever discussed on HN? Link the threads."},
+  {"id": "n1-reddit", "expect": false, "prompt": "What are people on r/programming saying about the new Python release?"},
+  {"id": "n2-yc", "expect": false, "prompt": "How do I apply to Y Combinator's next batch, and what are the deadlines?"},
+  {"id": "n3-clone", "expect": false, "prompt": "Build a Hacker News clone UI in React with upvotes and threaded comments."},
+  {"id": "n4-news", "expect": false, "prompt": "What's the latest news on the EU AI Act implementation?"},
+  {"id": "n5-article", "expect": false, "prompt": "Read and summarise https://example.com/blog/post-about-databases."}
+]

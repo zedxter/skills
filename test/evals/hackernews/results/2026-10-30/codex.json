@@ -1,0 +1,102 @@
+[
+  {
+    "id": "t1-opinion",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "t2-front",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "t3-thread",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "t4-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "t5-show",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "t6-user",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "t7-discussed",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "n1-reddit",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-yc",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-clone",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "21st-ui-build"
+    ]
+  },
+  {
+    "id": "n4-news",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-article",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]
