@@ -598,3 +598,17 @@ def test_live_smoke_telegram():
     assert ids == sorted(ids, reverse=True) and len(set(ids)) == 25
     assert all(x["date"] and x["url"].startswith("https://t.me/telegram/") for x in d["posts"])
     assert sum(1 for x in d["posts"] if x["text"]) >= 15 and d["next_before_id"]
+
+
+def test_crash_exits_7_not_1():
+    """An unexpected exception in main() exits 7 with one error line, never 1, which has its own meaning."""
+    code = ("import argparse, runpy, sys\n"
+            "def boom(*a, **k): raise RuntimeError('boom\\nsecond line')\n"
+            "argparse.ArgumentParser.parse_args = boom\n"
+            f"sys.argv = [{str(SCRIPT)!r}, 'x']\n"
+            f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n")
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+    assert p.returncode == 7, p.stderr
+    assert p.stderr.count("error:") == 1 and "unexpected RuntimeError: boom" in p.stderr
+    assert "second line" not in p.stderr and "Traceback" not in p.stderr

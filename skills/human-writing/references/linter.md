@@ -39,4 +39,4 @@ Measured on the corpora in `test/data/prose/` (2026-10-30):
 
 So a pass means "no obvious tells", not "good" and not "human". Emptiness, invented facts and a missing point are the review panel's job.
 
-Exit codes: `0` pass · `1` below the threshold or an `error` finding · `2` bad input (missing file, bad option, unreadable `--config` or `--voice`) · `7` the input is not UTF-8.
+Exit codes: `0` pass · `1` below the threshold or an `error` finding · `2` bad input (missing file, bad option, unreadable `--config` or `--voice`) · `7` the input is not UTF-8, or an unexpected error (the message says `unexpected`; a bug) · `130` interrupted.

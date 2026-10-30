@@ -309,6 +309,7 @@ the process exits with the first failing URL's code.
 | 5 | Content is neither HTML nor a readable PDF: image, office document, archive, binary, a password-protected or corrupt PDF, a PDF over the 10 MB body cap; with `--render always`, a navigation that turned into a download (`Download is starting`). No fallback. | `non_html`, `too_large` | Image: nothing to extract. Office/encrypted PDF: `--raw -o FILE` and a document tool. Other binary: `--raw -o FILE` only if the bytes are needed. Download: fetch without `--render`. `too_large`: download the PDF with another tool. |
 | 6 | Network: DNS failure, timeout (per attempt; in the browser: page load), connection refused/reset, TLS certificate error, too many redirects or a redirect to a non-http(s) URL (refused). With `--wayback`: archive.org unreachable or answering 429/502/503/504. | `dns`, `timeout`, `connection`, `tls`, `redirects` | Check connectivity and the URL; `--timeout 60`; `--proxy`; one retry later is reasonable, a loop is not. |
 | 7 | Unexpected library or extraction error. | `other` | Report the message; file an issue with the URL. |
+| 130 | Interrupted. | — | — |
 
 1, 4 and 7 are distinct on purpose: 4 = stop, 1 = try a different approach,
 7 = maybe transient.

@@ -159,7 +159,8 @@ The **start URL** decides; later pages only land in `failed`.
 | 4 | Start URL is blocked (bot wall, 429), disallowed by robots.txt, or robots.txt answered 5xx (`robots_unreachable`). | Stop. Tell the user; a bot wall will block every page the same way. robots.txt: ask the user whether they own the site before `--no-robots`. |
 | 5 | Start URL is not an HTML/PDF page (image, archive, unparsable or password-protected PDF). | Check the URL; crawl the page that links to it, or save it with `web-extract --raw -o`. |
 | 6 | Start URL unreachable (DNS, timeout, TLS), robots.txt unreachable for the same reason, or `--max-time` spent on robots.txt/sitemaps before the start URL was fetched (`max_time`). | Check connectivity; `--timeout 60`; a higher `--max-time` or `--no-sitemap`. |
-| 7 | Unexpected error, or interrupted (Ctrl-C; what was collected is still written). | Report it. |
+| 7 | Unexpected error. | Report it. |
+| 130 | Interrupted (Ctrl-C); what was collected is still written. | — |
 
 ## Workflow for the agent
 

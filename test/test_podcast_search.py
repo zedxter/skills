@@ -294,3 +294,17 @@ def test_live_apple_and_public_feed():
     data = json.loads(p.stdout)
     assert p.returncode == 0 and data["show"]["title"] == "This American Life" and len(data["results"]) == 2
     assert all(r["audio_url"].startswith("http") and r["published"] for r in data["results"])
+
+
+def test_crash_exits_7_not_1():
+    """An unexpected exception in main() exits 7 with one error line, never 1, which has its own meaning."""
+    code = ("import argparse, runpy, sys\n"
+            "def boom(*a, **k): raise RuntimeError('boom\\nsecond line')\n"
+            "argparse.ArgumentParser.parse_args = boom\n"
+            f"sys.argv = [{str(SCRIPT)!r}, 'x']\n"
+            f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n")
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+    assert p.returncode == 7, p.stderr
+    assert p.stderr.count("error:") == 1 and "unexpected RuntimeError: boom" in p.stderr
+    assert "second line" not in p.stderr and "Traceback" not in p.stderr

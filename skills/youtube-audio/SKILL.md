@@ -123,6 +123,7 @@ failure's.
 | 5 | The video is unavailable to this client: private, removed, members-only, age-restricted, or the site requires a signed-in account. | `private`, `unavailable`, `members_only`, `age_restricted`, `login_required` | Report it; age, members-only and login-only content need `--cookies-from-browser` with an eligible account. |
 | 6 | Network error (DNS, timeout, TLS, connection reset). | `network` | Check the connection or `--proxy`; one retry later is fine. |
 | 7 | Anything else, including yt-dlp failing to read YouTube's player (signature/nsig). | `extractor_outdated`, `other` | Update yt-dlp (`uv` uses the newest allowed release; `pip install -U yt-dlp yt-dlp-ejs`), then retry once. |
+| 130 | Interrupted; partial downloads (`.part`) resume on the next run. | — | — |
 
 ## Workflow for the agent
 

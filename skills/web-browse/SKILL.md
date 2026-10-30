@@ -107,6 +107,7 @@ flattened to one line and attribute values are quoted, so a page cannot fake a
 | 4 | Bot wall / challenge detected on the opened page. | Stop. Offer `start --headful` so the user passes it themselves; never try to solve it. |
 | 6 | Navigation failed: DNS, connection, TLS, timeout, or the URL was a download. | Check the URL/network; downloads: use `web-extract --raw -o`. |
 | 7 | Session still busy with an earlier command, or an unexpected error in the session. | Retry `status` in a moment; report persistent errors; `stop`/`start` resets. |
+| 130 | Interrupted. | — |
 
 ## Workflow for the agent
 

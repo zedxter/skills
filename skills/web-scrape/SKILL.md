@@ -124,6 +124,7 @@ and the field diagnostics; errors are one `error:` line.
 | 1 | No records: the selector matched nothing, the table/type does not exist, or `--probe` found no repeating blocks, tables or JSON-LD. The message says how many elements `--item` matched. | `--probe`, look at `web-extract URL -f html` or `--raw`, fix the selector; `--render always` for client-rendered lists. Do not retry unchanged. |
 | 2 | Bad input: no record definition, two of `--item/--json-ld/--table`, bad field spec/selector/modifier (also an XPath that fails when evaluated), `--table 0`, `--actions`/`--render-wait` with `--render off`, `--follow` without `--detail-field` or naming an unknown field, `--render always` without Playwright, `web-extract` missing. | Fix the arguments. |
 | 3 / 4 / 5 / 6 / 7 | The first listing page failed: HTTP error / bot wall or 429 / not HTML / network; 7 = any unexpected error (e.g. `-o` not writable), one `error:` line. Same kinds as `web-extract`. | 4: stop, say it is blocked; 3/6: check the URL; 5: this is a file, use `web-extract`. |
+| 130 | Interrupted. | — |
 
 ## Workflow for the agent
 

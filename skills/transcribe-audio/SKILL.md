@@ -136,13 +136,14 @@ One `error:` line on stderr with a hint after `—`.
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | 0 | Transcript written. | Use it (workflow below). |
-| 2 | Bad input: file not found, bad time or language code, unknown model, unsupported `--compute-type`, a playlist URL, unwritable `-o`, missing dependency, `--device cuda` without working CUDA, or interrupted (Ctrl-C). | Fix the argument; for the GPU, use `--device cpu`. |
+| 2 | Bad input: file not found, bad time or language code, unknown model, unsupported `--compute-type`, a playlist URL, unwritable `-o`, missing dependency, or `--device cuda` without working CUDA. | Fix the argument; for the GPU, use `--device cpu`. |
 | 3 | No speech detected (silence, music only), or the section is empty. | Tell the user; try `-l` with the right language or `--no-vad` for very quiet speech. |
 | 4 | Download blocked: YouTube bot check, HTTP 429, geo-block. | **Do not retry in a loop.** Ask the user before using `--cookies-from-browser BROWSER` (chrome, firefox, edge, safari, brave, chromium, opera, vivaldi; their own signed-in session, read locally by yt-dlp), or ask them to download the file and pass it. |
 | 5 | Media unavailable: private, removed, 404, members-only, age-restricted, login required, not started, DRM. | Report it. |
 | 6 | Network error during the media download. | One retry later, or `--proxy`. |
-| 7 | Decoder error: not a media file, corrupt, no audio track; or an unclassified yt-dlp error. | Check the file; update yt-dlp for site errors. |
+| 7 | Decoder error: not a media file, corrupt, no audio track; an unclassified yt-dlp error; or an unexpected error (the message says `unexpected`), which is a bug. | Check the file; update yt-dlp for site errors; report an `unexpected` error with the command line. |
 | 8 | Model not downloaded yet, model download failed, or out of memory. | Not downloaded: ask the user, then `--download-model`. Out of memory: a smaller `--model`. |
+| 130 | Interrupted. | — |
 
 ## Workflow for the agent
 

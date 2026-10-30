@@ -333,3 +333,17 @@ def test_bad_arguments_exit2():
     assert run("https://example.com/", "--item", ".a", "--actions", "[]")[0] == 2  # --actions with --render off
     assert run("https://example.com/", "--json-ld", "Product", "--field", "x=")[0] == 2
     assert run("not a url", "--table", "1")[0] == 2
+
+
+def test_crash_exits_7_not_1():
+    """An unexpected exception in main() exits 7 with one error line, never 1, which has its own meaning."""
+    code = ("import argparse, runpy, sys\n"
+            "def boom(*a, **k): raise RuntimeError('boom\\nsecond line')\n"
+            "argparse.ArgumentParser.parse_args = boom\n"
+            f"sys.argv = [{str(SCRIPT)!r}, 'x']\n"
+            f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n")
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+    assert p.returncode == 7, p.stderr
+    assert p.stderr.count("error:") == 1 and "unexpected RuntimeError: boom" in p.stderr
+    assert "second line" not in p.stderr and "Traceback" not in p.stderr

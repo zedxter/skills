@@ -14,6 +14,7 @@ the script exiting 4 or 6, the suite counts as "blocked", like the command.
 """
 
 import argparse
+import ast
 import contextlib
 import json
 import os
@@ -62,6 +63,8 @@ SUITES = {
     "web-search": (["ddgs>=9,<10", "curl_cffi", "trafilatura", "lxml_html_clean", "pypdf"], []),
     "wiki-lookup": ([], ["skills/wiki-lookup/scripts/wiki.py"]),
     "youtube-audio": (["yt-dlp", "yt-dlp-ejs", "brotli", "certifi", "pycryptodomex", "requests", "urllib3", "websockets"], ["skills/youtube-audio/scripts/audio.py"]),
+    "youtube-search": (["yt-dlp"], ["skills/youtube-search/scripts/search.py"]),
+    "youtube-transcript": (["youtube-transcript-api>=1.0"], []),
 }
 # Network tests inside the offline suites are switched off in CI; the probes cover the network.
 OFFLINE_ENV = {"WEB_EXTRACT_OFFLINE": "1"}
@@ -104,6 +107,57 @@ def frontmatter(text: str) -> dict[str, str] | None:
     return out
 
 
+def crash_guard_problem(source: str) -> str | None:
+    """What is wrong with a script's `if __name__ == "__main__":` guard, or None (also for a module without one).
+
+    The guard must catch KeyboardInterrupt and Exception, and the Exception handler must not exit 1, which
+    means "nothing found" (or "findings") everywhere."""
+    tree = ast.parse(source)
+    consts: dict[str, int] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target, value = node.targets[0], node.value
+        names = [t.id for t in target.elts if isinstance(t, ast.Name)] if isinstance(target, ast.Tuple) else (
+            [target.id] if isinstance(target, ast.Name) else [])
+        if isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id == "range" and value.args:
+            values = list(range(*[a.value for a in value.args if isinstance(a, ast.Constant)]))
+        elif isinstance(value, ast.Tuple):
+            values = [e.value if isinstance(e, ast.Constant) else None for e in value.elts]
+        else:
+            values = [value.value if isinstance(value, ast.Constant) else None]
+        consts.update((n, v) for n, v in zip(names, values) if isinstance(v, int))
+    guards = [n for n in tree.body if isinstance(n, ast.If) and isinstance(n.test, ast.Compare)
+              and isinstance(n.test.left, ast.Name) and n.test.left.id == "__name__"
+              and any(isinstance(c, ast.Constant) and c.value == "__main__" for c in n.test.comparators)]
+    if not guards:
+        return None
+    handlers: dict[str, ast.ExceptHandler] = {}
+    for node in ast.walk(guards[0]):
+        if isinstance(node, ast.Try):
+            for h in node.handlers:
+                types = h.type.elts if isinstance(h.type, ast.Tuple) else [h.type]
+                for t in types:
+                    if isinstance(t, ast.Name):
+                        handlers.setdefault(t.id, h)
+    if "BaseException" in handlers:
+        handlers.setdefault("KeyboardInterrupt", handlers["BaseException"])
+        handlers.setdefault("Exception", handlers["BaseException"])
+    missing = [name for name in ("KeyboardInterrupt", "Exception") if name not in handlers]
+    if missing:
+        return f"the __main__ block does not catch {' or '.join(missing)} (exit 130 and 7)"
+    exits = [c for c in ast.walk(handlers["Exception"]) if isinstance(c, ast.Call) and c.args
+             and isinstance(c.func, ast.Attribute) and c.func.attr in ("exit", "_exit")]
+    if not exits:
+        return "the __main__ block's Exception handler does not exit with a code"
+    for c in exits:
+        arg = c.args[0]
+        code = arg.value if isinstance(arg, ast.Constant) else consts.get(arg.id) if isinstance(arg, ast.Name) else None
+        if code in (0, 1):
+            return f"the __main__ block's Exception handler exits {code}; a crash must exit 7"
+    return None
+
+
 def check_skill(skill: Path, readme: str) -> list[str]:
     """Problems with one skill folder, as messages."""
     problems = []
@@ -132,7 +186,10 @@ def check_skill(skill: Path, readme: str) -> list[str]:
                 problems.append(f"{f.relative_to(ROOT)}:{n}: agent-specific text ({AGENT_SPECIFIC.search(line)[0]!r}); "
                                 "say it agent-neutrally")
     for script in sorted(skill.rglob("scripts/*.py")):
-        header = re.search(r"^# /// script\n(.*?)^# ///$", script.read_text(encoding="utf-8"), re.S | re.M)
+        source = script.read_text(encoding="utf-8")
+        if problem := crash_guard_problem(source):
+            problems.append(f"{script.relative_to(ROOT)}: {problem}; see CONTRIBUTING.md")
+        header = re.search(r"^# /// script\n(.*?)^# ///$", source, re.S | re.M)
         deps = re.search(r"^# dependencies = (.*)$", header[1], re.M) if header else None
         for bad in re.findall(r"\"([A-Za-z0-9_.-]+(?:\[[^\]]*\])?)", deps[1] if deps else ""):
             if bad.lower() in COPYLEFT or bad.lower().startswith("yt-dlp[default"):

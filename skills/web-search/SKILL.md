@@ -101,7 +101,8 @@ publisher field, the result's host); `--read` adds `content` and
 | 2 | Bad arguments (incl. a malformed `--region`, `--news` with a non-news `--backend`); `ddgs` or `curl_cffi` missing; `--read` without `web-extract`; bad `--searx` URL; SearXNG answering without JSON. | Fix it; `pip install ddgs curl_cffi`; install `web-extract` next to this skill; enable `formats: [html, json]` on the SearXNG instance. |
 | 4 | The search backend rate-limited or blocked the request (anonymous search frontends do this after bursts); SearXNG answering HTTP 403/429 (rate limit, bot protection, or JSON format disabled). | **Do not retry immediately.** Wait a minute, use another `--backend`, or the user's `--searx`. Tell the user. |
 | 6 | Network: timeout, DNS, unreachable SearXNG. | Check connectivity; `--timeout 30`. |
-| 7 | Unexpected engine error. | Report it; try another `--backend`. |
+| 7 | Unexpected engine or script error. | Report it; try another `--backend`. |
+| 130 | Interrupted. | — |
 
 ## Workflow for the agent
 

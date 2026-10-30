@@ -20,7 +20,8 @@ Exit codes (the start URL decides; later pages only appear in `failed`):
     0 at least one page collected (or mapped) · 1 nothing collected
     · 2 bad input / missing dependency or web-extract / output not writable · 3 start URL HTTP error
     · 4 start URL blocked / robots.txt disallows it or answered 5xx · 5 start URL is not HTML (image/binary/unparsable PDF)
-    · 6 start URL (or its robots.txt) unreachable, or --max-time spent before it was fetched · 7 other (or interrupted)
+    · 6 start URL (or its robots.txt) unreachable, or --max-time spent before it was fetched · 7 other, a bug included
+    · 130 interrupted (what was collected is still written)
 """
 
 import argparse
@@ -839,7 +840,7 @@ def main(argv: list[str] | None = None) -> int:
     start_fail = next((f for f in cr.failed if f["depth"] == 0 and f["parent"] is None), None)
     if cr.interrupted:
         sys.stderr.write("error: interrupted (writing what was collected)\n")
-        code = EXIT_OTHER
+        code = 130
     elif code != EXIT_OK and start_fail:
         e = start_fail["error"]
         sys.stderr.write(f"error: start URL failed ({e['kind']}): {e['message']}\n")
@@ -854,4 +855,23 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.stderr.write("error: interrupted\n")
+        sys.exit(130)
+    except BrokenPipeError as e:
+        try:
+            sys.stdout.flush()
+        except BrokenPipeError:  # the reader closed stdout (`| head`): stop quietly, as a pipe expects
+            try:
+                os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+            except OSError:
+                pass
+            sys.exit(0)
+        sys.stderr.write(f"error: unexpected BrokenPipeError: {e} — a bug; report it with the command line\n")
+        sys.exit(EXIT_OTHER)
+    except Exception as e:  # noqa: BLE001 - a crash exits 7, never 1 or another code that has a meaning
+        sys.stderr.write(f"error: unexpected {type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]} "
+                         "— a bug; report it with the command line\n")
+        sys.exit(EXIT_OTHER)

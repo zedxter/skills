@@ -610,7 +610,7 @@ def main(argv: list[str] | None = None) -> int:
             continue
         except KeyboardInterrupt:
             sys.stderr.write("error: interrupted; partial downloads (.part) are resumed on the next run\n")
-            return EXIT_OTHER
+            return 130
         except Exception as e:  # yt-dlp internals, postprocessor crashes
             msg = f"{type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]}"
             code, kind, hint = classify_error(msg)
@@ -633,4 +633,23 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.stderr.write("error: interrupted\n")
+        sys.exit(130)
+    except BrokenPipeError as e:
+        try:
+            sys.stdout.flush()
+        except BrokenPipeError:  # the reader closed stdout (`| head`): stop quietly, as a pipe expects
+            try:
+                os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+            except OSError:
+                pass
+            sys.exit(0)
+        sys.stderr.write(f"error: unexpected BrokenPipeError: {e} — a bug; report it with the command line\n")
+        sys.exit(EXIT_OTHER)
+    except Exception as e:  # noqa: BLE001 - a crash exits 7, never 1 or another code that has a meaning
+        sys.stderr.write(f"error: unexpected {type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]} "
+                         "— a bug; report it with the command line\n")
+        sys.exit(EXIT_OTHER)

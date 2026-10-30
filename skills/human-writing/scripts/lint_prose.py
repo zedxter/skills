@@ -18,12 +18,13 @@ The linter names patterns and quotes the line. It does not guess whether a model
 Exit codes:
     0 score at or above the threshold and no error-level finding · 1 score below the threshold or an
     error-level finding · 2 bad input (missing file, bad option, unreadable --config or --voice) · 7 the
-    input is not UTF-8 text
+    input is not UTF-8 text, or an unexpected error (a bug) · 130 interrupted
 """
 
 import argparse
 import bisect
 import json
+import os
 import re
 import statistics
 import sys
@@ -32,6 +33,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 EXIT_OK, EXIT_FAIL, EXIT_BAD_INPUT, EXIT_PARSE = 0, 1, 2, 7
+EXIT_BUG = 7  # an unexpected error; shares 7 with the documented code, never 1
 GENRES = ("article", "post", "docs")
 SEVERITY_WEIGHT = {"error": 10.0, "warning": 3.0, "info": 0.5}
 DEFAULT_THRESHOLD = 75
@@ -1128,4 +1130,23 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.stderr.write("error: interrupted\n")
+        sys.exit(130)
+    except BrokenPipeError as e:
+        try:
+            sys.stdout.flush()
+        except BrokenPipeError:  # the reader closed stdout (`| head`): stop quietly, as a pipe expects
+            try:
+                os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+            except OSError:
+                pass
+            sys.exit(0)
+        sys.stderr.write(f"error: unexpected BrokenPipeError: {e} — a bug; report it with the command line\n")
+        sys.exit(EXIT_BUG)
+    except Exception as e:  # noqa: BLE001 - a crash exits 7, never 1 or another code that has a meaning
+        sys.stderr.write(f"error: unexpected {type(e).__name__}: {(str(e).splitlines() or [''])[0][:300]} "
+                         "— a bug; report it with the command line\n")
+        sys.exit(EXIT_BUG)
