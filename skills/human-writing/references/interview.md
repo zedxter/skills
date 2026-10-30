@@ -73,6 +73,6 @@ Start it during the interview and keep it next to the draft. One line per factua
 | 6 | `flowctl sync` prints "3 files synced" | ran in /tmp/scratch | tested |
 ```
 
-- **Status**: `given` (the user said it), `verified` (checked against a file or page), `tested` (you ran it), `untested` (a command you could not run), `TODO` (missing; the text carries a `[TODO]`).
+- **Status**: `given` (the user said it), `author` (stated in a text the author wrote, with no source given; used in `edit` and `review`), `verified` (checked against a file or page), `tested` (you ran it), `untested` (a command you could not run), `TODO` (missing; the text carries a `[TODO]`).
 - Opinions and the author's judgements don't go in the ledger; facts do. "Postgres is the right default" is an opinion. "Postgres handled 4,000 writes a second on our db.m6g.large" is a fact.
 - The ledger goes to the fact checker during review and to the user with the final text.

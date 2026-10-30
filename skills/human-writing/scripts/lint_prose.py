@@ -326,17 +326,27 @@ def _mask_code_spans(line: str) -> str:
     'a     c           f'
     """
     runs = [(m.start(), m.end()) for m in re.finditer(r"`+", line)]
-    out, i = list(line), 0
+    if len(runs) < 2:
+        return line
+    nxt: list[int | None] = [None] * len(runs)
+    last: dict[int, int] = {}
+    for k in range(len(runs) - 1, -1, -1):
+        size = runs[k][1] - runs[k][0]
+        nxt[k] = last.get(size)
+        last[size] = k
+    spans, i = [], 0
     while i < len(runs):
-        s, e = runs[i]
-        j = next((k for k in range(i + 1, len(runs)) if runs[k][1] - runs[k][0] == e - s), None)
+        j = nxt[i]
         if j is None:
             i += 1
             continue
-        for k in range(s, runs[j][1]):
-            out[k] = " "
+        spans.append((runs[i][0], runs[j][1]))
         i = j + 1
-    return "".join(out)
+    out, pos = [], 0
+    for s, e in spans:
+        out += [line[pos:s], " " * (e - s)]
+        pos = e
+    return "".join(out) + line[pos:]
 
 
 def _mask_comments(line: str) -> str:
@@ -389,14 +399,21 @@ def _front_matter_end(lines: list[str]) -> int:
     3
     >>> _front_matter_end(["---", "", "A paragraph.", "", "---"])
     -1
+    >>> _front_matter_end(["---", "# comment", "title: Hello", "", "author: Me", "---"])
+    5
     """
     if not lines or lines[0].strip() != "---":
         return -1
+    keys = 0
     for i in range(1, len(lines)):
-        if lines[i].strip() in ("---", "..."):
-            return i if i > 1 else -1
-        if not lines[i].strip() or not FRONT_KEY.match(lines[i]):
+        stripped = lines[i].strip()
+        if stripped in ("---", "..."):
+            return i if keys else -1
+        if not stripped or stripped.startswith(("#", "[", "{")):
+            continue
+        if not FRONT_KEY.match(lines[i]):
             return -1
+        keys += 1
     return -1
 
 
@@ -414,11 +431,17 @@ def parse(text: str) -> Document:
     kinds: list[str] = []  # per line: blank | masked | heading | item | cont | para
     levels: dict[int, int] = {}  # line index → heading level
     fences: list[tuple[int, str]] = []
-    offset, in_fence, fence, in_comment, in_table, in_list = 0, False, "", False, False, False
+    offset, in_fence, fence, in_comment, in_table, in_list, list_indent = 0, False, "", False, False, False, 0
     front_end = _front_matter_end(lines)
+    close_after = [False] * (len(lines) + 1)  # close_after[i]: a later line i.. contains -->
+    for k in range(len(lines) - 1, -1, -1):
+        close_after[k] = close_after[k + 1] or "-->" in lines[k]
     for i, line in enumerate(lines):
         kind = "para"
         prev = kinds[-1] if kinds else "blank"
+        indent = len(line.expandtabs(4)) - len(line.expandtabs(4).lstrip(" "))
+        code_cs = _mask_code_spans(line)
+        open_at = code_cs.find("<!--")
         if i <= front_end:
             md, kind = _blank(line), "masked"
         elif in_fence:
@@ -434,12 +457,14 @@ def parse(text: str) -> Document:
                 rest = line[end + 3:]
                 md = " " * (end + 3) + _mask_inline(rest)
                 kind = "para" if rest.strip() else "masked"
+        elif line.strip() and prev in ("blank", "code") and (indent >= list_indent + 4 if in_list else indent >= 4):
+            md, kind = _blank(line), "code"  # indented code block
         elif (m := FENCE_OPEN.match(line)) and not (m.group(1)[0] == "`" and "`" in m.group(2)):
             in_fence, fence = True, m.group(1)
             fences.append((offset, m.group(2).strip()))
             md, kind = _blank(line), "masked"
-        elif "<!--" in line and "-->" not in line[line.find("<!--"):]:
-            start = line.find("<!--")
+        elif open_at != -1 and "-->" not in code_cs[open_at:] and close_after[i + 1]:
+            start = open_at
             in_comment = True
             head = line[:start]
             md = _mask_inline(head) + _blank(line[start:])
@@ -457,14 +482,13 @@ def parse(text: str) -> Document:
             md, kind = _blank(line), "masked"
         elif HR.match(line) or TABLE.match(line) or QUOTE.match(line):
             md, kind = _blank(line), "masked"
-        elif line.startswith(("    ", "\t")) and not in_list and prev in ("blank", "code"):
-            md, kind = _blank(line), "code"  # indented code block
+            in_list = in_list and not HR.match(line)
         else:
             md = _mask_inline(line)
             if HEADING.match(line):
-                kind = "heading"
-            elif LIST_ITEM.match(line):
-                kind, in_list = "item", True
+                kind, in_list = "heading", False
+            elif lm := LIST_ITEM.match(line):
+                kind, in_list, list_indent = "item", True, len(lm.group(0).expandtabs(4))
             elif line.startswith((" ", "\t")):
                 kind = "cont"
             elif prev == "blank":
@@ -635,9 +659,12 @@ class Linter:
 
     def _dedupe(self) -> None:
         rank = {r: i for i, r in enumerate(PHRASE_PRIORITY)}
+        sev = {"error": 0, "warning": 1, "info": 2}
+        def phrase(f: Finding) -> bool:  # a phrase match, not a span covering several sentences
+            return f.rule in rank and f.end - f.start <= 80 and not re.search(r"[.!?]\s", self.doc.text[f.start:f.end])
         kept: list[Finding] = []
-        for f in sorted(self.findings, key=lambda f: rank.get(f.rule, -1)):
-            if f.rule in rank and any(k.rule in rank and k.rule != f.rule and f.start < k.end and k.start < f.end for k in kept):
+        for f in sorted(self.findings, key=lambda f: (not phrase(f), sev[f.severity], rank.get(f.rule, -1))):
+            if phrase(f) and any(phrase(k) and k.rule != f.rule and f.start < k.end and k.start < f.end for k in kept):
                 continue
             kept.append(f)
         self.findings = kept
@@ -883,9 +910,10 @@ class Linter:
         rx = re.compile(RECAP_OPENERS, re.I)
         for b in paras:
             seg = d.prose[b.start:b.end].lstrip()
-            if seg[:15].lower().startswith(("in conclusion", "to sum up", "in summary", "to summarize", "to summarise")) or (b is paras[-1] and rx.match(seg)):
+            m = rx.match(seg)
+            if m and (b is paras[-1] or m.group(0).lower() in ("in conclusion", "to sum up", "in summary", "to summarize", "to summarise")):
                 off = b.start + (len(d.prose[b.start:b.end]) - len(seg))
-                self.add("recap-ending", off, off + min(len(seg), 60))
+                self.add("recap-ending", off, off + m.end())
 
     def _post_rules(self) -> None:
         d = self.doc

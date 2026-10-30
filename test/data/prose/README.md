@@ -1,6 +1,6 @@
-# Prose corpora for `prose-writer`
+# Prose corpora for `human-writing`
 
-Used by `test/test_prose_writer.py` to measure the linter's false positives and catch rate.
+Used by `test/test_human_writing.py` to measure the linter's false positives and catch rate.
 
 - `human/`: 20 texts written by people at 18F, the US government's digital services team. Both source repositories are works of the US government in the public domain, with copyright waived worldwide under CC0 1.0. Each file starts with a comment linking its source at a pinned commit.
   - `article-*`: ten blog posts published in 2017–2018 (`18F/18f.gsa.gov`, `content/posts/`).

@@ -1,5 +1,5 @@
 ---
-name: prose-writer
+name: human-writing
 description: Writes, edits and reviews English articles, posts and technical documentation so they read as written by a specific person rather than by a chat model. It interviews the author for concrete material, drafts in their voice, keeps a ledger of every fact, lints offline for AI tells, and runs a panel of independent reviewer sub-agents before anything is published. Use when the user asks to write, draft, edit, tighten or review a blog post, LinkedIn post, dev.to, Hashnode or Medium article, how-to, newsletter, README, tutorial, guide, API or CLI reference, ADR, changelog or release notes; to make text sound less like AI or check a draft for AI tells; or to review a text before publishing it.
 license: MIT
 compatibility: Python 3.12+ with uv (preferred) or plain python; the linter uses only the standard library and needs no network. macOS, Linux, Windows. The review panel works best in an agent that can start sub-agents; without that, the same reviews run one after another.
@@ -9,7 +9,7 @@ metadata:
   source: https://github.com/zedxter/skills
 ---
 
-# Prose Writer
+# Human Writing
 
 Most AI-sounding text fails before the first sentence. Nobody gave the writer a moment, a number, a mistake or a person who disagrees, so the model filled the gap with the average of everything it has read. Banned-word lists only fix the wording that results, so this skill also works on the input:
 

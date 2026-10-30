@@ -1,7 +1,7 @@
-"""Tests for skills/prose-writer/scripts/lint_prose.py.
+"""Tests for skills/human-writing/scripts/lint_prose.py.
 
-Run: uv run --no-project --with pytest python -I -m pytest test/test_prose_writer.py -q \
-         --doctest-modules skills/prose-writer/scripts/lint_prose.py
+Run: uv run --no-project --with pytest python -I -m pytest test/test_human_writing.py -q \
+         --doctest-modules skills/human-writing/scripts/lint_prose.py
 
 Offline. test/data/prose/human/ holds 20 human-written texts (18F blog posts from 2017–2018 and 18F guide pages, CC0 /
 US public domain); test/data/prose/slop/ holds 10 texts written in the default style of a chat model.
@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills" / "prose-writer" / "scripts" / "lint_prose.py"
+SCRIPT = ROOT / "skills" / "human-writing" / "scripts" / "lint_prose.py"
 DATA = ROOT / "test" / "data" / "prose"
 sys.path.insert(0, str(SCRIPT.parent))
 import lint_prose as lp  # noqa: E402
@@ -134,6 +134,22 @@ def test_markdown_structure_edge_cases():
     assert len(lp.parse("I said no. We left early. See No. 5 here.").sentences) == 3
 
 
+def test_verification_regressions():
+    # an HTML comment opener in inline code or plain prose doesn't hide the rest of the text
+    assert "ai-vocab" in rules_in("Use `<!--` to open a comment.\n\nThis will delve into a robust, seamless tapestry.")
+    assert "ai-vocab" in rules_in("The token <!-- opens a comment.\n\nThis will delve into a robust, seamless tapestry.")
+    # front matter with blank lines, comments or odd lines is still front matter
+    for fm in ("---\ntitle: Hello\n\nauthor: Me\n---\nBody text here.", "---\n# note\ntitle: Hello\n---\nBody text here.",
+               "---\n[weird]\ntitle: Hello\n---\nBody text here."):
+        assert lp.lint(fm, lp.Settings())["words"] == 3
+    # a finding spanning two sentences doesn't hide a phrase finding inside it
+    assert {"rhetorical", "weasel"} <= rules_in("Did we ship it? Experts agree we did.\n\nMore words here.")
+    # indented code with a fence line inside, and indented code inside list items
+    assert lp.lint("Intro.\n\n    Example:\n\n    ```\n    code\n\nText after.\n\nMore text.", lp.Settings())["words"] >= 5
+    assert "ai-vocab" not in rules_in("1. Step one:\n\n       npm install leverage robust\n\n2. Step two.")
+    assert "ai-vocab" not in rules_in("- item\n\n## Heading\n\n    leverage = robust\n")
+
+
 def test_overlapping_phrase_rules_report_once():
     for text in ("Here's what nobody tells you about caching.", "Some text.\n\nAt the end of the day, it works.",
                  "It serves as a testament to effort."):
@@ -149,7 +165,8 @@ def test_misc_regressions():
     assert "post-hook-fold" not in rules_in(front, "post")
 
 
-@pytest.mark.parametrize("text", ["x " + "`" * 3000, "[" * 200_000, "**a " * 50_000, "<!--" * 50_000, "<a" * 100_000])
+@pytest.mark.parametrize("text", ["x " + "`" * 3000, "[" * 200_000, "**a " * 50_000, "<!--" * 50_000, "<a" * 100_000,
+                                  "".join("`" * n + "x" for n in range(3, 300)) + "`a` " * 35_000])
 def test_pathological_input_is_fast(text):
     start = time.monotonic()
     lp.lint(text, lp.Settings())
