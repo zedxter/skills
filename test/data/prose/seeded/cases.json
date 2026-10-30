@@ -471,5 +471,267 @@
         "what": "comment-gate bait"
       }
     ]
+  },
+  "docs-02-csvdiff-readme": {
+    "genre": "docs",
+    "type": "README (mostly reference with a quick start)",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "newcomer-tester",
+      "source-checker"
+    ],
+    "audience": "data analysts and developers who compare exported CSV files",
+    "platform": "the project's README on GitHub and PyPI",
+    "field": "command-line tools and CSV processing",
+    "author": "the maintainer of an open-source tool",
+    "sources": [
+      "test/data/prose/seeded/src/csvdiff.py"
+    ],
+    "source_paths": [
+      "test/data/prose/seeded/src/csvdiff.py"
+    ],
+    "run_policy": "dry run only: do not run any commands",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "Pass a comma-separated list to ignore several.",
+        "lenses": [
+          "source-checker",
+          "fact-checker"
+        ],
+        "what": "--ignore is repeatable (append), not comma-separated"
+      },
+      {
+        "id": "D2",
+        "quote": "`text`, `json` or `csv`",
+        "lenses": [
+          "source-checker",
+          "fact-checker"
+        ],
+        "what": "there is no csv output format"
+      },
+      {
+        "id": "D3",
+        "quote": "Files are read as UTF-8.",
+        "lenses": [
+          "source-checker",
+          "newcomer-tester"
+        ],
+        "what": "CSVDIFF_ENCODING overrides the encoding; undocumented"
+      },
+      {
+        "id": "D4",
+        "quote": "exits with 0 when the files are identical and 1 when it finds differences",
+        "lenses": [
+          "source-checker",
+          "newcomer-tester"
+        ],
+        "what": "exit code 2 for bad input missing"
+      },
+      {
+        "id": "D5",
+        "quote": "Hash maps are a fundamental data structure",
+        "lenses": [
+          "cold-reader",
+          "slop-hunter",
+          "hostile-expert"
+        ],
+        "what": "explanation of hash maps in a README: wrong type, re-explains the obvious"
+      },
+      {
+        "id": "D6",
+        "quote": "csvdiff old.csv new.csv --key id",
+        "lenses": [
+          "newcomer-tester",
+          "cold-reader"
+        ],
+        "what": "output example shows no header/legend; + - ~ never explained"
+      }
+    ]
+  },
+  "docs-03-adr-queue": {
+    "genre": "docs",
+    "type": "ADR (architecture decision record)",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety"
+    ],
+    "audience": "engineers who join the team later and need to know why the queue exists",
+    "platform": "the team's internal docs repository",
+    "field": "distributed systems and data pipelines",
+    "author": "a backend engineer on the team",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "- **Kafka.** Rejected.",
+        "lenses": [
+          "hostile-expert",
+          "cold-reader"
+        ],
+        "what": "rejected without a reason"
+      },
+      {
+        "id": "D2",
+        "quote": "- **Keep cron, add a bigger VM.**",
+        "lenses": [
+          "hostile-expert",
+          "cold-reader"
+        ],
+        "what": "no verdict or reason for this option"
+      },
+      {
+        "id": "D3",
+        "quote": "The export finishes in about 40 minutes.",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert"
+        ],
+        "what": "stated as fact; the ledger says one staging run"
+      },
+      {
+        "id": "D4",
+        "quote": "4417-9902-1183",
+        "lenses": [
+          "publication-safety"
+        ],
+        "what": "AWS account number in a doc"
+      },
+      {
+        "id": "D5",
+        "quote": "survive a worker crash without double-counting invoices",
+        "lenses": [
+          "hostile-expert",
+          "cold-reader"
+        ],
+        "what": "the decision never says how idempotency is achieved; consequences omit retries"
+      }
+    ]
+  },
+  "docs-04-changelog": {
+    "genre": "docs",
+    "type": "changelog",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety"
+    ],
+    "audience": "developers who use the charting library and are deciding whether to upgrade",
+    "platform": "CHANGELOG.md in a public repository",
+    "field": "JavaScript libraries and semantic versioning",
+    "author": "a maintainer of the library",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "## [3.0.0]",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert",
+          "cold-reader"
+        ],
+        "what": "release date missing (ledger: 2026-10-28)"
+      },
+      {
+        "id": "D2",
+        "quote": "- Internet Explorer 11 is no longer supported.",
+        "lenses": [
+          "hostile-expert",
+          "cold-reader",
+          "fact-checker"
+        ],
+        "what": "breaking change under Changed, not marked breaking; legacyRenderer removal omitted"
+      },
+      {
+        "id": "D3",
+        "quote": "- Refactored the internal layout engine.",
+        "lenses": [
+          "cold-reader",
+          "hostile-expert",
+          "slop-hunter"
+        ],
+        "what": "internal change users can't act on"
+      },
+      {
+        "id": "D4",
+        "quote": "the line chart with 100,000 points now draws in 180 ms instead of 1.4 s",
+        "lenses": [
+          "hostile-expert",
+          "fact-checker"
+        ],
+        "what": "benchmark conditions (machine) omitted"
+      }
+    ]
+  },
+  "article-05-newsletter": {
+    "genre": "article",
+    "lenses": [
+      "cold-reader",
+      "hostile-expert",
+      "fact-checker",
+      "slop-hunter",
+      "publication-safety",
+      "platform-editor"
+    ],
+    "audience": "engineers at the company and a few hundred outside subscribers",
+    "platform": "the engineering team's monthly email newsletter",
+    "field": "search infrastructure",
+    "author": "an engineering manager",
+    "goal": "reading and clicks on the main story",
+    "defects": [
+      {
+        "id": "D1",
+        "quote": "You won't believe what we found in our logs",
+        "lenses": [
+          "platform-editor",
+          "slop-hunter",
+          "cold-reader"
+        ],
+        "what": "clickbait subject that the issue never pays off"
+      },
+      {
+        "id": "D2",
+        "quote": "We also started a book club.",
+        "lenses": [
+          "platform-editor",
+          "cold-reader"
+        ],
+        "what": "second main idea; newsletter should have one"
+      },
+      {
+        "id": "D3",
+        "quote": "- https://example.com/why-we-left-elasticsearch",
+        "lenses": [
+          "platform-editor",
+          "cold-reader"
+        ],
+        "what": "links with no sentence on why they're worth the click"
+      },
+      {
+        "id": "D4",
+        "quote": "Research shows that teams who read together ship 30% faster.",
+        "lenses": [
+          "fact-checker",
+          "hostile-expert",
+          "slop-hunter"
+        ],
+        "what": "unsourced statistic"
+      },
+      {
+        "id": "D5",
+        "quote": "Hi everyone,",
+        "lenses": [
+          "platform-editor"
+        ],
+        "what": "preview text wasted on a greeting"
+      }
+    ]
   }
 }

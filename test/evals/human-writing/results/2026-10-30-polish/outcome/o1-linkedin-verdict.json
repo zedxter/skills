@@ -1,0 +1,38 @@
+{
+  "topic": "o1-linkedin",
+  "order": [
+    "plain",
+    "skill"
+  ],
+  "human": "skill",
+  "useful": "skill",
+  "overall": "skill",
+  "unsupported": {
+    "plain": [
+      "'It's simple once you see it, but finding it was painful': the notes don't describe how hard the bug was to find",
+      "The advice bullets ('Check how you read your data before you add more machines', 'Plan for retries from day one') are lessons the notes don't state",
+      "'Once you have a queue, you have retries': a generalization that isn't in the notes"
+    ],
+    "skill": [
+      "'When a batch failed and got retried': the notes don't say the retries were caused by failures"
+    ]
+  },
+  "ai_tells": {
+    "plain": [
+      "Speed wasn't the hard part. Idempotency was.",
+      "What I'd tell anyone planning a similar move:",
+      "\u2192 Check how you read your data before you add more machines.",
+      "It's simple once you see it, but finding it was painful.",
+      "Huge thanks to",
+      "Please share in the comments \ud83d\udc47",
+      "#engineering #softwareengineering #aws #distributedsystems"
+    ],
+    "skill": [
+      "and the speedup wasn't the hard part."
+    ]
+  },
+  "why": {
+    "human": "B reads like an engineering manager telling the story plainly. It skips the stock LinkedIn moves: no arrow-bullet lessons, no 'Huge thanks', no emoji call to action, no hashtags. A follows the familiar template of hook, lessons and engagement prompt.",
+    "useful": "B gives the same technical substance more tightly, and its closing question (run ids or something else?) is specific enough to draw the comments from other migrators that the author wants. A's generic advice bullets add little that the story doesn't already show. B's inline TODOs have to be resolved before posting, but they flag real gaps in the notes."
+  }
+}

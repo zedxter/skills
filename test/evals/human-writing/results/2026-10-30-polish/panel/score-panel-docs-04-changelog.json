@@ -1,0 +1,45 @@
+{
+  "D1": {
+    "line": 3,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert",
+      "slop-hunter"
+    ]
+  },
+  "D2": {
+    "line": 10,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert"
+    ]
+  },
+  "D3": {
+    "line": 12,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert",
+      "slop-hunter"
+    ]
+  },
+  "D4": {
+    "line": 11,
+    "owner": true,
+    "any": true,
+    "lenses": [
+      "cold-reader",
+      "fact-checker",
+      "hostile-expert",
+      "slop-hunter"
+    ]
+  }
+}

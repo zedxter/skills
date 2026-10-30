@@ -17,11 +17,11 @@ If you can fetch URLs, you may open the linked pages to compare them. If you can
 3. **Names.** People, companies, products, projects, titles. Spelled as the source spells them, and attributed correctly.
 4. **Quotes.** Each quote should match the source word for word and be attributed to the right person. A paraphrase in quotation marks is a finding.
 5. **Strength.** Find claims that are stronger than the source: "doubled" where the source says "improved", "all users" where it says "most", "proves" where it says "suggests".
-6. **Outside knowledge.** Claims about how a library, runtime, service or tool behaves that the ledger doesn't cover. Even when they are probably true, report them as major with the fix "cite the documentation in the ledger, or cut".
+6. **Outside knowledge.** Claims about how a public library, runtime, service or tool behaves that the ledger doesn't cover. Wrong: blocker. Correct, standard documented behaviour without a link: minor, fix "add the documentation link to the ledger". Specific and unverifiable (an exact limit, an undocumented quirk): major, fix "verify or cut". Reasoning that follows from the material isn't outside knowledge.
 7. **Causal claims.** Does the source support "X caused Y", or only "Y happened after X"?
 8. **Unsupported claims.** Any factual statement with no ledger entry. Opinions and the author's own experience marked `user` are fine. Statistics, benchmarks and claims about other people or companies need a source.
 9. **Links.** Does each link point to what the text says it points to? If you can fetch, flag dead links and pages that don't contain the claim.
-10. **Placeholders.** List any `[TODO]` markers that remain.
+10. **Placeholders.** List any `[TODO]` markers that remain. If the ledger or the sources already answer one, report it as major and give the answer.
 
 ## Ignore
 

@@ -1,0 +1,14 @@
+[
+  {"id": "article-a", "genre": "article", "prompt": "Write a dev.to article about why our team switched from REST to gRPC for internal services."},
+  {"id": "article-b", "genre": "article", "prompt": "Write a blog post about lessons learned from migrating a monolith to Kubernetes."},
+  {"id": "article-c", "genre": "article", "prompt": "Write a Medium article about how to run effective code reviews."},
+  {"id": "article-d", "genre": "article", "prompt": "Write an engineering blog post about how we reduced our AWS bill by 40%."},
+  {"id": "post-a", "genre": "post", "prompt": "Write a LinkedIn post about getting my first job as a software engineer after a bootcamp."},
+  {"id": "post-b", "genre": "post", "prompt": "Write a LinkedIn post about what I learned from a failed startup."},
+  {"id": "post-c", "genre": "post", "prompt": "Write a LinkedIn post announcing that our team open-sourced our internal feature-flag library."},
+  {"id": "post-d", "genre": "post", "prompt": "Write a LinkedIn post about why developers should write more documentation."},
+  {"id": "docs-a", "genre": "docs", "prompt": "Write a README for a Python CLI tool called csvdiff that compares two CSV files and prints added, removed and changed rows."},
+  {"id": "docs-b", "genre": "docs", "prompt": "Write a getting-started guide for a REST API that manages to-do items, with authentication by API key."},
+  {"id": "docs-c", "genre": "docs", "prompt": "Write release notes for version 3.0 of a JavaScript charting library that adds dark mode, drops IE11 support and makes rendering faster."},
+  {"id": "docs-d", "genre": "docs", "prompt": "Write a contributing guide (CONTRIBUTING.md) for an open-source Go project."}
+]

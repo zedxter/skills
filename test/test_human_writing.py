@@ -64,6 +64,11 @@ RULE_CASES = [
     ("emoji-heading", "article", "# Release notes 🚀\n\nText here.", "# Release notes\n\nText here."),
     ("emoji-bullet", "article", "- 🔄 Sync\n- ⚡ Speed\n", "- Sync\n- Speed\n"),
     ("heading-density", "article", "## One\n\nShort.\n\n## Two\n\nAlso short.\n", "## One\n\n" + FILLER * 2 + "\n\n## Two\n\n" + FILLER * 2),
+    ("list-heavy", "article", "Intro. " + FILLER * 5 + "\n\n" + "".join(f"- point {i} here\n" for i in range(12)),
+     "Intro. " + FILLER * 5 + "\n\n- one point\n- two point\n"),
+    ("heading-heavy", "article", "".join(f"## Part {i}\n\n" + FILLER + "\n\n" for i in range(6)),
+     "## Part one\n\n" + FILLER * 6),
+    ("generic", "article", "The team wanted a better way to work. " * 40, FILLER * 6),
     ("title-case-heading", "article", "## How We Built The Cache\n\nText.", "## How we built the cache\n\nText."),
     ("code-fence-lang", "docs", "Run:\n\n```\nls\n```\n", "Run:\n\n```bash\nls\n```\n"),
     ("chat-residue", "article", "Great question! I hope this helps.", "The answer is 42."),
@@ -241,7 +246,7 @@ def genre_of(path: Path) -> str:
 
 
 def test_corpora_present():
-    assert len(HUMAN) >= 10 and len(SLOP) >= 10
+    assert len(HUMAN) >= 40 and len(SLOP) >= 10
 
 
 @pytest.mark.parametrize("path", HUMAN, ids=lambda p: p.name)
@@ -255,6 +260,20 @@ def test_human_text_passes(path):
 def test_slop_fails(path):
     r = lp.lint(path.read_text(encoding="utf-8"), lp.Settings(genre=genre_of(path)))
     assert r["score"] < lp.DEFAULT_THRESHOLD or r["counts"]["error"] > 0
+
+
+MODEL = sorted((DATA / "model").glob("*.md"))
+
+
+def test_model_output_articles_and_posts_mostly_fail():
+    # Real model output (generate_slop.py). Docs from a model are often fine and "humanized" output is a hard case,
+    # so only articles and posts written with no style instruction are held to a floor; see the evals README.
+    plain = [p for p in MODEL if not p.stem.endswith("humanized") and genre_of(p) in ("article", "post")]
+    failed = 0
+    for path in plain:
+        r = lp.lint(path.read_text(encoding="utf-8"), lp.Settings(genre=genre_of(path)))
+        failed += r["score"] < lp.DEFAULT_THRESHOLD or r["counts"]["error"] > 0
+    assert len(plain) >= 20 and failed / len(plain) >= 0.6
 
 
 def test_seeded_cases_are_consistent():

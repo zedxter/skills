@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run the human-writing review panel on the seeded-defect texts and score which planted defects it catches.
 
-    python3 -I run_panel.py panel  OUT_DIR [--model sonnet] [--only CASE]   # one isolated reviewer per lens
-    python3 -I run_panel.py single OUT_DIR [--model sonnet] [--only CASE]   # single-agent fallback, all lenses in one run
+    python3 -I run_panel.py panel  OUT_DIR [--model sonnet] [--only CASE,CASE]   # one isolated reviewer per lens
+    python3 -I run_panel.py single OUT_DIR [--model sonnet] [--only CASE,CASE]   # single-agent fallback, all lenses in one run
     python3 -I run_panel.py score  OUT_DIR                                  # score saved results again
 
 Cases, inputs and planted defects are in test/data/prose/seeded/cases.json. Every reviewer runs as a separate
@@ -47,12 +47,16 @@ def lens_inputs(lens: str, name: str, case: dict, text: str) -> str:
     if lens == "platform-editor":
         parts.append(f"Goal: {case.get('goal', 'understanding')}")
     if lens == "newcomer-tester":
-        parts += [f"Document type: {case['type']}", "Stated prerequisites: none are stated on the page.",
+        parts += [f"Document type: {case['type']}", "Stated prerequisites: whatever the page itself states.",
                   f"Run policy: {case['run_policy']}."]
     if lens == "source-checker":
-        help_text = subprocess.run([sys.executable, "-I", str(LINTER), "--help"], capture_output=True, text=True).stdout
-        parts += [f"Document type: {case['type']}",
-                  "Source of truth: skills/human-writing/scripts/lint_prose.py (read it) and its --help output:\n" + help_text]
+        parts.append(f"Document type: {case['type']}")
+        if case.get("source_paths"):
+            parts.append("Source of truth (read these files; paths relative to the current directory): "
+                         + ", ".join(case["source_paths"]))
+        else:
+            help_text = subprocess.run([sys.executable, "-I", str(LINTER), "--help"], capture_output=True, text=True).stdout
+            parts.append("Source of truth: skills/human-writing/scripts/lint_prose.py (read it) and its --help output:\n" + help_text)
     return "\n\n".join(parts)
 
 
@@ -124,9 +128,9 @@ def score(name: str, case: dict, results: list) -> dict:
 def main() -> int:
     mode, out = sys.argv[1], Path(sys.argv[2])
     model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else "sonnet"
-    only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
+    only = sys.argv[sys.argv.index("--only") + 1].split(",") if "--only" in sys.argv else None
     cases = json.loads((SEEDED / "cases.json").read_text(encoding="utf-8"))
-    cases = {k: v for k, v in cases.items() if only in (None, k)}
+    cases = {k: v for k, v in cases.items() if only is None or k in only}
     out.mkdir(parents=True, exist_ok=True)
     if mode == "panel":
         jobs = [(name, lens) for name, case in cases.items() for lens in case["lenses"]]

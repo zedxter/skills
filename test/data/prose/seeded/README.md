@@ -18,7 +18,7 @@ A how-to for `lint_prose.py` itself, so the source checker and newcomer tester c
 
 ### Result
 
-See `test/evals/human-writing/README.md`. The whole set of six texts and 40 defects was caught 40/40 by the panel and by the single-agent fallback on 2026-10-30.
+See `test/evals/human-writing/README.md`. On 2026-10-30 the first six texts (40 blunt defects) were caught 40/40 by both the panel and the single-agent fallback; the four subtler texts (20 defects) 19/20 by the panel's owning lenses (20/20 by any lens) and 20/20 by the single agent.
 
 ## The other texts
 
@@ -31,3 +31,7 @@ See `test/evals/human-writing/README.md`. The whole set of six texts and 40 defe
 | `article-04-git-undo` | how-to site | a question opener, an unsourced statistic, a destructive command without warning, a multi-action step with force-push, a false price, minimizers, a cheerleading sign-off |
 | `post-01-team-growth` | LinkedIn post | a question opener, a wrong headcount, a faux-insight setup, a confidential contract value, a link in the body, five hashtags, a second idea |
 | `post-02-oncall` | LinkedIn post with a voice profile | "half" for a one-third cut, a colleague's health detail, an off-voice paragraph, a misattributed quote, comment-gate bait |
+| `docs-02-csvdiff-readme` | README checked against `src/csvdiff.py` | an option described as comma-separated that is repeatable, an output format that doesn't exist, an undocumented encoding variable, a missing exit code, a data-structures lecture in a README, unexplained output symbols |
+| `docs-03-adr-queue` | ADR | two options rejected without reasons, a staging measurement stated as fact, an AWS account number, the idempotency requirement never addressed |
+| `docs-04-changelog` | changelog | a release without a date, a breaking change filed under Changed, an internal refactor users can't act on, a benchmark without its conditions |
+| `article-05-newsletter` | email newsletter | a clickbait subject, a second main idea, links with no reason to click, an unsourced statistic, the preview line spent on a greeting |
