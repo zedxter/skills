@@ -1,0 +1,47 @@
+{
+  "topic": "o2-devto",
+  "order": [
+    "skill",
+    "plain"
+  ],
+  "human": "skill",
+  "useful": "plain",
+  "overall": "skill",
+  "unsupported": {
+    "skill": [
+      "A heap snapshot needs about twice the current heap size and blocks the event loop (cited from Node docs, not in the notes)",
+      "A blocked event loop can fail the pod's liveness probe",
+      "Legitimate growth like warming caches, and the claim that an optional third snapshot shows which type keeps growing",
+      "The fix decrements when 'that socket emits close' (notes say the server's 'close' event; flagged in a TODO)"
+    ],
+    "plain": [
+      "Snapshots were taken 'while it was under normal traffic'",
+      "Snapshots were taken 'from the same running process'",
+      "Every one of these sockets was held by the array, found by clicking a Socket and opening the Retainers pane (the specific DevTools steps are not in the notes)",
+      "'Over three days that added up to 1.5 GB' attributed entirely to the retained sockets",
+      "'No more OOM kills, and no more restarts every three days'",
+      "'thousands of object types and millions of objects'",
+      "Things allocated and freed at a steady rate show a delta close to zero, so most of the noise disappears"
+    ]
+  },
+  "ai_tells": {
+    "skill": [
+      "Three warnings if you do this in production.",
+      "Almost all of it is supposed to be there."
+    ],
+    "plain": [
+      "In the end the bug was 12 lines of code. The more useful thing I learned was how to find it:",
+      "You're looking for something that grows inside a picture that doesn't move.",
+      "This looks reasonable, but",
+      "Knowing *what* leaked is half the answer.",
+      "It will probably save you a lot of time.",
+      "// \u274c Leaky",
+      "// \u2705 Fixed",
+      "Two things changed:"
+    ]
+  },
+  "why": {
+    "human": "A reads like a careful engineer: it is plain and hedged, it warns about production risks, and it questions its own notes (the 'close' contradiction). B has the polished template feel of bolded stats, \u274c/\u2705 code labels, a numbered DevTools tutorial and a generic takeaways list.",
+    "useful": "As published, B gives readers more: concrete ways to capture snapshots, step-by-step Comparison-view instructions, the Retainers pane, and a leaky-vs-fixed code pair. However, it repeats the notes' self-contradictory claim that 'close' never fires while the fix depends on 'close'."
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "topic": "o3-readme",
+  "order": [
+    "skill",
+    "plain"
+  ],
+  "human": "skill",
+  "useful": "tie",
+  "overall": "skill",
+  "unsupported": {
+    "skill": [],
+    "plain": [
+      "--dry-run exits 'without writing to S3' / 'Preview without writing anything' (the material only says it prints what would be exported and exits)",
+      "Lists specific boto3 credential sources ('environment variables, shared credentials/config files, instance/role credentials'), which is general boto3 knowledge and not from the material",
+      "1.x invocation shown as 'EXPORT_BUCKET=my-export-bucket python export.py public.orders' (an inferred usage pattern)"
+    ]
+  },
+  "ai_tells": {
+    "skill": [
+      "Replace the connection details and `YOUR_BUCKET` with your own."
+    ],
+    "plain": [
+      "The standard boto3 credential chain (environment variables, shared credentials/config files, instance/role credentials, etc.)",
+      "If your scripts, cron jobs or pipelines relied on `EXPORT_BUCKET`",
+      "# Preview without writing anything"
+    ]
+  },
+  "why": {
+    "human": "A reads like someone who knows what readers will ask. It gives a dry-run-first quick start, says 'Read this only if you have scripts or jobs written for a 1.x version', and its TODOs are specific, such as whether a dry run connects to the database or S3. B follows a standard template, with a configuration table, exit-codes and contact sections, and spells out boto3's credential chain in generic terms.",
+    "useful": "A's safe dry-run quick start and its note on whether a failed run is safe to re-run are practical. B's before/after migration example and grouped usage examples are also handy. B adds a small unsupported claim about dry-run behaviour, and A has a few more TODOs."
+  }
+}

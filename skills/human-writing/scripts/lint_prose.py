@@ -72,7 +72,7 @@ RULES = {r.id: r for r in [
     Rule("recap-ending", "warning", "warning", None, "Summary ending (\"In conclusion\", \"Ultimately\", \"The bottom line\")",
          "End on the last concrete point, takeaway or next action."),
     # Rhythm by rule
-    Rule("triad", "warning", "warning", None, "Groups of three over budget (1 per 250 words)", "Use two items, or four, or the one that matters."),
+    Rule("triad", "warning", "warning", None, "Groups of three over budget (1 per 400 words)", "Use two items, or four, or the one that matters."),
     Rule("fragment-stack", "warning", "warning", None, "Three or more fragments in a row (\"Fast. Cheap. Reliable.\")",
          "Write a full sentence that says how and why."),
     Rule("repeated-opener", "warning", "warning", "info", "Three or more sentences in a row start with the same word",
@@ -107,6 +107,12 @@ RULES = {r.id: r for r in [
     Rule("emoji-heading", "warning", "warning", "warning", "Emoji in a heading", "Remove it."),
     Rule("emoji-bullet", "warning", "info", "warning", "Emoji used as bullets", "Use plain list markers or prose."),
     Rule("heading-density", "warning", None, None, "Heading over a section of only a sentence or two", "Merge the section into its neighbour."),
+    Rule("list-heavy", "warning", None, None, "More list items than an article usually has (over 12 per 1,000 words)",
+         "Turn connected items back into paragraphs; keep lists for steps and truly parallel items."),
+    Rule("heading-heavy", "warning", None, None, "More headings than an article usually has (over 9 per 1,000 words)",
+         "Merge sections; an article is read top to bottom, not scanned like docs."),
+    Rule("generic", "warning", "warning", None, "Almost no names, numbers or dates in the whole piece",
+         "Add the specifics only this story has: the system, the number, the date, the person. Ask the author for them."),
     Rule("title-case-heading", "info", None, "info", "Heading in Title Case", "Use sentence case."),
     Rule("code-fence-lang", "warning", None, "warning", "Code block without a language tag", "Add the language after the opening fence."),
     # Leftovers from the chat
@@ -302,6 +308,7 @@ ABBREV = re.compile(r"\b(?:e\.g|i\.e|etc|vs|Mr|Mrs|Ms|Dr|St|approx|Fig|cf|a\.m|p
 INNER_DOT = re.compile(r"(?<=\w)[.](?=\w)")
 SENTENCE = re.compile(r"[^.!?]+(?:[.!?]+[\"”’)\]]*|$)")
 WORD = re.compile(r"[A-Za-z0-9][\w'’-]*")
+SPECIFIC_TOKEN = re.compile(r"[A-Za-z0-9][\w.+'’-]*")
 
 
 def _blank(s: str) -> str:
@@ -653,6 +660,7 @@ class Linter:
         self._passive()
         self._formatting()
         self._endings()
+        self._shape()
         if g == "post":
             self._post_rules()
         self._dedupe()
@@ -798,7 +806,7 @@ class Linter:
             for m in rx.finditer(seg):
                 if not re.search(r",\s*$", seg[:m.start()]):
                     hits.append((s.start + m.start(), s.start + m.end()))
-        budget = max(1, self.doc.words // 250)
+        budget = max(1, self.doc.words // 400)
         self.stats["triads"] = {"count": len(hits), "budget": budget}
         if len(hits) > budget:
             for s, e in hits:
@@ -850,6 +858,31 @@ class Linter:
                 m = PASSIVE.search(self.doc.prose, s.start, s.end)
                 if m:
                     self.add("passive", m.start(), m.end(), f"Passive voice ({len(passive)} of {len(sents)} sentences)")
+
+    def _shape(self) -> None:
+        """Whole-piece measures where human and model articles differ (see test/evals/human-writing/README.md)."""
+        d = self.doc
+        if d.words < 200:
+            return
+        per_k = 1000 / d.words
+        items = sum(1 for b in d.blocks if b.kind == "item")
+        heads = [b for b in d.blocks if b.kind == "heading"]
+        self.stats["shape"] = {"items_per_1k": round(items * per_k, 1), "headings_per_1k": round(len(heads) * per_k, 1)}
+        if items * per_k > 12 and items >= 6:
+            first = next(b for b in d.blocks if b.kind == "item")
+            self.add("list-heavy", first.start, first.end, f"{items} list items in {d.words} words")
+        if len(heads) * per_k > 9 and len(heads) >= 4:
+            self.add("heading-heavy", heads[0].start, heads[0].end, f"{len(heads)} headings in {d.words} words")
+        specific = 0
+        for s in d.sentences:
+            for t in SPECIFIC_TOKEN.findall(s.text)[1:]:
+                if t not in ("I", "I'm", "I’m", "I've", "I’ve", "I'd", "I’d", "I'll", "I’ll", "OK") and (t[0].isupper() or any(c.isdigit() for c in t)):
+                    specific += 1
+        self.stats["shape"]["specific_per_1k"] = round(specific * per_k, 1)
+        if specific * per_k < 6 and d.sentences:
+            first = d.sentences[0]
+            self.add("generic", first.start, first.end,
+                     f"{specific} names, numbers or dates in {d.words} words")
 
     def _formatting(self) -> None:
         d, g = self.doc, self.cfg.genre
