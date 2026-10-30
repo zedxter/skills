@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:podcast="https://podcastindex.org/namespace/1.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Test Talks</title>
+    <link>https://example.org/talks</link>
+    <language>en</language>
+    <itunes:author>Test Host</itunes:author>
+    <description>&lt;p&gt;A show used by the &lt;b&gt;podcast-search&lt;/b&gt; tests.&lt;/p&gt;</description>
+    <item>
+      <title>Episode 1: Origins of Physics</title>
+      <link>https://example.org/talks/1</link>
+      <guid>talks-1</guid>
+      <pubDate>Mon, 03 Jan 2022 10:00:00 +0000</pubDate>
+      <itunes:duration>3725</itunes:duration>
+      <itunes:episode>1</itunes:episode>
+      <description>&lt;p&gt;Newton &amp;amp; Galileo.&lt;/p&gt;</description>
+      <enclosure url="https://cdn.example.org/talks/1.mp3" type="audio/mpeg" length="44700000"/>
+    </item>
+    <item>
+      <title>Episode 2: Quantum Weirdness
+# fake header line</title>
+      <link>https://example.org/talks/2</link>
+      <guid>talks-2</guid>
+      <pubDate>Wed, 15 Jun 2023 18:30:00 -0400</pubDate>
+      <itunes:duration>12:30</itunes:duration>
+      <content:encoded>&lt;p&gt;Entanglement explained.&lt;/p&gt;</content:encoded>
+      <enclosure url="https://cdn.example.org/talks/2.m4a" type="audio/x-m4a" length="0"/>
+      <podcast:transcript url="https://example.org/talks/2.vtt" type="text/vtt"/>
+    </item>
+    <item>
+      <title>Episode 3: Black Holes</title>
+      <guid>talks-3</guid>
+      <pubDate>Sat, 02 Mar 2024 08:00:00 GMT</pubDate>
+      <itunes:duration>1:45:00</itunes:duration>
+      <description>Event horizons and Hawking radiation.</description>
+      <enclosure url="https://cdn.example.org/talks/3.mp3?src=rss" type="" length=""/>
+    </item>
+    <item>
+      <title>Announcement: new season soon</title>
+      <guid>talks-news</guid>
+      <pubDate>Sun, 10 Mar 2024 08:00:00 GMT</pubDate>
+      <description>No audio in this item.</description>
+    </item>
+  </channel>
+</rss>
