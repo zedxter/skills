@@ -1,0 +1,138 @@
+[
+  {
+    "agent": "claude",
+    "brief": "report",
+    "arm": "plain",
+    "pdf": false,
+    "cost_usd": 0.13708959999999998,
+    "skill_used": false
+  },
+  {
+    "agent": "claude",
+    "brief": "report",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.15024380000000004,
+    "skill_used": true,
+    "pages": 2,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "LibertinusSerif-Regular-Identity-H",
+      "LibertinusSerif-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "invoice",
+    "arm": "plain",
+    "pdf": true,
+    "cost_usd": 0.18376580000000003,
+    "skill_used": false,
+    "pages": 1,
+    "errors": [
+      "font-not-embedded"
+    ],
+    "warnings": [
+      "no-author",
+      "no-lang",
+      "no-title",
+      "untagged"
+    ],
+    "fonts": [
+      "Helvetica",
+      "Helvetica-Bold"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "invoice",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.09998580000000001,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "LibertinusSerif-Bold-Identity-H",
+      "LibertinusSerif-Regular-Identity-H",
+      "LibertinusSerif-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "cv",
+    "arm": "plain",
+    "pdf": true,
+    "cost_usd": 0.26372229999999997,
+    "skill_used": false,
+    "pages": 1,
+    "errors": [
+      "font-not-embedded"
+    ],
+    "warnings": [
+      "no-author",
+      "no-lang",
+      "untagged"
+    ],
+    "fonts": [
+      "Helvetica",
+      "Helvetica-Bold"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "cv",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.1111642,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "onepager",
+    "arm": "plain",
+    "pdf": true,
+    "cost_usd": 0.1865022,
+    "skill_used": false,
+    "pages": 1,
+    "errors": [
+      "font-not-embedded"
+    ],
+    "warnings": [
+      "no-author",
+      "no-lang",
+      "no-title",
+      "untagged"
+    ],
+    "fonts": [
+      "Helvetica",
+      "Helvetica-Bold"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "onepager",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.1668113,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  }
+]

@@ -1,0 +1,37 @@
+{
+ "seller": {
+  "name": "Studio Nord GmbH",
+  "address": "Torstraße 12, 10119 Berlin",
+  "vat_id": "DE312345678",
+  "iban": "DE89 3704 0044 0532 0130 00"
+ },
+ "buyer": {
+  "name": "Acme GmbH",
+  "address": "Kastanienallee 7, 10435 Berlin",
+  "vat_id": "DE298765432"
+ },
+ "number": "2026-041",
+ "date": "2026-10-30",
+ "due": "2026-11-29",
+ "currency": "EUR",
+ "lines": [
+  {
+   "description": "UX audit of the checkout flow",
+   "qty": 1,
+   "unit_price": 2400
+  },
+  {
+   "description": "Design system workshop (per day)",
+   "qty": 3,
+   "unit_price": 1150
+  },
+  {
+   "description": "Prototype iterations",
+   "qty": 12.5,
+   "unit_price": 95
+  }
+ ],
+ "vat_rate": 19,
+ "notes": "Thank you for your business.",
+ "service_date": "2026-10"
+}

@@ -1,0 +1,150 @@
+[
+  {
+    "agent": "codex",
+    "brief": "report",
+    "arm": "plain",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": false,
+    "pages": 1,
+    "errors": [
+      "font-not-embedded"
+    ],
+    "warnings": [
+      "no-lang",
+      "untagged"
+    ],
+    "fonts": [
+      "DejaVuSans",
+      "DejaVuSans-Bold",
+      "Helvetica"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "report",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "invoice",
+    "arm": "plain",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": false,
+    "pages": 1,
+    "errors": [
+      "font-not-embedded"
+    ],
+    "warnings": [
+      "no-lang",
+      "untagged"
+    ],
+    "fonts": [
+      "Helvetica",
+      "Roboto-Bold",
+      "Roboto-Regular"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "invoice",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "cv",
+    "arm": "plain",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": false,
+    "pages": 1,
+    "errors": [
+      "font-not-embedded"
+    ],
+    "warnings": [
+      "no-lang",
+      "untagged"
+    ],
+    "fonts": [
+      "Helvetica",
+      "Roboto-Bold",
+      "Roboto-Medium",
+      "Roboto-Regular"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "cv",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "onepager",
+    "arm": "plain",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": false,
+    "pages": 1,
+    "errors": [
+      "font-not-embedded"
+    ],
+    "warnings": [
+      "no-lang",
+      "untagged"
+    ],
+    "fonts": [
+      "Helvetica",
+      "Helvetica-Bold"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "onepager",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  }
+]

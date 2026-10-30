@@ -1,0 +1,30 @@
+[
+  {
+    "id": "report",
+    "files": {
+      "notes.md": "# Квартальный отчёт команды платформы, Q3 2026\n\n- Переехали CI с Jenkins на GitHub Actions: среднее время сборки 18 мин → 7 мин.\n- Инциденты: 4 (Q2: 9). Самый долгий — 3 ч 20 мин, отказ кэша Redis 14 августа.\n- Стоимость инфраструктуры: 41 200 € в месяц (Q2: 47 800 €), экономия за счёт spot-инстансов.\n- Команда: 7 человек, один ушёл, двое пришли.\n- Таблица SLO по сервисам: api — цель 99,9 %, факт 99,95 %; auth — 99,95 % / 99,91 %; billing — 99,9 % / 99,97 %; search — 99,5 % / 99,62 %.\n- Планы на Q4: миграция на PostgreSQL 17, единый журнал аудита, дежурства 1 неделя вместо 2.\n- Риски: вендор логов поднимает цены на 30 % с января; нужен план Б.\n"
+    },
+    "prompt": "Make a professional-looking PDF report from notes.md in this folder (the notes are in Russian; keep the report in Russian)."
+  },
+  {
+    "id": "invoice",
+    "files": {
+      "order.json": "{\"seller\": {\"name\": \"Studio Nord GmbH\", \"address\": \"Torstraße 12, 10119 Berlin\", \"vat_id\": \"DE312345678\", \"iban\": \"DE89 3704 0044 0532 0130 00\"},\n \"buyer\": {\"name\": \"Acme Ltd\", \"address\": \"1 King St, London EC2V 8AU\", \"vat_id\": \"GB123456789\"},\n \"number\": \"2026-041\", \"date\": \"2026-10-30\", \"due\": \"2026-11-29\", \"currency\": \"EUR\",\n \"lines\": [{\"description\": \"UX audit of the checkout flow\", \"qty\": 1, \"unit_price\": 2400},\n           {\"description\": \"Design system workshop (per day)\", \"qty\": 3, \"unit_price\": 1150},\n           {\"description\": \"Prototype iterations\", \"qty\": 12.5, \"unit_price\": 95}],\n \"vat_rate\": 19, \"notes\": \"Reverse charge may apply for B2B services within the EU.\"}\n"
+    },
+    "prompt": "Make a professional PDF invoice from order.json in this folder."
+  },
+  {
+    "id": "cv",
+    "files": {
+      "cv.txt": "Jane Example — Staff Software Engineer\njane@example.com · +44 20 7946 0000 · London · github.com/jexample\n\nBackend engineer, ten years in payments and data pipelines.\n\nAcme Payments, Staff Engineer, Mar 2021 – now (London)\n- Tech lead for the ledger and export platform, 12 engineers\n- Cut the nightly export from 9 hours to 41 minutes with a streaming queue worker\n- Idempotent batch writes: zero double-counted invoices since 2024\n- Mentored four engineers to senior\n\nShopfront, Senior Engineer, Sep 2016 – Feb 2021\n- Order pipeline on PostgreSQL and Kafka, 40k orders/hour peak\n- Led the move from a monolith to six services\n\nBSc Computer Science, University of Manchester, 2012–2016, First class\nSkills: Go, Python, SQL, TypeScript; PostgreSQL, Kafka, Kubernetes, Terraform\nLanguages: English (native), German (professional)\nCertified Kubernetes Administrator (CNCF, 2023)\n"
+    },
+    "prompt": "Turn cv.txt in this folder into a polished, professional-looking one-page CV as a PDF."
+  },
+  {
+    "id": "onepager",
+    "files": {
+      "summary.txt": "Queue worker for the nightly export — project summary for the leadership meeting, October 2026.\nProblem: the nightly export loaded the whole invoices table into memory; 9 hours, 14.2 GB peak memory, 6 failed runs in Q3, retried runs double-counted invoices.\nWhat we built: a queue worker streaming rows in batches of 5,000; a run id on every batch so retries are safe; at most 20 batches in flight.\nResults: runtime 9 h -> 41 min; peak memory 14.2 GB -> 380 MB; failed runs 6 -> 0.\nAsks: decide by 15 November whether credit notes go into the same export; keep the old cron job one more quarter as a fallback.\nContact: Platform team, platform@example.com\n"
+    },
+    "prompt": "Make a one-page PDF handout for a leadership meeting from summary.txt in this folder."
+  }
+]

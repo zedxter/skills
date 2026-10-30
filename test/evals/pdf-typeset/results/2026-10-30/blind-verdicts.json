@@ -1,0 +1,197 @@
+{
+  "round1": [
+    {
+      "pair": "pair-1",
+      "agent": "claude",
+      "brief": "invoice",
+      "A": "skill",
+      "B": "plain",
+      "winner_label": "B",
+      "winner": "plain"
+    },
+    {
+      "pair": "pair-2",
+      "agent": "claude",
+      "brief": "cv",
+      "A": "plain",
+      "B": "skill",
+      "winner_label": "A",
+      "winner": "plain"
+    },
+    {
+      "pair": "pair-3",
+      "agent": "claude",
+      "brief": "onepager",
+      "A": "plain",
+      "B": "skill",
+      "winner_label": "B",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-4",
+      "agent": "codex",
+      "brief": "report",
+      "A": "skill",
+      "B": "plain",
+      "winner_label": "A",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-5",
+      "agent": "codex",
+      "brief": "invoice",
+      "A": "plain",
+      "B": "skill",
+      "winner_label": "A",
+      "winner": "plain"
+    },
+    {
+      "pair": "pair-6",
+      "agent": "codex",
+      "brief": "cv",
+      "A": "plain",
+      "B": "skill",
+      "winner_label": "A",
+      "winner": "plain"
+    },
+    {
+      "pair": "pair-7",
+      "agent": "codex",
+      "brief": "onepager",
+      "A": "skill",
+      "B": "plain",
+      "winner_label": "B",
+      "winner": "plain"
+    }
+  ],
+  "round2": [
+    {
+      "pair": "pair-1",
+      "agent": "claude",
+      "brief": "cv",
+      "X": "plain",
+      "Y": "skill",
+      "winner_label": "X",
+      "winner": "plain"
+    },
+    {
+      "pair": "pair-2",
+      "agent": "claude",
+      "brief": "onepager",
+      "X": "plain",
+      "Y": "skill",
+      "winner_label": "Y",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-3",
+      "agent": "claude",
+      "brief": "invoice",
+      "X": "plain",
+      "Y": "skill",
+      "winner_label": "Y",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-4",
+      "agent": "codex",
+      "brief": "report",
+      "X": "plain",
+      "Y": "skill",
+      "winner_label": "X",
+      "winner": "plain"
+    },
+    {
+      "pair": "pair-5",
+      "agent": "codex",
+      "brief": "onepager",
+      "X": "skill",
+      "Y": "plain",
+      "winner_label": "X",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-6",
+      "agent": "codex",
+      "brief": "cv",
+      "X": "skill",
+      "Y": "plain",
+      "winner_label": "Y",
+      "winner": "plain"
+    },
+    {
+      "pair": "pair-7",
+      "agent": "codex",
+      "brief": "invoice",
+      "X": "plain",
+      "Y": "skill",
+      "winner_label": "X",
+      "winner": "plain"
+    }
+  ],
+  "round3": [
+    {
+      "pair": "pair-1",
+      "agent": "claude",
+      "brief": "onepager",
+      "P": "skill",
+      "Q": "plain",
+      "winner_label": "P",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-2",
+      "agent": "codex",
+      "brief": "invoice",
+      "P": "skill",
+      "Q": "plain",
+      "winner_label": "P",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-3",
+      "agent": "codex",
+      "brief": "report",
+      "P": "skill",
+      "Q": "plain",
+      "winner_label": "P",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-4",
+      "agent": "claude",
+      "brief": "invoice",
+      "P": "skill",
+      "Q": "plain",
+      "winner_label": "P",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-5",
+      "agent": "codex",
+      "brief": "cv",
+      "P": "skill",
+      "Q": "plain",
+      "winner_label": "tie",
+      "winner": "tie"
+    },
+    {
+      "pair": "pair-6",
+      "agent": "codex",
+      "brief": "onepager",
+      "P": "plain",
+      "Q": "skill",
+      "winner_label": "Q",
+      "winner": "skill"
+    },
+    {
+      "pair": "pair-7",
+      "agent": "claude",
+      "brief": "cv",
+      "P": "plain",
+      "Q": "skill",
+      "winner_label": "Q",
+      "winner": "skill"
+    }
+  ]
+}
