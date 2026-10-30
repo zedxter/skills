@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. Needs ffmpeg/ffprobe on PATH (brew/apt/winget install ffmpeg) and network access to YouTube. A JavaScript runtime (deno, node or bun) lets yt-dlp see every YouTube format. YouTube bot-checks some IPs (often cloud/VPN); then the user's own browser cookies (--cookies-from-browser) or a proxy are needed.
 metadata:
   author: zedxter
-  version: "1.0.0"
+  version: "1.0.1"
   source: https://github.com/zedxter/skills
 ---
 
@@ -26,8 +26,8 @@ machine; no API key, no conversion website, no upload anywhere.
 - "Split this album/mix/course into tracks" (`--split-chapters`, when the
   video has chapters; check with `--info`).
 - A playlist or channel's latest uploads as audio (bounded by `--max-items`).
-- Audio for a local speech-to-text tool when `youtube-transcript` reports that
-  the video has no captions.
+- The audio file itself for a video without captions; for the text, use
+  `transcribe-audio` directly.
 
 Not for: the transcript or a summary (`youtube-transcript` reads captions
 without downloading anything), finding videos (`youtube-search`), video files,
@@ -170,6 +170,7 @@ failure's.
 
 - `youtube-search` → pick a video → `youtube-audio` (or `youtube-transcript`
   for the text).
-- `youtube-transcript` exit "no transcript" → `youtube-audio` → a local
-  speech-to-text tool on the saved file.
+- `youtube-transcript` exit "no transcript" → `transcribe-audio` (it fetches
+  the audio itself; use `youtube-audio` first only when the user also wants
+  the file).
 - `--info` before `--split-chapters` or `--start/--end` to choose timestamps.
