@@ -9,7 +9,8 @@
 A probe is a short real command per skill, judged by its exit code: 0 is "ok"; 4 (blocked or rate-limited) and 6
 (network) are "blocked" - the source refused this machine's network, which on CI runners is often a datacenter-IP
 policy rather than a broken skill; anything else, a timeout included, is "broken". When the command is ok, the
-skill's live pytest suite (its *_LIVE=1 tests) runs too and must pass at least one test.
+skill's live pytest suite (its *_LIVE=1 tests) runs too and must pass at least one test; when its only failures are
+the script exiting 4 or 6, the suite counts as "blocked", like the command.
 """
 
 import argparse
@@ -196,12 +197,33 @@ def verdict(code: int | str) -> str:
 
 
 def run_probe(cmd: list[str], timeout: int, env: dict[str, str] | None = None) -> tuple[int | str, str]:
-    """(exit code or "timeout", the end of the output)."""
+    """(exit code or "timeout", the whole output)."""
     try:
         r = subprocess.run(cmd, cwd=ROOT, timeout=timeout, env={**os.environ, **(env or {})}, **RUN)
     except subprocess.TimeoutExpired:
         return "timeout", f"no answer within {timeout} s"
-    return r.returncode, (r.stdout[-300:] + "\n" + r.stderr).strip()[-600:]
+    return r.returncode, (r.stdout + "\n" + r.stderr).strip()
+
+
+def live_verdict(code: int | str, out: str) -> str:
+    r"""A live pytest run: "ok" when it passed at least one test (all skipped or none selected is not a pass);
+    "blocked" when every failure is a script exiting 4 or 6 (pytest prints "assert 6 == 0" for the live tests'
+    `returncode == 0` checks), the same split as the commands; otherwise "broken".
+
+    >>> live_verdict(1, "E       assert 6 == 0\n1 failed")
+    'blocked'
+    >>> live_verdict(1, "E       assert 6 == 0\nE       assert 7 == 0\n2 failed")
+    'broken'
+    >>> live_verdict(0, "3 skipped")
+    'broken'
+    """
+    if code == 0 and re.search(r"\b\d+ passed\b", out):
+        return "ok"
+    exits = re.findall(r"\bassert (\d+) == 0\b", out)
+    failed = re.search(r"\b(\d+) failed\b", out)
+    if exits and failed and all(e in ("4", "6") for e in exits) and len(exits) >= int(failed[1]):
+        return "blocked"
+    return "broken"
 
 
 def cmd_probe(args: argparse.Namespace) -> int:
@@ -212,7 +234,7 @@ def cmd_probe(args: argparse.Namespace) -> int:
         start = time.monotonic()
         code, out = run_probe(["uv", "run", "-q", str(script), *argv[1:]], 300)
         results.append({"skill": skill, "kind": "command", "command": " ".join(["scripts/" + argv[0], *argv[1:]]),
-                        "exit": code, "verdict": verdict(code), "output": out,
+                        "exit": code, "verdict": verdict(code), "output": out[-600:],
                         "seconds": round(time.monotonic() - start, 1)})
         print(f"{results[-1]['verdict']:8} {skill:20} command    exit {code}", flush=True)
         # The live suite repeats what the command found when the source refused this network: skip it then.
@@ -223,9 +245,8 @@ def cmd_probe(args: argparse.Namespace) -> int:
                 cmd += ["--with", d]
             start = time.monotonic()
             code, out = run_probe(cmd + PY + ["-rs", "-k", "live", test_file], 900, {live_env: "1"})
-            ran = code == 0 and re.search(r"\b\d+ passed\b", out)  # all skipped or none selected is not a pass
             results.append({"skill": skill, "kind": "live tests", "command": f"{live_env}=1 pytest -k live {test_file}",
-                            "exit": code, "verdict": "ok" if ran else "broken", "output": out,
+                            "exit": code, "verdict": live_verdict(code, out), "output": out[-600:],
                             "seconds": round(time.monotonic() - start, 1)})
             print(f"{results[-1]['verdict']:8} {skill:20} live tests exit {code}", flush=True)
     if args.json:
