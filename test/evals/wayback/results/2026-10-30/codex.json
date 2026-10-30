@@ -1,0 +1,114 @@
+[
+  {
+    "id": "t1-dead-link",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t2-changed",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t4-save",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t5-old-pdfs",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t6-prove",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "n1-read-live",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-git-history",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-backup",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-explain",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "t7-old-docs-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "n5-live-url",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n6-git-log",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n7-archive-email",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

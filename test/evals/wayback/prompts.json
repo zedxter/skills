@@ -1,0 +1,72 @@
+[
+  {
+    "id": "t1-dead-link",
+    "expect": true,
+    "prompt": "This link from my 2019 notes is dead now: https://blog.example.org/2019/launch-notes. Can you find what the page said?"
+  },
+  {
+    "id": "t2-changed",
+    "expect": true,
+    "prompt": "When did example.com change its homepage text over the last ten years? Use the Internet Archive."
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Что было на странице https://example.com/pricing в марте 2021 года? Посмотри в веб-архиве."
+  },
+  {
+    "id": "t4-save",
+    "expect": true,
+    "prompt": "Archive https://example.com/terms in the Wayback Machine so we have a timestamped copy."
+  },
+  {
+    "id": "t5-old-pdfs",
+    "expect": true,
+    "prompt": "Which PDF files did example.com host in the past, according to archived snapshots?"
+  },
+  {
+    "id": "t6-prove",
+    "expect": true,
+    "prompt": "I need proof of what https://example.com/ said on 15 June 2015, with a link I can cite."
+  },
+  {
+    "id": "n1-read-live",
+    "expect": false,
+    "prompt": "Summarise the tool.py file in this folder in three bullet points."
+  },
+  {
+    "id": "n2-git-history",
+    "expect": false,
+    "prompt": "Show how CHANGELOG.md in this folder changed between versions 1.0 and 2.0, based on the file itself."
+  },
+  {
+    "id": "n3-backup",
+    "expect": false,
+    "prompt": "Write a Python script that backs up a local folder to a tar.gz archive with today's date in the name."
+  },
+  {
+    "id": "n4-explain",
+    "expect": false,
+    "prompt": "What is the difference between a WARC file and a ZIP archive? Two sentences, from what you know."
+  },
+  {
+    "id": "t7-old-docs-ru",
+    "expect": true,
+    "prompt": "Найди старую версию документации https://docs.example.com/v1/ — сейчас там уже v3."
+  },
+  {
+    "id": "n5-live-url",
+    "expect": false,
+    "prompt": "Summarise this page for me: https://docs.python.org/3/whatsnew/3.13.html"
+  },
+  {
+    "id": "n6-git-log",
+    "expect": false,
+    "prompt": "Show how README.md changed over time in this git repository."
+  },
+  {
+    "id": "n7-archive-email",
+    "expect": false,
+    "prompt": "How do I archive an email thread in Gmail so it leaves the inbox? Two sentences."
+  }
+]
