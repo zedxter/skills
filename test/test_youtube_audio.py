@@ -1,6 +1,6 @@
 """Tests for skills/youtube-audio/scripts/audio.py.
 
-Run: uv run --with pytest --with 'yt-dlp[default]' --with mutagen python -I -m pytest test/test_youtube_audio.py -q
+Run: python3 test/ops.py test youtube-audio   (yt-dlp with the non-GPL part of its default extra)
 
 YouTube itself is not contacted: it bot-checks many IPs, so the download pipeline is
 exercised with info dicts shaped like YouTube's (formats, thumbnail, chapters) whose
@@ -229,3 +229,58 @@ def test_page_text_cannot_forge_report_lines():
 def test_failed_record_reports_in_info_mode_too():
     failed = [{"ok": False, "url": "u", "error": {"code": 5, "kind": "login_required", "message": "m", "hint": "h"}}]
     assert ya.human(failed, args_for("--info")) == "failed: u: login_required — m\n"  # used to raise KeyError
+
+
+# ------------------------------------------------------------------ cover art without mutagen (GPL)
+
+def streams(path):
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                          "stream=codec_type:stream_disposition=attached_pic:stream_tags=title,artist:format_tags=title,artist",
+                          "-of", "json", str(path)], capture_output=True, text=True, check=True).stdout
+    return json.loads(out)
+
+
+@ffmpeg
+@pytest.mark.parametrize("ext,codec", [("opus", "libopus"), ("flac", "flac"), ("m4a", "aac")])
+def test_cover_is_embedded_with_ffmpeg(tmp_path, ext, codec):
+    import os
+    audio = tmp_path / f"a.{ext}"
+    chapters = tmp_path / "chapters.txt"  # the files the skill writes carry chapters: [CHAPTER] sections in the tags
+    chapters.write_text(";FFMETADATA1\ntitle=Täst; = #1\nartist=Chan\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\n"
+                        "title=Intro\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=500\nEND=1000\ntitle=Rest\n", encoding="utf-8")
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "sine=duration=1", "-f", "ffmetadata",
+                    "-i", str(chapters), "-map", "0:a", "-map_metadata", "1", "-map_chapters", "1", "-c:a", codec,
+                    "-metadata", "title=Täst; = #1", "-metadata", "artist=Chan", str(audio)], check=True)
+    cover = tmp_path / "a.jpg"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=red:s=320x180", "-frames:v", "1",
+                    str(cover)], check=True)
+    os.utime(audio, (1_000_000_000, 1_000_000_000))
+    pp = ya.CoverPP(None, already_have_thumbnail=True)
+    pp.report_warning = lambda m: pytest.fail(m)
+    for _ in range(2):  # a rerun replaces the cover instead of adding a second one
+        files, info = pp.run({"ext": ext, "filepath": str(audio), "thumbnails": [{"filepath": str(cover)}]})
+    d = streams(audio)
+    pics = [s for s in d["streams"] if s["codec_type"] == "video"]
+    assert len(pics) == 1 and pics[0]["disposition"]["attached_pic"] == 1
+    tags = {**d["format"].get("tags", {}), **next(s for s in d["streams"] if s["codec_type"] == "audio").get("tags", {})}
+    assert {k.lower(): v for k, v in tags.items()}["title"] == "Täst; = #1"
+    assert audio.stat().st_mtime == 1_000_000_000 and files == []
+    chap = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_chapters", "-of", "json", str(audio)],
+                                     capture_output=True, text=True, check=True).stdout)["chapters"]
+    if ext != "flac":  # ffmpeg writes no chapters into FLAC at all, with or without a cover
+        assert [c["tags"]["title"] for c in chap] == ["Intro", "Rest"]  # they survive, without the picture in them
+
+
+def test_picture_block_round_trip():
+    import base64
+    import struct
+    jpg = b"\xff\xd8\xff\xe0" + b"x" * 300_000  # a large cover: far over a command line's limit as base64
+    raw = base64.b64decode(ya.picture_block(jpg))
+    kind, mlen = struct.unpack(">II", raw[:8])
+    assert kind == 3 and raw[8:8 + mlen] == b"image/jpeg" and raw.endswith(jpg)
+    assert ya.ffmetadata_escape("a=b;c#d\\e\nf") == "a\\=b\;c\\#d\\\\e\\\nf"
+
+
+def test_the_skill_installs_no_mutagen():
+    header = (Path(__file__).resolve().parents[1] / "skills/youtube-audio/scripts/audio.py").read_text().split("# ///")[1]
+    assert "mutagen" not in header.split("dependencies")[1] and "yt-dlp[default]" not in header

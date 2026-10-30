@@ -107,9 +107,11 @@ copyleft code by default:
   its user. Tools used only by the tests are not covered; for example, the
   `anki-deck` tests import Anki's own library (AGPL) to check that decks open.
 
-Known exception, to be fixed: `yt-dlp[default]` pulls in `mutagen`
-(GPL-2.0+), which yt-dlp uses to embed cover art and tags. This affects
-`youtube-audio`, which also lists it explicitly, and `transcribe-audio`.
+`yt-dlp[default]` is not used, because it brings `mutagen` (GPL-2.0+). Skills
+that need yt-dlp list the rest of that extra themselves
+(`yt-dlp-ejs brotli certifi pycryptodomex requests urllib3 websockets`), and
+`youtube-audio` embeds cover art with ffmpeg. `python3 test/ops.py validate`
+rejects these packages and a few other copyleft ones in a script's dependencies.
 
 ## Sources and etiquette
 

@@ -1,6 +1,6 @@
 """Tests for skills/transcribe-audio/scripts/transcribe.py.
 
-Run: uv run --no-project --with pytest --with faster-whisper --with 'yt-dlp[default]' python -I -m pytest \
+Run: python3 test/ops.py test transcribe-audio, or uv run --no-project --with pytest --with faster-whisper --with yt-dlp python -I -m pytest \
          test/test_transcribe_audio.py -q --doctest-modules skills/transcribe-audio/scripts/transcribe.py
 
 Speech tests need the `tiny` model (78 MB) in the Hugging Face cache and skip otherwise; fetch it once with

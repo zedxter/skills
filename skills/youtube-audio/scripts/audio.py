@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["yt-dlp[default]>=2025.10.22", "mutagen>=1.47"]
+# # yt-dlp's "default" extra without mutagen (GPL): cover art is embedded with ffmpeg instead (CoverPP).
+# dependencies = ["yt-dlp>=2025.10.22", "yt-dlp-ejs", "brotli", "certifi", "pycryptodomex", "requests>=2.32.2,<3", "urllib3>=2.0.2,<3", "websockets>=13"]
 # ///
 """Save the audio track of a YouTube video (or playlist) as m4a/opus, or convert it to mp3.
 
@@ -40,9 +41,10 @@ EXIT_OK, EXIT_BAD_INPUT, EXIT_NO_AUDIO, EXIT_BLOCKED, EXIT_UNAVAILABLE, EXIT_NET
 try:
     import yt_dlp
     from yt_dlp.postprocessor.common import PostProcessor
+    from yt_dlp.postprocessor.embedthumbnail import EmbedThumbnailPP
     from yt_dlp.utils import DownloadError, PostProcessingError
 except ImportError:
-    sys.stderr.write("error: missing dependency yt-dlp; run with `uv run audio.py …` or `pip install 'yt-dlp[default]' mutagen`\n")
+    sys.stderr.write("error: missing dependency yt-dlp; run with `uv run audio.py …` or `pip install yt-dlp yt-dlp-ejs brotli certifi pycryptodomex requests urllib3 websockets`\n")
     sys.exit(EXIT_BAD_INPUT)
 
 VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -51,7 +53,7 @@ LOSSY = {"mp3", "m4a", "opus"}
 DEFAULT_MAX_ITEMS = 25
 FFMPEG_HINT = ("ffmpeg is required for this (conversion, cutting, chapters, cover art); install it: "
                "macOS `brew install ffmpeg`, Debian/Ubuntu `sudo apt install ffmpeg`, Windows `winget install ffmpeg`")
-UPDATE_HINT = "YouTube changes often; update yt-dlp (uv run picks the newest allowed release; with pip: pip install -U 'yt-dlp[default]')"
+UPDATE_HINT = "YouTube changes often; update yt-dlp (uv run picks the newest allowed release; with pip: pip install -U yt-dlp yt-dlp-ejs)"
 
 # Ordered (pattern, exit code, kind, hint). First match wins; matched against yt-dlp's error text.
 ERROR_RULES: list[tuple[str, int, str, str]] = [
@@ -294,6 +296,78 @@ class TrimPP(PostProcessor):
         return [], info
 
 
+def picture_block(image: bytes) -> str:
+    """A FLAC/Vorbis METADATA_BLOCK_PICTURE (front cover) as base64, the form Ogg Opus and Vorbis files carry it in.
+
+    >>> import base64; b = base64.b64decode(picture_block(b"\\x89PNG\\r\\n\\x1a\\n..."))
+    >>> b[:4], b[8:17], b[-11:]
+    (b'\\x00\\x00\\x00\\x03', b'image/png', b'\\x89PNG\\r\\n\\x1a\\n...')
+    """
+    import base64
+    import struct
+    mime = b"image/png" if image.startswith(b"\x89PNG") else b"image/jpeg"
+    block = (struct.pack(">II", 3, len(mime)) + mime + struct.pack(">I", 0)  # type 3 = front cover; no description
+             + struct.pack(">IIIII", 0, 0, 0, 0, len(image)) + image)  # size and depth unknown: players read the image
+    return base64.b64encode(block).decode("ascii")
+
+
+def ffmetadata_escape(value: str) -> str:
+    return re.sub(r"([=;#\\\n])", r"\\\1", value)
+
+
+ATTACHED_PIC = {"flac", "m4a", "mp4", "m4v", "mov"}  # containers where ffmpeg stores the cover as a picture stream
+OGG = {"opus", "ogg"}                                # Ogg keeps it as a base64 METADATA_BLOCK_PICTURE comment
+
+
+class CoverPP(EmbedThumbnailPP):
+    """yt-dlp's cover embedding without mutagen (GPL), so the skill installs no GPL code: m4a, FLAC and Ogg are done
+    here with ffmpeg (yt-dlp's own ffmpeg fallback fails for m4a); mp3 and mkv go through yt-dlp's ffmpeg path."""
+
+    def run(self, info: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+        if info.get("ext") not in ATTACHED_PIC | OGG:
+            return super().run(info)
+        import subprocess
+        import tempfile
+        thumbs = [t for t in info.get("thumbnails") or [] if t.get("filepath") and os.path.exists(t["filepath"])]
+        if not thumbs:
+            return [], info
+        cover = thumbs[-1]["filepath"]
+        src = Path(info["filepath"])
+        mtime = src.stat().st_mtime  # kept, as yt-dlp keeps it: a rerun must not look like a new download
+        tmp = src.with_name(src.stem + ".cover" + src.suffix)
+        if info["ext"] in ATTACHED_PIC:
+            cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-i", cover, "-map", "0:a", "-map", "1",
+                   "-c", "copy", "-disposition:v", "attached_pic", "-metadata:s:v", "title=Album cover",
+                   "-metadata:s:v", "comment=Cover (front)", str(tmp)]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+        else:
+            # Ogg carries the picture as a base64 comment, often over 100 KB: too long for a command line, so it
+            # goes in through an ffmetadata file, next to the tags the file already has.
+            dump = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(src), "-f", "ffmetadata", "-"],
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace")
+            lines = [ln for ln in (dump.stdout if dump.returncode == 0 else ";FFMETADATA1").split("\n")
+                     if not ln.upper().startswith("METADATA_BLOCK_PICTURE=")]  # one cover
+            # A global key must come before the first [CHAPTER] or [STREAM] section, or it belongs to that section.
+            at = next((i for i, ln in enumerate(lines) if ln.startswith("[")), len(lines))
+            lines.insert(at, "METADATA_BLOCK_PICTURE=" + ffmetadata_escape(picture_block(Path(cover).read_bytes())))
+            meta = "\n".join(lines).rstrip("\n") + "\n"
+            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as fh:
+                fh.write(meta)
+            try:
+                cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-f", "ffmetadata", "-i", fh.name,
+                       "-map", "0:a", "-c", "copy", "-map_metadata", "1", str(tmp)]
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+            finally:
+                os.unlink(fh.name)
+        if proc.returncode != 0 or not tmp.exists() or tmp.stat().st_size == 0:
+            tmp.unlink(missing_ok=True)
+            self.report_warning(f"could not embed the cover: {(proc.stderr or '').strip()[:200]}")
+            return [], info
+        os.replace(tmp, src)
+        self.try_utime(str(src), mtime, mtime)
+        return ([] if self._already_have_thumbnail else [cover]), info
+
+
 class QuietLogger:
     """yt-dlp logger that swallows its own output; failures surface as DownloadError and get one `error:` line."""
 
@@ -325,6 +399,10 @@ def short_message(text: str) -> str:
 def make_ydl(args: argparse.Namespace, out_dir: Path) -> Any:
     """A YoutubeDL with the run's options plus the section cutter right after the audio conversion."""
     ydl = yt_dlp.YoutubeDL(build_opts(args, out_dir))
+    chain = ydl._pps["post_process"]
+    for i, pp in enumerate(chain):  # cover art without mutagen for Ogg and FLAC
+        if type(pp).__name__ == "EmbedThumbnailPP":
+            chain[i] = CoverPP(ydl, already_have_thumbnail=pp._already_have_thumbnail)
     if args.start is not None or args.end is not None:
         # post_process hooks run in registration order; insert the cutter right after FFmpegExtractAudio
         chain = ydl._pps["post_process"]

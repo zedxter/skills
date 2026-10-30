@@ -35,6 +35,8 @@ AGENT_SPECIFIC = re.compile(r"(?i:\.claude\b|\.codex\b|\.gemini\b|\bopencode\b|/
 AGENT_DIRS_MARK = re.compile(r"#\s*agent-dirs\s*$")
 TEXT_FILES = {".md", ".py", ".typ", ".txt", ".json", ".yaml", ".yml", ".toml"}
 SKILLS_REF = "skills-ref==0.1.1"
+# GPL/AGPL packages (or extras that pull them in) a skill must not install; see CONTRIBUTING.md.
+COPYLEFT = {"mutagen", "piper-tts", "gallery-dl", "patool", "pymupdf", "ebooklib", "fitz"}
 RUN = {"capture_output": True, "text": True, "encoding": "utf-8", "errors": "replace"}
 PY = ["python", "-I", "-m", "pytest", "-q", "-p", "no:cacheprovider"]
 
@@ -49,7 +51,8 @@ SUITES = {
     "podcast-search": (["feedparser"], ["skills/podcast-search/scripts/podcast.py"]),
     "scholar-search": ([], ["skills/scholar-search/scripts/scholar.py"]),
     "telegram-channel": (["beautifulsoup4"], ["skills/telegram-channel/scripts/channel.py"]),
-    "transcribe-audio": (["faster-whisper", "yt-dlp[default]"], ["skills/transcribe-audio/scripts/transcribe.py"]),
+    "transcribe-audio": (["faster-whisper", "yt-dlp", "yt-dlp-ejs", "brotli", "certifi", "pycryptodomex", "requests", "urllib3", "websockets"],
+                         ["skills/transcribe-audio/scripts/transcribe.py"]),
     "wayback": ([], ["skills/wayback/scripts/wayback.py"]),
     "weather": ([], []),
     "web-browse": (["playwright", "curl_cffi", "trafilatura", "lxml_html_clean", "pypdf"], []),
@@ -58,7 +61,7 @@ SUITES = {
     "web-scrape": (["curl_cffi", "trafilatura", "lxml_html_clean", "pypdf", "cssselect"], []),
     "web-search": (["ddgs>=9,<10", "curl_cffi", "trafilatura", "lxml_html_clean", "pypdf"], []),
     "wiki-lookup": ([], ["skills/wiki-lookup/scripts/wiki.py"]),
-    "youtube-audio": (["yt-dlp[default]", "mutagen"], []),
+    "youtube-audio": (["yt-dlp", "yt-dlp-ejs", "brotli", "certifi", "pycryptodomex", "requests", "urllib3", "websockets"], ["skills/youtube-audio/scripts/audio.py"]),
 }
 # Network tests inside the offline suites are switched off in CI; the probes cover the network.
 OFFLINE_ENV = {"WEB_EXTRACT_OFFLINE": "1"}
@@ -128,6 +131,13 @@ def check_skill(skill: Path, readme: str) -> list[str]:
             if AGENT_SPECIFIC.search(line) and not (f.suffix == ".py" and AGENT_DIRS_MARK.search(line)):
                 problems.append(f"{f.relative_to(ROOT)}:{n}: agent-specific text ({AGENT_SPECIFIC.search(line)[0]!r}); "
                                 "say it agent-neutrally")
+    for script in sorted(skill.rglob("scripts/*.py")):
+        header = re.search(r"^# /// script\n(.*?)^# ///$", script.read_text(encoding="utf-8"), re.S | re.M)
+        deps = re.search(r"^# dependencies = (.*)$", header[1], re.M) if header else None
+        for bad in re.findall(r"\"([A-Za-z0-9_.-]+(?:\[[^\]]*\])?)", deps[1] if deps else ""):
+            if bad.lower() in COPYLEFT or bad.lower().startswith("yt-dlp[default"):
+                problems.append(f"{script.relative_to(ROOT)}: depends on {bad}, which is or brings GPL/AGPL code; "
+                                "see CONTRIBUTING.md")
     if f"(skills/{name})" not in readme:
         problems.append(f"{name}: no row in README.md")
     r = subprocess.run(["uvx", "--from", SKILLS_REF, "agentskills", "validate", str(skill)], **RUN)
