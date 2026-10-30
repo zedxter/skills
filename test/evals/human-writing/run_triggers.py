@@ -10,6 +10,7 @@ only and read-only tools; Codex runs in its read-only sandbox. A run counts as "
 the skill or reads its SKILL.md. Costs real tokens: about 20 short agent runs per agent.
 """
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -40,7 +41,7 @@ def skills_used(agent: str, events: list[dict]) -> list[str]:
                     names.append(str(c.get("input", {}).get("skill", "?")))
         if agent == "codex":
             cmd = e.get("item", {}).get("command", "") if e.get("type") == "item.completed" else ""
-            names += [m for m in __import__("re").findall(r"skills/([\w:-]+)/SKILL\.md", cmd)]
+            names += [m for m in re.findall(r"skills/([\w:-]+)/SKILL\.md", cmd)]
     return names
 
 
