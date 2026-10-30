@@ -1,0 +1,100 @@
+[
+  {
+    "id": "t1-mp3",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "t2-offline",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "t4-section",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "t5-chapters",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "t6-info",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "t7-playlist",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "n1-summarise",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-local-convert",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-podcast-mp3",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-audacity",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-summarise",
+    "expect": true,
+    "prompt": "Summarise this video: https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  },
+  {
+    "id": "t2-srt",
+    "expect": true,
+    "prompt": "Get me the transcript of https://youtu.be/dQw4w9WgXcQ as SRT."
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Сделай конспект этого видео с тайм-кодами: https://www.youtube.com/watch?v=aircAruvnKk"
+  },
+  {
+    "id": "t4-takeaways",
+    "expect": true,
+    "prompt": "What are the key takeaways from https://www.youtube.com/watch?v=zjkBMFhNj_g ?"
+  },
+  {
+    "id": "t5-quotes",
+    "expect": true,
+    "prompt": "Pull a few quotes about scaling from https://youtu.be/kCc8FmEb1nY"
+  },
+  {
+    "id": "t6-translate",
+    "expect": true,
+    "prompt": "Translate what is said in https://www.youtube.com/watch?v=9bZkp7q19f0 into English."
+  },
+  {
+    "id": "t7-question",
+    "expect": true,
+    "prompt": "Does the speaker in https://www.youtube.com/watch?v=8pTEmbeENF4 mention test-driven development?"
+  },
+  {
+    "id": "n1-search",
+    "expect": false,
+    "prompt": "Find YouTube videos about Kubernetes networking."
+  },
+  {
+    "id": "n2-mp3",
+    "expect": false,
+    "prompt": "Download the audio of https://youtu.be/dQw4w9WgXcQ as mp3."
+  },
+  {
+    "id": "n3-voice-memo",
+    "expect": false,
+    "prompt": "Transcribe my voice memo memo.m4a in this folder."
+  },
+  {
+    "id": "n4-own-captions",
+    "expect": false,
+    "prompt": "How do I add captions to my own YouTube upload?"
+  },
+  {
+    "id": "n5-api-code",
+    "expect": false,
+    "prompt": "Write a Python script that uses the YouTube Data API to list my playlists."
+  }
+]
