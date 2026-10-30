@@ -211,7 +211,8 @@ skills/
     ├── SKILL.md        # frontmatter (name, description, …) + instructions
     ├── scripts/        # executable helpers the agent runs (optional)
     └── references/     # longer docs loaded on demand (optional)
-test/                   # pytest suites for the scripts
+test/                   # pytest suites for the scripts, evals, and ops.py (validation, tests, live probes)
+.github/workflows/      # CI on every pull request; a weekly liveness probe of every source
 ```
 
 Run the test suites with every script dependency available (browser tests skip
@@ -236,12 +237,19 @@ install chromium-headless-shell`.
 `name` matches the folder name, `description` says both what the skill does and
 when to use it, and the body stays short enough to be read in one go.
 
+`python3 test/ops.py test` runs every suite with exactly the dependencies CI
+installs, one suite at a time (`python3 test/ops.py test weather`).
+
 ## Contributing
 
-Issues and pull requests are welcome. For a new skill: one folder under
-`skills/`, a `SKILL.md` with a precise trigger description, scripts that run
-unchanged on macOS, Linux and Windows, print clear errors with meaningful exit
-codes, and a row in the table above.
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the rules:
+- what a skill folder holds;
+- the description as a routing rule;
+- exit codes;
+- agent neutrality;
+- permissive dependencies only;
+- source etiquette;
+- the checks to run before a pull request (`python3 test/ops.py validate`).
 
 ## License
 

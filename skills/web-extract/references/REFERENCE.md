@@ -47,7 +47,7 @@ live GET (curl_cffi; or Chromium with --render always)
 - Body cap: 10 MB decompressed (`size_limit` warning, `partial: true`).
 - Honesty: with `--impersonate chrome` the TLS/HTTP2 handshake and client hints
   (`Sec-CH-UA`, `Accept-*`) look like Chrome; the `User-Agent` is always
-  `web-extract/1.0 (+https://github.com/zedxter/skills)`. `firefox` sends no
+  `zedxter-skills-web-extract/1.0 (+https://github.com/zedxter/skills)`. `firefox` sends no
   client hints, so there is no UA/hint mismatch; `none` is plain libcurl with
   the script's own `Accept` headers.
 
@@ -154,7 +154,7 @@ body under `cf-mitigated: challenge`. Results depend on IP reputation.
   human-passed challenge ends with the real page's status. Headless renders
   abort image, media and font requests; `--headful` loads everything.
 - Identification: headless renders use Chromium's own `HeadlessChrome/…`
-  `User-Agent` with ` web-extract/1.0 (+https://github.com/zedxter/skills)`
+  `User-Agent` with ` zedxter-skills-web-extract/1.0 (+https://github.com/zedxter/skills)`
   appended; `--headful` keeps the stock `User-Agent` because a person is
   browsing. No stealth patches, no fingerprint spoofing: a wall that blocks
   headless Chromium stays blocked (exit 4 as usual).

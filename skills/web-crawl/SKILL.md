@@ -42,8 +42,8 @@ anything the user could not browse themselves.
 
 The script is `scripts/crawl.py` relative to this skill. It imports the
 `web-extract` skill's `scripts/extract.py`, looked up next to this skill
-(`../web-extract/scripts/extract.py`), in `~/.claude/skills/web-extract`,
-other agents' skill dirs, or `$WEB_EXTRACT_SCRIPT`; exit 2 with a message when
+(`../web-extract/scripts/extract.py`), in the usual agent skill folders
+(`.agents/skills/` and others), or `$WEB_EXTRACT_SCRIPT`; exit 2 with a message when
 it is missing.
 
 ```bash
