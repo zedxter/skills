@@ -1,0 +1,52 @@
+[
+  {
+    "id": "t1-latest",
+    "expect": true,
+    "prompt": "What has @durov posted lately? Give me a short summary of the latest posts."
+  },
+  {
+    "id": "t2-link",
+    "expect": true,
+    "prompt": "Summarise this post for me: https://t.me/telegram/441"
+  },
+  {
+    "id": "t3-digest-ru",
+    "expect": true,
+    "prompt": "Сделай дайджест канала t.me/addmeto за последнюю неделю."
+  },
+  {
+    "id": "t4-topic",
+    "expect": true,
+    "prompt": "Did the Telegram News channel (t.me/s/telegram) ever announce anything about Stories? Find those posts."
+  },
+  {
+    "id": "t5-links",
+    "expect": true,
+    "prompt": "Which articles and websites has the telegram channel @habr_com linked to recently? List the URLs."
+  },
+  {
+    "id": "t6-date",
+    "expect": true,
+    "prompt": "What did the Telegram channel BotNews post in September 2024?"
+  },
+  {
+    "id": "n1-bot-code",
+    "expect": false,
+    "prompt": "Write a minimal Python Telegram bot with python-telegram-bot that echoes every message back. Just the code."
+  },
+  {
+    "id": "n2-howto",
+    "expect": false,
+    "prompt": "How do I change my Telegram channel from private to public? Answer in two sentences from what you know."
+  },
+  {
+    "id": "n3-regex",
+    "expect": false,
+    "prompt": "Write a regular expression that matches Telegram usernames like @some_name (5 to 32 characters)."
+  },
+  {
+    "id": "n4-other-site",
+    "expect": false,
+    "prompt": "Summarise what tool.py in this folder does, in three bullet points."
+  }
+]
