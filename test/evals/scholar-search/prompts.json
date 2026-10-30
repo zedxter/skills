@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-topic",
+    "expect": true,
+    "prompt": "Find me recent peer-reviewed papers on microplastics in human blood, with DOIs."
+  },
+  {
+    "id": "t2-related-work",
+    "expect": true,
+    "prompt": "I'm writing the related-work section of a paper on retrieval-augmented generation. Which papers from the last two years should I cite?"
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Найди свежие статьи про CRISPR base editing для лечения серповидноклеточной анемии, желательно в открытом доступе."
+  },
+  {
+    "id": "t4-most-cited",
+    "expect": true,
+    "prompt": "What are the most cited papers on graph neural networks?"
+  },
+  {
+    "id": "t5-preprints",
+    "expect": true,
+    "prompt": "Are there any new bioRxiv or medRxiv preprints on long COVID immunology since January 2026?"
+  },
+  {
+    "id": "t6-bibtex",
+    "expect": true,
+    "prompt": "Give me BibTeX entries for DOI 10.1038/nature14539 and arXiv 1706.03762."
+  },
+  {
+    "id": "t7-free-pdf",
+    "expect": true,
+    "prompt": "Is there a free, legal full-text PDF of the paper with DOI 10.1126/science.aaa8415?"
+  },
+  {
+    "id": "n1-verify-refs",
+    "expect": false,
+    "prompt": "Check the references in refs.bib in this folder - are they all real and correctly cited?"
+  },
+  {
+    "id": "n2-news",
+    "expect": false,
+    "prompt": "What's the latest news about the James Webb Space Telescope this week?"
+  },
+  {
+    "id": "n3-explain",
+    "expect": false,
+    "prompt": "Explain how the attention mechanism in transformers works, with a tiny numeric example."
+  },
+  {
+    "id": "n4-code",
+    "expect": false,
+    "prompt": "Write a Python function that parses a BibTeX file into a list of dicts."
+  },
+  {
+    "id": "n5-cite-format",
+    "expect": false,
+    "prompt": "Format this reference in APA 7th edition: LeCun Y, Bengio Y, Hinton G. Deep learning. Nature 521, 436-444 (2015)."
+  }
+]

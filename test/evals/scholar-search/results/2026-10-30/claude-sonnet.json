@@ -1,0 +1,100 @@
+[
+  {
+    "id": "t1-topic",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "scholar-search"
+    ]
+  },
+  {
+    "id": "t2-related-work",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "scholar-search"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "scholar-search"
+    ]
+  },
+  {
+    "id": "t4-most-cited",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "scholar-search"
+    ]
+  },
+  {
+    "id": "t5-preprints",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "scholar-search"
+    ]
+  },
+  {
+    "id": "t6-bibtex",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "scholar-search"
+    ]
+  },
+  {
+    "id": "t7-free-pdf",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "scholar-search"
+    ]
+  },
+  {
+    "id": "n1-verify-refs",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-news",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-explain",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-cite-format",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

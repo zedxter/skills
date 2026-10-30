@@ -28,7 +28,7 @@ decide.
   before you hand them over.
 
 Not for:
-- **Finding papers on a topic.** That is a literature search.
+- **Finding papers on a topic.** That is a literature search: `scholar-search`.
 - **Formatting citations in APA, IEEE and so on.**
 - **Summarising papers.** This skill checks that a work exists and is cited
   correctly, not what it says.
