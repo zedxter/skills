@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/engineering/security/secrets.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/engineering/security/secrets.md (CC0 1.0 / US public domain) -->
 
 Developers use [sensitive information](https://handbook.tts.gsa.gov/general-information-and-resources/sensitive-information/#what-is-considered-sensitive), such as keys and secrets, throughout the lifecycle of an application from local development to production deployments. Keys are used to decrypt and encrypt information, while the term secret can be used for any sensitive values, like database passwords. If keys and secrets become compromised, your entire system and its data may be compromised as well.
 

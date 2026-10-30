@@ -54,4 +54,4 @@ Habits the linter would flag that are genuinely theirs. The linter reads these t
 - lint-allow-words: honestly, actually
 ```
 
-Keep the overrides honest. Allow a rule only if the samples show the habit clearly, not because the draft happens to trip it.
+Keep the overrides honest. Allow a rule only if several samples show the habit, not because the draft happens to trip it.

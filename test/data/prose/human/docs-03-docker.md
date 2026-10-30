@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/engineering/tools/docker.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/engineering/tools/docker.md (CC0 1.0 / US public domain) -->
 
 Below we lay out recommendations for using Docker to wrap development dependencies. Unfortunately, this is a relatively new space and we don't have a consistent, end-to-end setup at the moment. Instead, we'll provide pointers, partial solutions, and examples. We intend to flesh out complete solutions as they become apparent in addition to a comprehensive introduction.
 

@@ -6,12 +6,12 @@ Platform behaviour changes. Each section says when its facts were checked; re-ch
 
 Checked 2026-10-30.
 
-- **Length limit: 3,000 characters.** This is the one limit LinkedIn documents. The linter's `post-length` rule enforces it.
+- **Length limit: 3,000 characters.** LinkedIn documents this limit in its help center. The linter's `post-length` rule enforces it.
 - **The "see more" cut** is observed, not documented: roughly 140 characters on mobile and 210 on desktop. Check in LinkedIn's composer preview. The first line has to make sense and make the point within that space.
 - **Opening**: a statement or a number. Not a question, and not `Here's what…`.
-- **Layout**: short paragraphs with blank lines. Plain text only: no Markdown headings, bold or links render. Unicode "bold" letters hurt accessibility (screen readers spell them out); avoid them.
+- **Layout**: short paragraphs with blank lines. Markdown syntax doesn't render: headings, bold and `[text](url)` links show as typed. Bare URLs do become links, usually with a preview card. Unicode "bold" letters hurt accessibility (screen readers spell them out); avoid them.
 - **Links**: external links in the body are widely reported to reduce reach. If reach matters, put the link in the first comment and say "link in the first comment".
-- **Hashtags**: 0–2, at the end. The linter flags more than 3.
+- **Hashtags**: 0–2, at the end. The linter flags more than 2.
 - **Mentions**: tag a person or company only when they are part of the story and would welcome it.
 - **Ending**: the takeaway, or one specific question. A `P.S.` line is fine for a real follow-up.
 - **Engagement bait** is flagged by the linter: "comment X to get Y", "tag someone who", "agree?", "repost if".
@@ -49,8 +49,11 @@ series: CI cost
 
 ## Hashnode and Medium
 
+Checked 2026-10-30, except where marked.
+
+
 - **Cross-posting**: set the canonical URL to the original. On Hashnode it's the "originally published at" setting. On Medium, importing a story from a URL sets it. Without a canonical link the copy competes with the original in search.
-- **Medium** renders a limited Markdown subset when pasting. Check code blocks and tables in the preview: tables don't render, so use a list or an image.
+- **Medium** doesn't reliably convert pasted Markdown (not re-checked): plan to fix formatting in its editor, and check code blocks in the preview. Medium has no tables, so use a list or an image.
 - Both allow a subtitle; use it for the concrete promise ("41 → 9 minutes, no tests dropped"), not a second title.
 
 ## How-to and life-hack sites

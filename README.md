@@ -37,6 +37,13 @@ the right section through `web-extract`'s engine.
 `prose-writer` uses `web-search` and `web-extract` to research and read sources (every fact goes into its ledger with the URL),
 and `youtube-transcript` or `transcribe-audio` to turn a talk or voice memo into material for an article.
 
+`prose-writer`'s catalogue of AI tells is written for this repo but builds on
+[blader/humanizer](https://github.com/blader/humanizer), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop),
+[petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop), [sergebulaev/linkedin-skills](https://github.com/sergebulaev/linkedin-skills)
+and [eric-tramel/slop-guard](https://github.com/eric-tramel/slop-guard) (all MIT), and paraphrases Wikipedia's
+[Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) (CC BY-SA). Its human-text test corpus is
+public-domain 18F writing (CC0).
+
 ## Requirements
 
 - Python 3.12+ and [`uv`](https://docs.astral.sh/uv/) (recommended). Each script

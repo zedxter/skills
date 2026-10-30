@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-01-11-the-best-way-to-build-big-is-to-start-small.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-01-11-the-best-way-to-build-big-is-to-start-small.md (CC0 1.0 / US public domain) -->
 
 Large software systems are hard, and in government we’re tasked with
 building large systems to manage complex benefits and processes. Often

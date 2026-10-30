@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/engineering/languages-runtimes/python.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/engineering/languages-runtimes/python.md (CC0 1.0 / US public domain) -->
 
 This is a **WORK IN PROGRESS**. Help us make it better by [submitting an issue](https://github.com/18F/guides/issues/new) or joining us in the [#python](https://gsa-tts.slack.com/messages/C02ES0C3R) channel!
 

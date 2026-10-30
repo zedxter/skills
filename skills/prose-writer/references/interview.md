@@ -1,22 +1,22 @@
 # Gathering material
 
-A text is only as specific as what the writer knows. This step gets the specifics out of the author, or out of the repository, before any drafting. Ask in one message, conversationally, and only for what you can't infer. Three good answers beat ten form fields.
+A text is only as specific as what the writer knows. This step gets the specifics out of the author, or out of the repository, before any drafting. Ask in one message, conversationally, and only for what you can't infer. Ask for a few things and get them in detail; a long questionnaire gets short answers.
 
 ## Articles and posts
 
 Ask for these five things, in this order. Each one becomes a line of the piece's spine.
 
 1. **The moment.** "When did this last actually happen? What exactly happened?" You want a scene with a date, a place or system, and people. Not "teams often struggle with X" but "on 14 March our nightly export took 9 hours and blocked the morning release."
-2. **The number.** "What did it cost, save, take, break? How much, how many, how long?" One real number does more than any adjective. Odd precision ("$1,840", "37 minutes") reads as true because it usually is.
+2. **The number.** "What did it cost, save, take, break? How much, how many, how long?" One real number does more than any adjective. Keep the number as precise as the author gave it; never round it up into something rounder or invent decimals.
 3. **What you got wrong.** "What did you believe before that you don't believe now?" This is usually the opening beat. It gives the piece tension and makes the author credible.
-4. **Who disagrees.** "Who would push back on this, and what would they say?" This names the audience and gives the piece something to argue with. If nobody would disagree, the point is probably too obvious to publish.
+4. **Who disagrees.** "Who would push back on this, and what would they say?" This names the audience and gives the piece something to argue with. For an opinion piece, if nobody would disagree, the point is probably too obvious to publish. A how-to or build log doesn't need an opponent.
 5. **What the reader should do differently.** "After reading, what should someone change on Monday?" This becomes the close.
 
 Then settle the frame:
 
 - **Reader**: who exactly, and what they already know ("backend engineers at startups who have used Postgres but never tuned it").
 - **Platform and length**: see `platforms.md`.
-- **Goal**: comments, saves, sign-ups, hiring, or just understanding. It changes the ending.
+- **Goal**: comments, saves, sign-ups, hiring, or understanding. It changes the ending.
 
 ### Pressing vague answers
 
@@ -31,7 +31,7 @@ Press each soft answer **once**, then accept what you get and use a `[TODO]` for
 | "we improved the process" | "What did you stop doing? What did you start?" |
 | "it's best practice" | "What happened when you didn't do it?" |
 
-If the user says "just write it" or gives no material at all, write a draft with `[TODO: the number]`, `[TODO: when this happened]` in the places a specific detail belongs, and list them at the end. Never fill them with plausible inventions.
+If the user asks you to write it straight away, or gives no material at all, write a draft with `[TODO: the number]`, `[TODO: when this happened]` in the places a specific detail belongs, and list them at the end. Never fill them with plausible inventions.
 
 ### Material from other sources
 
@@ -56,7 +56,7 @@ Read first, ask second. The repository answers most questions better than the us
 2. **Their goal.** "What are they trying to get done when they open this page?" This decides the Diátaxis type (`docs.md`).
 3. **Scope.** "What should this page deliberately not cover?"
 4. **Environment.** Supported OS, versions, required access, and anything the code assumes silently.
-5. **Known pain.** "Where do people get stuck today? What do they ask in issues or chat?" This is gold for troubleshooting sections.
+5. **Known pain.** "Where do people get stuck today? What do they ask in issues or chat?" The answers belong in the troubleshooting section.
 
 ## The facts ledger
 

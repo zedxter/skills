@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-01-17-life-changing-magic-writing-release-notes.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-01-17-life-changing-magic-writing-release-notes.md (CC0 1.0 / US public domain) -->
 
 A key part of agile development is constantly shipping new features. The
 team behind the Federal Election Commission’s (FEC) beta website ships

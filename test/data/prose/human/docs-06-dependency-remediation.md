@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/engineering/security/dependency-remediation.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/engineering/security/dependency-remediation.md (CC0 1.0 / US public domain) -->
 
 Your application should have dependency scanning to ensure that the libraries your code relies on do not have vulnerabilities within them. For more on how to set up vulnerability scanning see the [Before You Ship guide](https://before-you-ship.18f.gov/security/static-analysis/#dependency-analysis)’s suggestions.
 

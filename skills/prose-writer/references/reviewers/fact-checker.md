@@ -73,4 +73,4 @@ Severity:
 - **major**: the reader is lost, misled or put off. Examples are an unclear main point, a buried hook, a cluster of tells, or a missing step.
 - **minor**: worth fixing if cheap. Examples are a weak word, a small rhythm issue, or an inconsistent term.
 
-A false or invented fact is always a blocker. A true claim without a ledger entry is usually major.
+A false or invented fact is always a blocker. A true claim without a ledger entry is usually major. A claim with status `author` (the author stated it and gave no source) needs a source only when it is surprising, precise, or about someone else; otherwise list it in `questions_for_author` instead of reporting a finding.

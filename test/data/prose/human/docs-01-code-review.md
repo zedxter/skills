@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/engineering/our-approach/code-review.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/engineering/our-approach/code-review.md (CC0 1.0 / US public domain) -->
 
 _A friendly guide for reviewing code — and not each other — at 18F._
 

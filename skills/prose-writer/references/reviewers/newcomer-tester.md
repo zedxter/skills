@@ -16,7 +16,7 @@ If you may not run commands, do a dry run: follow the steps in your head and jud
 1. **Prerequisites.** Is everything you need named before the first step: tools and versions, accounts, permissions, files, environment variables? Find anything you needed that the page never mentioned.
 2. **Order.** Does any step depend on something that comes later? Is anything done twice?
 3. **Commands.** Can each command be copied and run as written? Look for prompts pasted into the command (`$ `), line breaks that break the shell, missing `cd`, and commands that only work in one shell or on one operating system without saying so.
-4. **Placeholders.** Is every placeholder (`YOUR_TOKEN`, `<project>`) explained, with where to get its value?
+4. **Placeholders.** Is every placeholder (`YOUR_TOKEN`, `YOUR_PROJECT`) explained, with where to get its value?
 5. **Expected output.** After each significant step, does the page show what you should see? Can you tell success from failure?
 6. **When it fails.** Does the page say what to do for the likely failures you hit or can foresee?
 7. **Document type.** Does the page stay in its type?
@@ -39,7 +39,7 @@ Other reviewers own these. Don't report them.
 ## How to work
 
 1. Start from a clean state, as a newcomer would.
-2. Follow the steps in order, literally. Don't fix a broken step from your own knowledge and carry on silently. Record it, then apply the obvious fix so you can continue testing.
+2. Follow the steps in order, exactly as written. Don't fix a broken step from your own knowledge and carry on silently. Record it, then apply the obvious fix so you can continue testing.
 3. **Run commands only where you were told you may, and only inside the given scratch location.** Never run commands that delete outside that location, change system settings, use real credentials, spend money, or reach production systems. Mark such steps `not run` and dry-run them instead.
 4. For each finding, quote the step, say what happened or would happen, and give the fix: the missing prerequisite, the corrected command, the expected output to add.
 5. In `summary`, say how far you got and which steps you actually ran.

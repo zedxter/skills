@@ -55,7 +55,7 @@ If the build fails with `401 invalid key`, the CI cache may still hold the old v
 
 - **Prerequisites first**: access, versions, what must already be installed or configured.
 - **One action per step.** If a step has "and then", it's two steps.
-- **Every command copy-pasteable**: no prompt characters, no line-wrapping that breaks the shell, placeholders in `<ANGLE_BRACKETS>` explained right after the block.
+- **Every command copy-pasteable**: no prompt characters, no line-wrapping that breaks the shell, placeholders in capitals like `YOUR_API_KEY`, explained right after the block. Avoid `<angle brackets>`: pasted unchanged into a shell, they are redirections.
 - **Expected output** after any command whose output matters, trimmed to the relevant lines.
 - **Failure path**: the most likely error message, quoted exactly, and what to do.
 - **Code blocks** always carry a language tag (`code-fence-lang`).
@@ -116,7 +116,7 @@ Write the ADR so that someone who joins in a year understands why, including wha
 
 ### Changelog
 
-Follow keepachangelog.com: newest first, a section per version with a date, and entries grouped under Added, Changed, Deprecated, Removed, Fixed, Security. Each entry is one line a user can act on, written for users and not for the commit log. Link the issue or PR.
+Follow keepachangelog.com: an `Unreleased` section at the top, then newest version first, each with an ISO date (`## [1.4.0] - 2026-10-30`), and entries grouped under Added, Changed, Deprecated, Removed, Fixed, Security. Each entry is one line a user can act on, written for users and not for the commit log. Link the issue or PR.
 
 ### Release notes
 
@@ -138,7 +138,7 @@ Changelog entries say what changed; release notes say what it means for the read
 ### Reference (API, CLI, config)
 
 - Consistent entries: the same fields in the same order for every item (name, type, default, required, description, example).
-- Complete: every flag, every field, every error code. A partial reference is a trap.
+- Complete: every flag, every field, every error code. Readers assume a reference lists everything, so a missing entry reads as "doesn't exist".
 - Examples per item where usage isn't obvious, with real values.
 - Generated from the source when possible; hand-written prose goes into explanation pages.
 

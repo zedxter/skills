@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-10-03-building-a-large-scale-design-system.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-10-03-building-a-large-scale-design-system.md (CC0 1.0 / US public domain) -->
 
 Today, there are nearly [30,000 U.S federal websites]({{ "/2017/01/04/tracking-the-us-governments-progress-on-moving-https/" | url }}) with almost no consistency between them. Between the hundreds of thousands of government employees working in technology, there’s nothing in common with how these websites are built or maintained.
 

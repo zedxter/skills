@@ -1,10 +1,10 @@
 # Before and after
 
-Each pair shows a typical chat-model draft and a rewrite. The rewrites use facts that a real interview would have produced; those facts are invented for the example. In real work, a fact you don't have becomes a `[TODO]`, never an invention.
+Each pair shows a typical chat-model draft and a rewrite. **The facts in every "after" are made up for illustration**, standing in for what an interview would have produced. In real work, a fact you don't have becomes a `[TODO]`, never an invention; the last pair shows that case.
 
 ## LinkedIn post
 
-Before (lint: 43/100, faux-insight error, 5 hashtags):
+Before (the linter reports a faux-insight error, five hashtags and several warnings):
 
 ~~~text
 I got promoted to Staff Engineer today. 🎉
@@ -34,7 +34,7 @@ Most of this year went into one design doc: how three teams should share a singl
 
 The hardest part was turning down the search rewrite in March. It was the project I wanted most, and nobody else could have staffed the schema work.
 
-If you're on the same path: count what other teams stop getting stuck on, not what you ship.
+I now count my good weeks by how many teams I unblocked, which is harder to measure than merged pull requests.
 ~~~
 
 What changed:
@@ -59,11 +59,11 @@ Enter Rust.
 After:
 
 ~~~markdown
-# Rewriting one Python stage in Rust cut our pipeline from 3 hours to 25 minutes
+# Rewriting one Python stage in Rust cut our pipeline from 3 hours to 70 minutes
 
-Our nightly pipeline parses about 40 GB of gzipped JSON logs. By August it ran for three hours, and the parse stage took two of them. We rewrote that stage in Rust and left the rest in Python. The whole run now takes 25 minutes, and the instance bill dropped by about a third.
+Our nightly pipeline parses about 40 GB of gzipped JSON logs. By August it ran for three hours, and the parse stage took two of them. We rewrote that stage in Rust and left the rest in Python. Parsing now takes 9 minutes, the whole run about 70, and the instance bill dropped by about a third.
 
-**TL;DR:** profile first. Only one stage was CPU-bound; rewriting the other five would have bought nothing.
+TL;DR: profile before you rewrite. Only the parse stage was CPU-bound. The other five spend their hour waiting on S3 and the database, and Rust would not have shortened that wait.
 ~~~
 
 What changed:
@@ -122,3 +122,24 @@ What changed:
 - the minimizers are gone;
 - there is one action per step, with the exact UI path;
 - the reader learns how to check it worked.
+
+## A rewrite with gaps
+
+When the interview didn't produce a number, the rewrite marks the gap instead of filling it.
+
+Before:
+
+~~~text
+Our migration to the new queue was a huge success, dramatically reducing latency and improving reliability across the board.
+~~~
+
+After:
+
+~~~text
+After we moved the order events to the new queue, p95 latency dropped from [TODO: before, in ms] to [TODO: after, in ms]. We have had [TODO: count] dropped messages since [TODO: date], against roughly one a week before.
+~~~
+
+What changed:
+
+- the vague praise became the two measurements the claim depends on;
+- each missing value is a visible `[TODO]` listed for the author, and none is guessed.

@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-09-26-automated-scanning-for-sensitive-information.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-09-26-automated-scanning-for-sensitive-information.md (CC0 1.0 / US public domain) -->
 
 Often when developing open source software, and especially software that relies on outside services, you’ll find that you have to manage sensitive information. While there are a large number of things that can be considered sensitive, open source developers often deal with sensitive items such as API tokens, passwords, and private keys that are required for the system to function. In addition, there may be other things to consider private, especially when dealing with infrastructure as code, such as IP addresses.
 

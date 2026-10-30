@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/engineering/tools/continuous-deployment.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/engineering/tools/continuous-deployment.md (CC0 1.0 / US public domain) -->
 
 ## Pre-requisites
 This guide assumes that you already have:

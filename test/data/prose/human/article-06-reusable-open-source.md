@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-10-23-how-reusable-is-open-source-software.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-10-23-how-reusable-is-open-source-software.md (CC0 1.0 / US public domain) -->
 
 Here at TTS, we’re big fans of [open source](https://github.com/18F/open-source-policy/blob/master/policy.md) software. It’s one of the key ways we hope to provide transparency and cost effectiveness to taxpayers. The [White House Open Source policy](https://sourcecode.cio.gov/AppendixA/) defines open source software as ”software that can be accessed, used, modified, and shared by anyone.” TTS releases all of the code we develop to the public domain in online repositories available to anyone to copy or reuse. In building this software, we incorporate existing open source code libraries to minimize the need for code license management.
 

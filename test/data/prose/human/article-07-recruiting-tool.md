@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-11-08-four-lessons-we-learned-while-building-our-own-design-research-recruiting-tool.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-11-08-four-lessons-we-learned-while-building-our-own-design-research-recruiting-tool.md (CC0 1.0 / US public domain) -->
 
 In November 2016, design researchers at GSA discovered that one of the tools we used to recruit folks for our moderated design research ultimately wouldn’t comply with the security needs of our organization. This made a few of us wonder: _What would it take for GSA to design and operate its own recruiting service, taking compliance into account from the outset?_
 

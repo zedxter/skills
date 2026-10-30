@@ -119,12 +119,14 @@ RULES = {r.id: r for r in [
          "Delete it. What is easy for you is the step where the reader is stuck."),
     Rule("docs-future", None, None, "info", "Future tense in documentation (\"this will create\")", "Use present tense: \"this creates\"."),
     Rule("docs-please", None, None, "info", "\"please\" in instructions", "Give the instruction directly."),
+    Rule("docs-cheer", None, None, "warning", "Cheerleading in docs (\"Happy coding!\", \"Congratulations!\", \"It's that simple!\")",
+         "Delete it; tell the reader how to check the result instead."),
     Rule("docs-latin", None, None, "info", "Latin abbreviation (e.g., i.e., etc., via)", "Use \"for example\", \"that is\", \"and so on\", \"through\"."),
     # Posts only
     Rule("post-opening-question", None, "warning", None, "Post opens with a question", "Open with a statement or a number; move the question to the end."),
     Rule("post-hook-fold", None, "info", None, "First sentence runs past the ~210-character \"see more\" fold", "Shorten the opening line."),
     Rule("post-length", None, "error", None, "Post is longer than LinkedIn's 3,000-character limit", "Cut it, or publish it as an article."),
-    Rule("post-hashtags", None, "warning", None, "More than three hashtags", "Keep 0–2, at the end."),
+    Rule("post-hashtags", None, "warning", None, "More than two hashtags", "Keep 0–2, at the end."),
 ]}
 
 
@@ -248,7 +250,7 @@ DASHES = re.compile(r"—|(?<=\s)–(?=\s)|(?<=\s)--(?=\s)|(?<=\w)--(?=\w)")
 
 
 def _compile(phrases: list[str]) -> re.Pattern:
-    alts = [p.replace("'", "['’]") for p in sorted(set(phrases), key=len, reverse=True)]
+    alts = [p.replace("'", "['’]").replace(" ", r"\s+") for p in sorted(set(phrases), key=len, reverse=True)]
     return re.compile(r"(?<![\w-])(?:" + "|".join(alts) + r")(?![\w-])", re.I)
 
 
@@ -287,13 +289,16 @@ class Document:
         return line + 1, offset - self.line_starts[line] + 1
 
 
-FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+FENCE_OPEN = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 HEADING = re.compile(r"^ {0,3}(#{1,6})\s+")
 LIST_ITEM = re.compile(r"^(\s*)(?:[-*+]|\d{1,3}[.)])\s+(?:\[[ xX]\]\s+)?")
 HR = re.compile(r"^ {0,3}([-*_])(?:\s*\1){2,}\s*$")
 TABLE = re.compile(r"^\s*\||^\s*:?-{3,}:?\s*\|")
+TABLE_DELIM = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$")
+SETEXT = re.compile(r"^ {0,3}(=+|-+)\s*$")
+FRONT_KEY = re.compile(r"^(?:[\w\"'-][^:]*:|\s+\S|\s*-\s)")
 QUOTE = re.compile(r"^ {0,3}>")
-ABBREV = re.compile(r"\b(?:e\.g|i\.e|etc|vs|Mr|Mrs|Ms|Dr|St|approx|No|Fig|cf|a\.m|p\.m|U\.S|U\.K)\.", re.I)
+ABBREV = re.compile(r"\b(?:e\.g|i\.e|etc|vs|Mr|Mrs|Ms|Dr|St|approx|Fig|cf|a\.m|p\.m|U\.S|U\.K)\.|\bNo\.(?=\s*\d)")
 INNER_DOT = re.compile(r"(?<=\w)[.](?=\w)")
 SENTENCE = re.compile(r"[^.!?]+(?:[.!?]+[\"”’)\]]*|$)")
 WORD = re.compile(r"[A-Za-z0-9][\w'’-]*")
@@ -314,15 +319,56 @@ def _mask(line: str, pattern: str, keep_group: int | None = None, flags: int = 0
     return re.sub(pattern, repl, line, flags=flags)
 
 
+def _mask_code_spans(line: str) -> str:
+    """Mask `code` spans: a backtick run closes at the next run of the same length (linear in practice).
+
+    >>> _mask_code_spans("a `b` c ``d ` e`` f")
+    'a     c           f'
+    """
+    runs = [(m.start(), m.end()) for m in re.finditer(r"`+", line)]
+    out, i = list(line), 0
+    while i < len(runs):
+        s, e = runs[i]
+        j = next((k for k in range(i + 1, len(runs)) if runs[k][1] - runs[k][0] == e - s), None)
+        if j is None:
+            i += 1
+            continue
+        for k in range(s, runs[j][1]):
+            out[k] = " "
+        i = j + 1
+    return "".join(out)
+
+
+def _mask_comments(line: str) -> str:
+    out, pos = line, 0
+    while (start := out.find("<!--", pos)) != -1:
+        end = out.find("-->", start + 4)
+        if end == -1:
+            break
+        out = out[:start] + " " * (end + 3 - start) + out[end + 3:]
+        pos = end + 3
+    return out
+
+
+def _mask_urls(line: str) -> str:
+    def repl(m: re.Match) -> str:
+        url = m.group(0)
+        trimmed = url.rstrip(".,;:!?")
+        return " " * len(trimmed) + url[len(trimmed):]
+    return re.sub(r"\bhttps?://[^\s)>\]]+", repl, line)
+
+
 def _mask_inline(line: str) -> str:
-    line = _mask(line, r"<!--.*?-->")
-    line = _mask(line, r"!\[[^\]]*\]\([^)]*\)")
-    line = _mask(line, r"\[([^\]]+)\]\([^)]*\)", keep_group=1)
-    line = _mask(line, r"\[([^\]]+)\]\[[^\]]*\]", keep_group=1)
-    line = _mask(line, r"(`+)(?:(?!\1).)+?\1")
-    line = _mask(line, r"<https?://[^>]+>")
-    line = _mask(line, r"\bhttps?://[^\s)>\]]+")
-    line = _mask(line, r"</?[A-Za-z][^>]*>")
+    line = _mask_comments(line)
+    line = _mask_code_spans(line)
+    if "](" in line:
+        line = _mask(line, r"!\[[^\]\n]{0,500}\]\([^)\n]{0,1000}\)")
+        line = _mask(line, r"\[([^\]\n]{1,500})\]\([^)\n]{0,1000}\)", keep_group=1)
+    if "][" in line:
+        line = _mask(line, r"\[([^\]\n]{1,500})\]\[[^\]\n]{0,200}\]", keep_group=1)
+    line = _mask(line, r"<https?://[^>\s]{1,1000}>")
+    line = _mask_urls(line)
+    line = _mask(line, r"</?[A-Za-z][^<>\n]{0,300}>")
     return line
 
 
@@ -334,6 +380,24 @@ def _to_prose(md_line: str) -> str:
     line = re.sub(r"\*+", lambda m: " " * len(m.group(0)), line)
     line = re.sub(r"(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])", lambda m: " " * len(m.group(0)), line)
     return line
+
+
+def _front_matter_end(lines: list[str]) -> int:
+    """Index of the closing --- of YAML front matter, or -1. A leading --- rule followed by prose is not front matter.
+
+    >>> _front_matter_end(["---", "title: x", "tags: [a]", "---", "Body"])
+    3
+    >>> _front_matter_end(["---", "", "A paragraph.", "", "---"])
+    -1
+    """
+    if not lines or lines[0].strip() != "---":
+        return -1
+    for i in range(1, len(lines)):
+        if lines[i].strip() in ("---", "..."):
+            return i if i > 1 else -1
+        if not lines[i].strip() or not FRONT_KEY.match(lines[i]):
+            return -1
+    return -1
 
 
 def parse(text: str) -> Document:
@@ -348,48 +412,69 @@ def parse(text: str) -> Document:
     lines = text.split("\n")
     md_lines: list[str] = []
     kinds: list[str] = []  # per line: blank | masked | heading | item | cont | para
+    levels: dict[int, int] = {}  # line index → heading level
     fences: list[tuple[int, str]] = []
-    offset, in_fence, fence, in_comment = 0, False, "", False
-    front = lines and lines[0].strip() == "---"
-    front_end = -1
-    if front:
-        for i in range(1, len(lines)):
-            if lines[i].strip() in ("---", "..."):
-                front_end = i
-                break
+    offset, in_fence, fence, in_comment, in_table, in_list = 0, False, "", False, False, False
+    front_end = _front_matter_end(lines)
     for i, line in enumerate(lines):
         kind = "para"
+        prev = kinds[-1] if kinds else "blank"
         if i <= front_end:
             md, kind = _blank(line), "masked"
         elif in_fence:
             md, kind = _blank(line), "masked"
-            if re.match(r"^ {0,3}" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}\s*$", line):
+            if re.match(r"^\s*" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}\s*$", line):
                 in_fence = False
         elif in_comment:
-            md, kind = _blank(line), "masked"
-            if "-->" in line:
+            end = line.find("-->")
+            if end == -1:
+                md, kind = _blank(line), "masked"
+            else:
                 in_comment = False
-        elif m := FENCE_OPEN.match(line):
+                rest = line[end + 3:]
+                md = " " * (end + 3) + _mask_inline(rest)
+                kind = "para" if rest.strip() else "masked"
+        elif (m := FENCE_OPEN.match(line)) and not (m.group(1)[0] == "`" and "`" in m.group(2)):
             in_fence, fence = True, m.group(1)
             fences.append((offset, m.group(2).strip()))
             md, kind = _blank(line), "masked"
-        elif line.strip().startswith("<!--") and "-->" not in line:
-            in_comment, md, kind = True, _blank(line), "masked"
+        elif "<!--" in line and "-->" not in line[line.find("<!--"):]:
+            start = line.find("<!--")
+            in_comment = True
+            head = line[:start]
+            md = _mask_inline(head) + _blank(line[start:])
+            kind = "masked" if not head.strip() else ("item" if LIST_ITEM.match(line) else "para")
         elif not line.strip():
             md, kind = line, "blank"
+            in_table = False
+        elif in_table and "|" in line:
+            md, kind = _blank(line), "masked"
+        elif "|" in line and i + 1 < len(lines) and TABLE_DELIM.match(lines[i + 1]):
+            md, kind, in_table = _blank(line), "masked", True
+        elif SETEXT.match(line) and prev == "para" and (len(kinds) < 2 or kinds[-2] in ("blank", "masked", "heading")):
+            kinds[-1] = "heading"
+            levels[i - 1] = 1 if line.strip()[0] == "=" else 2
+            md, kind = _blank(line), "masked"
         elif HR.match(line) or TABLE.match(line) or QUOTE.match(line):
             md, kind = _blank(line), "masked"
+        elif line.startswith(("    ", "\t")) and not in_list and prev in ("blank", "code"):
+            md, kind = _blank(line), "code"  # indented code block
         else:
             md = _mask_inline(line)
             if HEADING.match(line):
                 kind = "heading"
             elif LIST_ITEM.match(line):
-                kind = "item"
+                kind, in_list = "item", True
             elif line.startswith((" ", "\t")):
                 kind = "cont"
+            elif prev == "blank":
+                in_list = False
+        if kind == "para" and prev == "blank" and not line.startswith((" ", "\t")):
+            in_list = False
         md_lines.append(md)
         kinds.append(kind)
         offset += len(line) + 1
+    kinds = ["masked" if k == "code" else k for k in kinds]
 
     md_text = "\n".join(md_lines)
     prose_text = "\n".join(_to_prose(x) for x in md_lines)
@@ -406,7 +491,7 @@ def parse(text: str) -> Document:
             current = None
         elif kind == "heading":
             hm = HEADING.match(lines[i])
-            blocks.append(Block("heading", start, end, len(hm.group(1)) if hm else 1))
+            blocks.append(Block("heading", start, end, len(hm.group(1)) if hm else levels.get(i, 1)))
             current = None
         elif kind == "item":
             current = Block("item", start, end)
@@ -444,6 +529,14 @@ class Finding:
     text: str
     message: str
     hint: str
+    start: int = field(default=0, repr=False)
+    end: int = field(default=0, repr=False)
+
+
+# When phrase rules overlap on one span, only the first in this order is reported.
+PHRASE_PRIORITY = ["chat-residue", "faux-insight", "recap-ending", "throat-clearing", "rhetorical", "metadiscourse",
+                   "vague-declarative", "stock-phrase", "sales-language", "weasel", "engagement-bait", "copula-avoidance",
+                   "ai-vocab"]
 
 
 @dataclass
@@ -461,6 +554,7 @@ class Linter:
         self.doc, self.cfg = doc, settings
         self.findings: list[Finding] = []
         self.stats: dict[str, object] = {}
+        self.lines = doc.text.split("\n")
 
     # helpers
     def sev(self, rule_id: str) -> str | None:
@@ -479,7 +573,7 @@ class Linter:
             return
         line, col = self.doc.pos(start)
         rule = RULES[rule_id]
-        self.findings.append(Finding(rule_id, sev, line, col, snippet[:120], message or rule.summary, rule.hint))
+        self.findings.append(Finding(rule_id, sev, line, col, snippet[:120], message or rule.summary, rule.hint, start, end))
 
     def scan(self, rule_id: str, pattern: re.Pattern | str, *, layer: str = "prose", skip_linked: bool = False) -> int:
         if not self.sev(rule_id):
@@ -490,8 +584,7 @@ class Linter:
         for b in self.doc.blocks:
             for m in rx.finditer(hay, b.start, b.end):
                 if skip_linked:
-                    ln = self.doc.pos(m.start())[0] - 1
-                    full = self.doc.text.split("\n")[ln]
+                    full = self.lines[self.doc.pos(m.start())[0] - 1]
                     if "](" in full or "http" in full:
                         continue
                 self.add(rule_id, m.start(), m.end())
@@ -522,6 +615,7 @@ class Linter:
         if g == "docs":
             self.scan("docs-minimizer", DOCS_MINIMIZERS)
             self.scan("docs-please", r"\bplease\b")
+            self.scan("docs-cheer", r"\b(?:happy (?:coding|hacking|building)|congratulations|congrats|you(?:['’]re| are) all set|that['’]s it|it['’]s that (?:simple|easy)|voil[aà])\s*!")
             self.scan("docs-latin", r"(?<!\w)(?:e\.g\.|i\.e\.|etc\.|via\b)")
             self.scan("docs-future", r"\b(?:will|['’]ll)\s+(?:be\s+)?(?!not\b)[a-z]+")
         self._throat_clearing()
@@ -537,6 +631,16 @@ class Linter:
         self._endings()
         if g == "post":
             self._post_rules()
+        self._dedupe()
+
+    def _dedupe(self) -> None:
+        rank = {r: i for i, r in enumerate(PHRASE_PRIORITY)}
+        kept: list[Finding] = []
+        for f in sorted(self.findings, key=lambda f: rank.get(f.rule, -1)):
+            if f.rule in rank and any(k.rule in rank and k.rule != f.rule and f.start < k.end and k.start < f.end for k in kept):
+                continue
+            kept.append(f)
+        self.findings = kept
 
     def _vocab(self, rx: re.Pattern) -> None:
         # Pre-2022 human prose uses these words too; one of them is weak evidence, a cluster is strong.
@@ -552,10 +656,10 @@ class Linter:
                      severity=None if over else "info")
 
     def _throat_clearing(self) -> None:
-        rx = re.compile(r"^(?:but |and |so )?(?:" + _compile(THROAT_CLEARING).pattern + ")", re.I)
+        rx = re.compile(r"(?:(?:but|and|so)\s+)?(?:" + _compile(THROAT_CLEARING).pattern + ")", re.I)
         for s in self.doc.sentences:
-            if m := rx.match(s.text):
-                self.add("throat-clearing", s.start, s.start + m.end())
+            if m := rx.match(self.doc.prose, s.start, s.end):
+                self.add("throat-clearing", s.start, m.end())
 
     def _contrasts(self) -> None:
         d = self.doc
@@ -696,7 +800,10 @@ class Linter:
             words = [w.lower() for w in WORD.findall(s.text)]
             if sum(w in HEDGES for w in words) >= 3:
                 self.add("hedge-stack", s.start, s.end, "Three or more hedges in one sentence")
-        rx = re.compile(r"\b(?:" + "|".join(sorted(INTENSIFIERS - self.cfg.allow_words)) + r")\b", re.I)
+        allowed = sorted(INTENSIFIERS - self.cfg.allow_words)
+        if not allowed:
+            return
+        rx = re.compile(r"\b(?:" + "|".join(allowed) + r")\b", re.I)
         hits = []
         for b in d.blocks:
             hits += [m.span() for m in rx.finditer(d.prose, b.start, b.end)]
@@ -741,7 +848,7 @@ class Linter:
             for i in emoji_lines:
                 self.add("emoji-bullet", d.blocks[i].start, d.blocks[i].end)
         # bold
-        bold = re.compile(r"(\*\*|__)(?=\S)(.+?)(?<=\S)\1")
+        bold = re.compile(r"(?<![\w*_])(\*\*|__)(?=\S)(.{1,300}?)(?<=\S)\1(?![\w*_])")
         labels, inline = [], []
         for b in d.blocks:
             if b.kind == "heading":
@@ -749,6 +856,8 @@ class Linter:
             seg_start = b.start
             first_char = len(d.md[b.start:b.end]) - len(LIST_ITEM.sub("", d.md[b.start:b.end], count=1))
             for m in bold.finditer(d.md, b.start, b.end):
+                if m.group(1) == "__" and re.fullmatch(r"\w+", m.group(2)):
+                    continue  # __init__ and other dunder names, not emphasis
                 is_label = m.start() - seg_start <= first_char + 1 and re.match(r"\s*[:.—–-]|.*[:.]$", d.md[m.end():m.end() + 2] if not m.group(2).endswith((":", ".")) else ":")
                 if is_label and b.kind == "item":
                     labels.append(m.span())
@@ -787,10 +896,11 @@ class Linter:
             first = d.sentences[0]
             if first.text.endswith("?"):
                 self.add("post-opening-question", first.start, first.end)
-            if first.end - d.text.find(body[:1]) > 210:
-                self.add("post-hook-fold", first.start, first.end, f"First sentence ends at character {first.end}")
+            hook_len = first.end - d.blocks[first.block].start
+            if d.blocks[first.block].start == min(b.start for b in d.blocks) and hook_len > 210:
+                self.add("post-hook-fold", first.start, first.end, f"First sentence is {hook_len} characters long")
         tags = list(re.finditer(r"(?<![\w#&])#[A-Za-z]\w*", d.md))
-        if len(tags) > 3:
+        if len(tags) > 2:
             for m in tags:
                 self.add("post-hashtags", m.start(), m.end(), f"{len(tags)} hashtags")
 
@@ -825,23 +935,37 @@ def load_voice(path: Path, cfg: Settings) -> None:
             cfg.allow_words |= values
 
 
+def _strings(value: object, where: str) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise ValueError(f"{where} must be a list of strings")
+    return value
+
+
+def _table(data: dict, key: str) -> dict:
+    value = data.get(key, {})
+    if not isinstance(value, dict):
+        raise ValueError(f"[{key}] must be a table")
+    return value
+
+
 def load_config(path: Path, cfg: Settings) -> None:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
-    rules = data.get("rules", {})
-    disabled = set(rules.get("disable", []))
-    overrides = {k: v for k, v in data.get("severity", {}).items()}
+    rules, severity, words = _table(data, "rules"), _table(data, "severity"), _table(data, "words")
+    disabled = set(_strings(rules.get("disable", []), "[rules] disable"))
+    if not all(isinstance(v, str) for v in severity.values()):
+        raise ValueError(f"[severity] values must be strings in {path}")
+    overrides = dict(severity)
     unknown = (disabled | overrides.keys()) - RULES.keys()
     if unknown:
         raise ValueError(f"unknown rule id(s) in {path}: {', '.join(sorted(unknown))}")
     bad = {v for v in overrides.values() if v not in ("error", "warning", "info")}
     if bad:
         raise ValueError(f"severity must be error, warning or info in {path}, got: {', '.join(sorted(bad))}")
-    words = data.get("words", {})
     cfg.disabled |= disabled
     cfg.severity |= overrides
-    cfg.allow_words |= {w.lower() for w in words.get("allow", [])}
-    cfg.extra_vocab += list(words.get("ai_vocab", []))
-    cfg.extra_phrases += list(words.get("stock_phrases", []))
+    cfg.allow_words |= {w.lower() for w in _strings(words.get("allow", []), "[words] allow")}
+    cfg.extra_vocab += _strings(words.get("ai_vocab", []), "[words] ai_vocab")
+    cfg.extra_phrases += _strings(words.get("stock_phrases", []), "[words] stock_phrases")
 
 
 # ---------------------------------------------------------------------------------------------- output
@@ -853,7 +977,8 @@ def lint(text: str, cfg: Settings) -> dict:
     findings = sorted(linter.findings, key=lambda f: (f.line, f.col, f.rule))
     counts = {s: sum(f.severity == s for f in findings) for s in ("error", "warning", "info")}
     return {"genre": cfg.genre, "words": doc.words, "score": score(findings, doc.words), "counts": counts,
-            "stats": linter.stats, "findings": [asdict(f) for f in findings]}
+            "stats": linter.stats,
+            "findings": [{k: v for k, v in asdict(f).items() if k not in ("start", "end")} for f in findings]}
 
 
 def render_text(name: str, result: dict, threshold: int) -> str:

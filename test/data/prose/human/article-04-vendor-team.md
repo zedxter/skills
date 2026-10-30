@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-08-30-what-makes-a-great-vendor-team.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-08-30-what-makes-a-great-vendor-team.md (CC0 1.0 / US public domain) -->
 
 When our acquisition team helps an agency develop a product, we form a joint team between the Technology Transformation Services (TTS) acquisition staff, the federal agency we’re partnering with, and a private vendor. From our experience with the Agile Blanket Purchase Agreement (BPA), we’ve found that in order to build effective cross-functional teams and successful IT projects, we need alignment on several principles:
 - Open software development

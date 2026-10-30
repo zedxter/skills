@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/engineering/our-approach/incident-reports.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/engineering/our-approach/incident-reports.md (CC0 1.0 / US public domain) -->
 
 Though we fully expect to write dependable applications, every project will experience service disruptions and other significant failings. In all cases, we want to learn from our mistakes both within our projects and more broadly. Incident reports, which detail the events and how they were resolved, are an excellent mechanism for sharing this information.
 

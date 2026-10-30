@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/guides/blob/main/content/content-guide/our-style/active-voice.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/guides/blob/debc24b34f23686194d9fe42e391859d569bd39a/content/content-guide/our-style/active-voice.md (CC0 1.0 / US public domain) -->
 
 Our writing should be concise and direct. We prefer the active voice because it supports brevity and makes written content more engaging, too.
 

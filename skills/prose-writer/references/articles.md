@@ -30,12 +30,12 @@ Don't open with:
 
 - a definition (`Kubernetes is a container orchestration platform…`);
 - the state of the world (`In today's fast-paced…`, `AI is changing everything`);
-- a question (it delays the point, and on LinkedIn it measurably costs reach);
+- a question (it delays the point; LinkedIn analytics vendors also report lower reach for question openers, though LinkedIn has published nothing on it);
 - a summary of what the article will do (`In this post I'll walk through…`). If a roadmap helps in a long tutorial, put it after the hook, in one sentence.
 
 ## The middle
 
-- **One idea per paragraph**, with its evidence in the same paragraph. A paragraph that only asserts is a slide.
+- **One idea per paragraph**, with its evidence in the same paragraph. A paragraph that only asserts gives the reader nothing to check.
 - **Show the mechanism.** "It got faster" is a claim; "the query stopped scanning the whole table because the new index covers `(tenant_id, created_at)`" is an explanation the reader can reuse.
 - **Concrete over abstract**, every time you have the choice: the error message, the config line, the command, the name of the meeting.
 - **Code in articles**: short, runnable, language-tagged, with the output when the output is the point. Cut boilerplate and link to the full version.

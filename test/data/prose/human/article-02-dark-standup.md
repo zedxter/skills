@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-01-19-the-dark-standup.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-01-19-the-dark-standup.md (CC0 1.0 / US public domain) -->
 
 In September, our Operations team was authorized for a limited amount of
 overtime during the fiscal year crunch. The team needed the extra hours,

@@ -1,4 +1,4 @@
-<!-- source: https://github.com/18F/18f.gsa.gov/blob/main/content/posts/2017-09-20-managing-custom-software-development-in-government-when-youre-not-a-software-engineer.md (CC0 1.0 / US public domain) -->
+<!-- source: https://github.com/18F/18f.gsa.gov/blob/292605ab095af8e70e2087aca63c2319ce892a4c/content/posts/2017-09-20-managing-custom-software-development-in-government-when-youre-not-a-software-engineer.md (CC0 1.0 / US public domain) -->
 
 As custom software development becomes integral to accomplishing any program’s mission, many managers in government find themselves faced with handling the unfamiliar: overseeing the design and implementation of a digital product that is functional, user-friendly, and necessary for realizing your program’s mission. 
 
