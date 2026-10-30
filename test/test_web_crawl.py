@@ -390,6 +390,23 @@ def test_bad_arguments_exit2():
     assert run("https://example.com/", "--max-pages", "0")[0] == 2
 
 
+def test_finds_web_extract_in_plugin_cache(tmp_path):
+    """Installed as a plugin, the skill has no sibling web-extract; it is found in the plugin cache instead."""
+    alone = tmp_path / "web-crawl" / "scripts"
+    alone.mkdir(parents=True)
+    (alone / "crawl.py").write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+    cached = tmp_path / "config" / "plugins" / "cache" / "market" / "web-extract" / "abc123" / "scripts"
+    cached.mkdir(parents=True)
+    (cached / "extract.py").write_text("FOUND = 'plugin cache'\n", encoding="utf-8")
+    env = {**os.environ, "HOME": str(tmp_path / "home"), "CLAUDE_CONFIG_DIR": str(tmp_path / "config")}
+    env.pop("WEB_EXTRACT_SCRIPT", None)
+    code = (f"import runpy; m = runpy.run_path({str(alone / 'crawl.py')!r}); "
+            "print(m['load_web_extract']().FOUND)")
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", env=env, cwd=tmp_path)
+    assert p.returncode == 0 and p.stdout.strip() == "plugin cache", p.stderr
+
+
 def test_crash_exits_7_not_1():
     """An unexpected exception in main() exits 7 with one error line, never 1, which has its own meaning."""
     code = ("import argparse, runpy, sys\n"
