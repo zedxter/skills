@@ -40,7 +40,8 @@ redistribute copyrighted music.
 ## Quick start
 
 The script is `scripts/audio.py` relative to this skill; `uv` installs yt-dlp
-and mutagen on the first run. ffmpeg must be installed separately.
+(with YouTube's challenge solver, `yt-dlp-ejs`) on the first run. ffmpeg must be
+installed separately; it also embeds the cover art.
 
 ```bash
 uv run scripts/audio.py "https://www.youtube.com/watch?v=VIDEO_ID"          # original audio → ./Title [id].m4a
@@ -53,7 +54,7 @@ uv run scripts/audio.py VIDEO_ID --info                                     # me
 uv run scripts/audio.py VIDEO_ID --cookies-from-browser firefox             # when YouTube asks to sign in
 ```
 
-Without `uv`: `python -m pip install "yt-dlp[default]" mutagen`, then
+Without `uv`: `python -m pip install yt-dlp yt-dlp-ejs brotli certifi pycryptodomex requests urllib3 websockets`, then
 `python scripts/audio.py …`. Install ffmpeg: macOS `brew install ffmpeg`,
 Debian/Ubuntu `sudo apt install ffmpeg`, Windows `winget install ffmpeg`.
 
@@ -121,7 +122,7 @@ failure's.
 | 4 | Blocked by YouTube: "Sign in to confirm you're not a bot", HTTP 429, geo-restriction. | `bot_check`, `rate_limited`, `geo_blocked` | **Stop retrying.** Offer `--cookies-from-browser <their browser>` (their own account) or another network/`--proxy`; for 429 wait several minutes. |
 | 5 | The video is unavailable to this client: private, removed, members-only, age-restricted, or the site requires a signed-in account. | `private`, `unavailable`, `members_only`, `age_restricted`, `login_required` | Report it; age, members-only and login-only content need `--cookies-from-browser` with an eligible account. |
 | 6 | Network error (DNS, timeout, TLS, connection reset). | `network` | Check the connection or `--proxy`; one retry later is fine. |
-| 7 | Anything else, including yt-dlp failing to read YouTube's player (signature/nsig). | `extractor_outdated`, `other` | Update yt-dlp (`uv` uses the newest allowed release; `pip install -U "yt-dlp[default]"`), then retry once. |
+| 7 | Anything else, including yt-dlp failing to read YouTube's player (signature/nsig). | `extractor_outdated`, `other` | Update yt-dlp (`uv` uses the newest allowed release; `pip install -U yt-dlp yt-dlp-ejs`), then retry once. |
 
 ## Workflow for the agent
 

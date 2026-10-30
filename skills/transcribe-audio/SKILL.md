@@ -62,7 +62,7 @@ uv run scripts/transcribe.py talk.m4a --start 10:00 --end 25:00           # a se
 uv run scripts/transcribe.py memo.ogg --prompt "Kubernetes, Grafana, Sutskever"   # spell names right
 ```
 
-Without `uv`: `python -m pip install faster-whisper "yt-dlp[default]"`, then
+Without `uv`: `python -m pip install faster-whisper yt-dlp yt-dlp-ejs brotli certifi pycryptodomex requests urllib3 websockets`, then
 `python scripts/transcribe.py …`.
 
 Output starts with a header like `youtube-transcript`'s (text and timestamps

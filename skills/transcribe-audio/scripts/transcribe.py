@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["faster-whisper>=1.1", "yt-dlp[default]>=2025.10.22"]
+# # yt-dlp's "default" extra without mutagen (GPL), which only embeds cover art; this script embeds none.
+# dependencies = ["faster-whisper>=1.1", "yt-dlp>=2025.10.22", "yt-dlp-ejs", "brotli", "certifi", "pycryptodomex", "requests>=2.32.2,<3", "urllib3>=2.0.2,<3", "websockets>=13"]
 # ///
 """Transcribe speech in an audio/video file or URL locally with faster-whisper (offline, no API key).
 
@@ -45,7 +46,7 @@ try:
     from faster_whisper.utils import _MODELS, download_model
 except ImportError as e:
     sys.stderr.write(f"error: missing dependency ({e.name}); run with `uv run transcribe.py …` or "
-                     "`pip install faster-whisper 'yt-dlp[default]'`\n")
+                     "`pip install faster-whisper yt-dlp yt-dlp-ejs brotli certifi pycryptodomex requests urllib3 websockets`\n")
     sys.exit(EXIT_BAD_INPUT)
 
 SAMPLE_RATE = 16000
@@ -66,7 +67,7 @@ MODEL_INFO: dict[str, tuple[int, str]] = {
 }
 WINDOW_SECONDS, CUT_SLACK = 600, 30  # long audio is transcribed in ~10-minute windows cut at a pause
 PARAGRAPH_HARD_SPLIT = 2  # a paragraph with no sentence end is cut after this many × --paragraph-seconds
-UPDATE_HINT = "sites change often; update yt-dlp (uv run picks the newest allowed release; with pip: pip install -U 'yt-dlp[default]')"
+UPDATE_HINT = "sites change often; update yt-dlp (uv run picks the newest allowed release; with pip: pip install -U yt-dlp yt-dlp-ejs)"
 
 # Ordered (pattern, exit code, kind, hint) for yt-dlp errors; first match wins.
 ERROR_RULES: list[tuple[str, int, str, str]] = [
@@ -338,7 +339,7 @@ def fetch(url: str, args: argparse.Namespace, out_dir: Path) -> tuple[Path, dict
         import yt_dlp
         from yt_dlp.utils import DownloadError
     except ImportError:
-        raise Failure(EXIT_BAD_INPUT, "missing dependency yt-dlp", "run with uv, or pip install 'yt-dlp[default]'")
+        raise Failure(EXIT_BAD_INPUT, "missing dependency yt-dlp", "run with uv, or pip install yt-dlp yt-dlp-ejs brotli certifi pycryptodomex requests urllib3 websockets")
     try:
         with yt_dlp.YoutubeDL(ydl_opts(args, out_dir)) as ydl:
             # Resolve without downloading first so a playlist/channel URL is refused before anything is fetched;

@@ -215,17 +215,11 @@ test/                   # pytest suites for the scripts, evals, and ops.py (vali
 .github/workflows/      # CI on every pull request; a weekly liveness probe of every source
 ```
 
-Run the test suites with every script dependency available (browser tests skip
-when Playwright's Chromium is not installed; network tests skip with
-`WEB_EXTRACT_OFFLINE=1`; speech tests skip until the 78 MB `tiny` Whisper model
-is cached: `uv run skills/transcribe-audio/scripts/transcribe.py test/data/jfk.ogg
--m tiny --download-model`):
-
-```bash
-uv run --with pytest --with curl_cffi --with trafilatura --with lxml_html_clean \
-    --with pypdf --with cssselect --with 'ddgs>=9,<10' --with playwright \
-    --with 'yt-dlp[default]' --with mutagen --with faster-whisper --with feedparser python -I -m pytest test -q
-```
+`python3 test/ops.py test` runs every test suite with exactly the dependencies
+CI installs, one suite at a time (`python3 test/ops.py test weather`). Browser
+tests skip when Playwright's Chromium is not installed, and speech tests skip
+until the 78 MB `tiny` Whisper model is cached
+(`uv run skills/transcribe-audio/scripts/transcribe.py test/data/jfk.ogg -m tiny --download-model`).
 
 `web-crawl`, `web-scrape`, `web-search --read` and `web-browse read` import
 `web-extract`'s script at run time, so install the web skills together (the
@@ -236,9 +230,6 @@ install chromium-headless-shell`.
 `SKILL.md` follows the [Agent Skills specification](https://agentskills.io/specification):
 `name` matches the folder name, `description` says both what the skill does and
 when to use it, and the body stays short enough to be read in one go.
-
-`python3 test/ops.py test` runs every suite with exactly the dependencies CI
-installs, one suite at a time (`python3 test/ops.py test weather`).
 
 ## Contributing
 
