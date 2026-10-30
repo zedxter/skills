@@ -1,0 +1,102 @@
+[
+  {
+    "id": "t1-what-wiki-says",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "t2-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "t3-url",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "t4-fact",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "t5-other-lang",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "t6-403",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "t7-disambig",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "n1-news",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-papers",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-edit",
+    "expect": false,
+    "loaded": true,
+    "ok": false,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "n4-explain",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-fandom",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]
