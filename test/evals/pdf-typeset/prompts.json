@@ -1,0 +1,57 @@
+[
+  {
+    "id": "t1-report",
+    "expect": true,
+    "prompt": "Make a nice PDF report from these notes: Q3 platform team. CI moved from Jenkins to GitHub Actions, builds 18 min -> 7 min. Incidents 4 (Q2: 9). Infra cost 41,200 EUR/month (Q2: 47,800)."
+  },
+  {
+    "id": "t2-invoice",
+    "expect": true,
+    "prompt": "Create a PDF invoice: from Studio Nord GmbH to Acme Ltd, UX audit 2400 EUR, 3 workshop days at 1150 EUR, VAT 19%, invoice number 2026-041, dated today."
+  },
+  {
+    "id": "t3-cv",
+    "expect": true,
+    "prompt": "Turn my CV into a professional-looking PDF. I'm Jane Example, staff engineer at Acme Payments since 2021, before that senior engineer at Shopfront 2016-2021, BSc Computer Science Manchester 2016."
+  },
+  {
+    "id": "t4-export-md",
+    "expect": true,
+    "prompt": "Export CHANGELOG.md in this folder as a nicely formatted PDF."
+  },
+  {
+    "id": "t5-ru-letter",
+    "expect": true,
+    "prompt": "Сделай PDF-письмо партнёру: благодарим за встречу 28 октября, подтверждаем старт проекта 10 ноября, подпись — Анна Беккер."
+  },
+  {
+    "id": "t6-onepager",
+    "expect": true,
+    "prompt": "I need a one-page PDF summary of our queue-worker project for the leadership meeting: runtime 9h -> 41 min, memory 14 GB -> 380 MB, zero failed runs since launch."
+  },
+  {
+    "id": "n1-merge",
+    "expect": false,
+    "prompt": "Merge a.pdf and b.pdf in this folder into one file."
+  },
+  {
+    "id": "n2-extract",
+    "expect": false,
+    "prompt": "Extract the tables from report.pdf into a CSV file."
+  },
+  {
+    "id": "n3-html",
+    "expect": false,
+    "prompt": "Write an HTML landing page for our queue-worker project with a hero section and three feature cards."
+  },
+  {
+    "id": "n4-explain",
+    "expect": false,
+    "prompt": "What is the difference between PDF/A-2b and PDF/A-3b? Two sentences."
+  },
+  {
+    "id": "n5-fill-form",
+    "expect": false,
+    "prompt": "Fill in the application form in form.pdf in this folder with my name Jane Example and today's date."
+  }
+]

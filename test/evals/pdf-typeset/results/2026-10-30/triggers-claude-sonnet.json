@@ -1,0 +1,91 @@
+[
+  {
+    "id": "t1-report",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "pdf-typeset"
+    ]
+  },
+  {
+    "id": "t2-invoice",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "pdf-typeset"
+    ]
+  },
+  {
+    "id": "t3-cv",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "pdf-typeset"
+    ]
+  },
+  {
+    "id": "t4-export-md",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "pdf-typeset"
+    ]
+  },
+  {
+    "id": "t5-ru-letter",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "pdf-typeset"
+    ]
+  },
+  {
+    "id": "t6-onepager",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "pdf-typeset"
+    ]
+  },
+  {
+    "id": "n1-merge",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-extract",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-html",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-explain",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-fill-form",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

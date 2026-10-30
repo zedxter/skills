@@ -1,0 +1,68 @@
+[
+  {
+    "agent": "claude",
+    "brief": "report",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.2833876,
+    "skill_used": true,
+    "pages": 2,
+    "errors": [
+      "missing-glyph"
+    ],
+    "warnings": [],
+    "fonts": [
+      "LibertinusSerif-Bold-Identity-H",
+      "LibertinusSerif-Regular-Identity-H",
+      "LibertinusSerif-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "invoice",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.0888201,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "cv",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.1325121,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "claude",
+    "brief": "onepager",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": 0.1436321,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  }
+]

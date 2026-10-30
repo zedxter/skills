@@ -1,0 +1,66 @@
+[
+  {
+    "agent": "codex",
+    "brief": "report",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "invoice",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "cv",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  },
+  {
+    "agent": "codex",
+    "brief": "onepager",
+    "arm": "skill",
+    "pdf": true,
+    "cost_usd": null,
+    "skill_used": true,
+    "pages": 1,
+    "errors": [],
+    "warnings": [],
+    "fonts": [
+      "SourceSans3-Bold-Identity-H",
+      "SourceSans3-Regular-Identity-H",
+      "SourceSans3-Semibold-Identity-H"
+    ]
+  }
+]

@@ -1,0 +1,44 @@
+{
+  "pair-1": {
+    "agent": "claude",
+    "brief": "cv",
+    "X": "plain",
+    "Y": "skill"
+  },
+  "pair-2": {
+    "agent": "claude",
+    "brief": "onepager",
+    "X": "plain",
+    "Y": "skill"
+  },
+  "pair-3": {
+    "agent": "claude",
+    "brief": "invoice",
+    "X": "plain",
+    "Y": "skill"
+  },
+  "pair-4": {
+    "agent": "codex",
+    "brief": "report",
+    "X": "plain",
+    "Y": "skill"
+  },
+  "pair-5": {
+    "agent": "codex",
+    "brief": "onepager",
+    "X": "skill",
+    "Y": "plain"
+  },
+  "pair-6": {
+    "agent": "codex",
+    "brief": "cv",
+    "X": "skill",
+    "Y": "plain"
+  },
+  "pair-7": {
+    "agent": "codex",
+    "brief": "invoice",
+    "X": "plain",
+    "Y": "skill"
+  }
+}

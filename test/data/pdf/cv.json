@@ -1,0 +1,31 @@
+{
+  "basics": {
+    "name": "Jane Example",
+    "label": "Staff Software Engineer",
+    "email": "jane@example.com",
+    "phone": "+44 20 7946 0000",
+    "url": "https://jane.example.com",
+    "summary": "Backend engineer with ten years in payments and data pipelines. I like boring infrastructure that stays up.",
+    "location": {"city": "London", "countryCode": "GB"},
+    "profiles": [{"network": "GitHub", "username": "jexample", "url": "https://github.com/jexample"}]
+  },
+  "work": [
+    {"name": "Acme Payments", "position": "Staff Engineer", "location": "London", "startDate": "2021-03",
+     "summary": "Tech lead for the ledger and export platform (12 engineers).",
+     "highlights": ["Cut the nightly export from 9 hours to 41 minutes with a streaming queue worker.",
+                    "Designed idempotent batch writes; zero double-counted invoices since 2024.",
+                    "Mentored four engineers to senior."]},
+    {"name": "Shopfront", "position": "Senior Engineer", "startDate": "2016-09", "endDate": "2021-02",
+     "highlights": ["Built the order pipeline on PostgreSQL and Kafka (40k orders/hour peak).",
+                    "Led the move from a monolith to six services."]}
+  ],
+  "education": [
+    {"institution": "University of Manchester", "area": "Computer Science", "studyType": "BSc", "startDate": "2012", "endDate": "2016", "score": "First class"}
+  ],
+  "skills": [
+    {"name": "Languages", "keywords": ["Go", "Python", "SQL", "TypeScript"]},
+    {"name": "Infrastructure", "keywords": ["PostgreSQL", "Kafka", "Kubernetes", "Terraform"]}
+  ],
+  "languages": [{"language": "English", "fluency": "Native"}, {"language": "German", "fluency": "Professional"}],
+  "certificates": [{"name": "Certified Kubernetes Administrator", "issuer": "CNCF", "date": "2023-05"}]
+}

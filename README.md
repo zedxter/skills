@@ -28,6 +28,7 @@ everywhere.
 | [`web-scrape`](skills/web-scrape) | Scrapes **structured records** into JSON, JSONL, CSV or a Markdown table: one record per repeating element (CSS/XPath `--item`), fields by selector with `@attr` and `\|number`/`\|date`/`\|list` modifiers, or records from schema.org JSON-LD and HTML tables; walks next-page links, opens each record's detail page for more fields, and `--probe` shows a page's repeating blocks. Fetching via `web-extract` (bot-wall detection, optional headless rendering). Free stand-in for Apify actors and Firecrawl extract. Triggers when the user wants a list, catalogue, table or search-result page turned into rows. |
 | [`web-search`](skills/web-search) | Searches the web **without an API key** via the `ddgs` metasearch library (DuckDuckGo, Bing, Brave, Google, Yahoo, Wikipedia backends) or the user's own SearXNG: title, URL, snippet, news date/source; filters by time window, region and site; `--read N` fetches the top results through `web-extract` and returns what the pages say. Free stand-in for Tavily, Serper and Firecrawl search. Triggers when the user asks to look something up, find sources, recent news or docs, or when the built-in search tool is missing or thin. |
 | [`web-browse`](skills/web-browse) | Drives a **real Chromium step by step** from the CLI: a background session that persists between commands, `open`, `snapshot` of interactive elements with numbered refs, `click`, `type`, `select`, `press`, `scroll`, `wait`, tabs, `read` as Markdown (via `web-extract`), `screenshot`, `eval`; `--profile` keeps logins, `--headful` lets a human log in or pass a check. Free stand-in for Browser Use, Browserbase and Playwright MCP. Triggers when a task needs several dependent steps in a browser: log in and read, search a site and open a result, fill a form, click through an app. |
+| [`pdf-typeset`](skills/pdf-typeset) | Typesets **Markdown or JSON into a professional-looking PDF** with Typst, installed as a Python package (no LaTeX, browser or system libraries): report with cover and contents, document, letter, one-pager, 16:9 slides, **invoice with exact Decimal totals**, CV from JSON Resume; three themes, Cyrillic and other scripts, tagged PDF with metadata. Every render is **checked** (missing glyphs, text in the margins, overlapping text, unembedded fonts, blank, spilled or nearly empty pages, low-resolution images) and written as **PNG pages** for the agent to look at; `check` runs the same on any PDF. Triggers when the user wants a report, memo, letter, invoice, CV, one-pager or slides as a PDF, or Markdown exported to PDF. |
 | [`human-writing`](skills/human-writing) | Writes, edits and reviews **English articles, posts and technical documentation** (LinkedIn, dev.to, Hashnode, Medium, how-tos, README, tutorials, reference, ADRs, changelogs) so they read as written by a person, not a chat model. Interviews the author for real material, drafts in their voice from a **voice profile**, keeps a **facts ledger** so nothing is invented, lints offline for AI tells (`scripts/lint_prose.py`, standard library only, per-genre rules and budgets), and before publishing runs a **panel of isolated reviewer sub-agents** (cold reader, hostile expert, fact checker, slop hunter, publication safety, voice keeper, platform editor, newcomer tester, source checker), then merges their findings. Triggers when the user asks to write, tighten or review a post, article or doc, to make text sound less like AI, or to check a text before publishing. |
 
 They chain naturally: search → pick a video by date/views/length → transcript →
@@ -37,6 +38,7 @@ summary (or `transcribe-audio` when there are no captions, and `youtube-audio` f
 the right section through `web-extract`'s engine.
 `human-writing` uses `web-search` and `web-extract` to research and read sources (every fact goes into its ledger with the URL),
 and `youtube-transcript` or `transcribe-audio` to turn a talk or voice memo into material for an article.
+`human-writing` writes the text and `pdf-typeset` sets it as a report, letter or one-pager PDF.
 
 `human-writing`'s catalogue of AI tells is written for this repo but builds on
 [blader/humanizer](https://github.com/blader/humanizer), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop),
@@ -44,6 +46,12 @@ and `youtube-transcript` or `transcribe-audio` to turn a talk or voice memo into
 and [eric-tramel/slop-guard](https://github.com/eric-tramel/slop-guard) (all MIT), and paraphrases Wikipedia's
 [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) (CC BY-SA). Its human-text test corpus is
 public-domain 18F writing (CC0).
+
+`pdf-typeset` bundles [Source Sans 3](https://github.com/adobe-fonts/source-sans) (SIL Open Font License 1.1,
+licence in `skills/pdf-typeset/fonts/source-sans-3/LICENSE.md`) and uses the fonts built into Typst
+(Libertinus Serif, New Computer Modern, DejaVu Sans Mono). Its Python dependencies are permissively licensed:
+`typst` (Apache-2.0), `markdown-it-py` and `mdit-py-plugins` (MIT), PyYAML (MIT), `pypdf` (BSD-3-Clause),
+`pypdfium2` (Apache-2.0 / BSD-3-Clause) and Pillow (MIT-CMU).
 
 ## Source policies
 
