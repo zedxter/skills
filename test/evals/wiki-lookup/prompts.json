@@ -1,0 +1,14 @@
+[
+  {"id": "t1-what-wiki-says", "expect": true, "prompt": "What does Wikipedia say about the Tunguska event? Give me the gist and a link I can cite."},
+  {"id": "t2-ru", "expect": true, "prompt": "Что пишет русская Википедия про Транссибирскую магистраль? Нужна краткая справка со ссылкой."},
+  {"id": "t3-url", "expect": true, "prompt": "Summarise the History section of https://de.wikipedia.org/wiki/K%C3%B6lner_Dom for me in English."},
+  {"id": "t4-fact", "expect": true, "prompt": "According to Wikidata, what is the population of Lagos and as of which date?"},
+  {"id": "t5-other-lang", "expect": true, "prompt": "What is the Japanese Wikipedia article title for 'Photosynthesis', and is there a Ukrainian one?"},
+  {"id": "t6-403", "expect": true, "prompt": "I tried to fetch https://en.wikipedia.org/wiki/Ada_Lovelace with curl and got a 403. Can you get me the article's infobox details?"},
+  {"id": "t7-disambig", "expect": true, "prompt": "Look up 'Mercury' on Wikipedia - I mean the Roman god - and tell me what it says."},
+  {"id": "n1-news", "expect": false, "prompt": "What happened in the news today about the European Central Bank's interest rate decision?"},
+  {"id": "n2-papers", "expect": false, "prompt": "Find peer-reviewed papers from the last two years on microplastics in human blood."},
+  {"id": "n3-edit", "expect": false, "prompt": "Write a Python script that logs into Wikipedia with my bot account and fixes typos in articles."},
+  {"id": "n4-explain", "expect": false, "prompt": "Explain the difference between a list and a tuple in Python."},
+  {"id": "n5-fandom", "expect": false, "prompt": "Write a short story set on the planet Mercury in the style of a 1950s pulp magazine."}
+]
