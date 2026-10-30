@@ -1,0 +1,44 @@
+{
+  "topic": "o2-devto",
+  "order": [
+    "skill",
+    "plain"
+  ],
+  "human": "skill",
+  "useful": "plain",
+  "overall": "skill",
+  "unsupported": {
+    "skill": [
+      "The Comparison view lists only what was allocated and freed between two snapshots (general claim, not from notes)",
+      "Writing a snapshot ... needs roughly twice the heap's size in memory (external fact, though cited)",
+      "six hours was plenty for ours"
+    ],
+    "plain": [
+      "Clicking one of those sockets and opening the Retainers panel showed what was keeping it alive (method not in notes)",
+      "Sort by # Delta or Size Delta / Most constructors barely changed between the two snapshots",
+      "The buggy middleware code itself (activeSockets array, indexOf/splice, metrics.gauge) is invented",
+      "There have been no more OOM kills",
+      "Every one of them stayed in memory, along with everything it referenced",
+      "After a deploy or restart, the pod sat at about 300 MB",
+      "Take them far enough apart ... For us, 6 hours was plenty",
+      "one socket can carry a huge number of requests and stay open far longer than you'd expect"
+    ]
+  },
+  "ai_tells": {
+    "skill": [
+      "so even a missed decrement would skew a number instead of holding memory"
+    ],
+    "plain": [
+      "That last item turned out to be the problem.",
+      "One snapshot shows what's in memory. Two snapshots show what's *growing*, and growth is what a leak is.",
+      "That leads you straight to the code.",
+      "If you only need a number, keep a number.",
+      "If your Node service has a sawtooth memory graph, take two snapshots a few hours apart and look at the delta.",
+      "The main lesson: **don't stare at one heap snapshot. Take two and compare them.**"
+    ]
+  },
+  "why": {
+    "human": "A reads like a careful engineer drafting a post. It is terse, hedges where the notes are thin, and flags real technical doubts, such as why 'close' would never fire, inline. B follows the standard blog template: bolded key phrases, a numbered takeaways list and a tidy closing call to action.",
+    "useful": "B gives readers a complete path to follow: step-by-step DevTools Comparison instructions, the Retainers panel, before/after code and generalizable takeaways. A is so full of TODOs that a reader gets little beyond the core idea."
+  }
+}

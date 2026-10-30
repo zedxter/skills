@@ -1,0 +1,12 @@
+{
+  "panel": {
+    "defects": 40,
+    "owner": 40,
+    "any": 40
+  },
+  "single": {
+    "defects": 40,
+    "owner": 40,
+    "any": 40
+  }
+}

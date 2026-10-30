@@ -1,0 +1,22 @@
+[
+  {"id": "t1-devto", "expect": true,
+   "prompt": "Write a dev.to post about how we shrank our Docker image from 1.2 GB to 180 MB with a multi-stage build and a distroless base. Use only these facts; don't ask questions, put [TODO] where something is missing."},
+  {"id": "t2-readme", "expect": true,
+   "prompt": "Write a README section that documents the command-line options of tool.py in this folder."},
+  {"id": "t3-less-ai", "expect": true,
+   "prompt": "This reads like ChatGPT wrote it. Make it sound like a person:\n\nIn today's fast-paced world, observability is no longer a luxury. It's a necessity. Logs, metrics, and traces form the foundation of any robust strategy, empowering teams to unlock deep insights."},
+  {"id": "t4-ready", "expect": true,
+   "prompt": "Is this LinkedIn post ready to publish?\n\nI got promoted to Staff Engineer today. But here's what nobody tells you: it's not about writing more code. It's about multiplying others. Agree? #leadership #growth #career #engineering"},
+  {"id": "t5-repurpose", "expect": true,
+   "prompt": "Turn this into a LinkedIn post:\n\nWe moved our nightly export from a cron job to a queue worker. Runtime went from 9 hours to 40 minutes, mostly because the worker streams rows instead of loading the whole table into memory. The hard part was idempotency: a retried batch used to double-count invoices, so every batch now carries a run id and the writer skips ids it has seen."},
+  {"id": "t6-release-notes", "expect": true,
+   "prompt": "Write the release notes for version 2.0 from CHANGELOG.md in this folder."},
+  {"id": "n1-code", "expect": false,
+   "prompt": "Write a Python function that parses an ISO 8601 date string and returns a datetime. Just the code."},
+  {"id": "n2-translate", "expect": false,
+   "prompt": "Translate into Russian: The worker streams rows instead of loading the whole table into memory."},
+  {"id": "n3-explain", "expect": false,
+   "prompt": "What does the --batch-size option in tool.py do? One sentence."},
+  {"id": "n4-regex", "expect": false,
+   "prompt": "Give me a regex that matches a semantic version like 1.4.0 or 2.0.0-rc.1."}
+]

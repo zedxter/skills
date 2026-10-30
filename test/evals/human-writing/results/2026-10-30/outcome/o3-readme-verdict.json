@@ -1,0 +1,37 @@
+{
+  "topic": "o3-readme",
+  "order": [
+    "plain",
+    "skill"
+  ],
+  "human": "skill",
+  "useful": "plain",
+  "overall": "plain",
+  "unsupported": {
+    "plain": [
+      "boto3 credential chain listed as 'environment variables, `~/.aws/credentials`, instance/role credentials' (general boto3 knowledge, not from the material)",
+      "the 1.x example `EXPORT_BUCKET=my-data-exports python export.py public.orders` assumes how 1.x was invoked",
+      "'then exit without writing anything' for --dry-run (the material only says 'print what would be exported and exit')",
+      "'`<n>`: the batch number' (inferred, though A then flags it with a TODO)",
+      "the full path 's3://<bucket>/...' assumes the key sits at the root of the bucket"
+    ],
+    "skill": [
+      "'Each batch is written as one S3 object' in the --batch-size row is supported, but the boto3 credentials guide URL is added from outside the material"
+    ]
+  },
+  "ai_tells": {
+    "plain": [
+      "'Scripts or jobs that relied on it must now pass `--bucket` explicitly'",
+      "a configuration table that duplicates the arguments table",
+      "'**no longer read**' in bold"
+    ],
+    "skill": [
+      "'scripts and jobs that relied on it must pass `--bucket` instead'",
+      "'[TODO: example output of a run and of `--dry-run`]'"
+    ]
+  },
+  "why": {
+    "human": "B reads more like a person wrote it: it uses plain prose (\"It's an internal tool\", \"the database you're exporting from\") and has fewer tables. A is more template-shaped, with a configuration table that repeats the arguments table and a separate TODO section for each standard heading.",
+    "useful": "A gives the reader more to act on: a before-and-after migration example for 1.x users, a combined example using --since with --batch-size, the full s3:// path, and gaps flagged inline next to each output component. B is tighter but leaves more of the output section as a single block of TODOs."
+  }
+}

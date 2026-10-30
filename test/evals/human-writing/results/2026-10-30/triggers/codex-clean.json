@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-devto",
+    "expect": true,
+    "loaded": true,
+    "ok": true
+  },
+  {
+    "id": "t2-readme",
+    "expect": true,
+    "loaded": true,
+    "ok": true
+  },
+  {
+    "id": "t3-less-ai",
+    "expect": true,
+    "loaded": true,
+    "ok": true
+  },
+  {
+    "id": "t4-ready",
+    "expect": true,
+    "loaded": true,
+    "ok": true
+  },
+  {
+    "id": "t5-repurpose",
+    "expect": true,
+    "loaded": true,
+    "ok": true
+  },
+  {
+    "id": "t6-release-notes",
+    "expect": true,
+    "loaded": true,
+    "ok": true
+  },
+  {
+    "id": "n1-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true
+  },
+  {
+    "id": "n2-translate",
+    "expect": false,
+    "loaded": false,
+    "ok": true
+  },
+  {
+    "id": "n3-explain",
+    "expect": false,
+    "loaded": true,
+    "ok": false
+  },
+  {
+    "id": "n4-regex",
+    "expect": false,
+    "loaded": false,
+    "ok": true
+  }
+]

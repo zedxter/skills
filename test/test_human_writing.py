@@ -257,6 +257,21 @@ def test_slop_fails(path):
     assert r["score"] < lp.DEFAULT_THRESHOLD or r["counts"]["error"] > 0
 
 
+def test_seeded_cases_are_consistent():
+    cases = json.loads((DATA / "seeded" / "cases.json").read_text(encoding="utf-8"))
+    briefs = {p.stem for p in (SCRIPT.parents[1] / "references" / "reviewers").glob("*.md")}
+    assert len(cases) >= 6
+    for name, case in cases.items():
+        text = (DATA / "seeded" / f"{name}.md").read_text(encoding="utf-8")
+        assert (DATA / "seeded" / f"{name}.ledger.md").exists()
+        assert set(case["lenses"]) <= briefs and case["genre"] in lp.GENRES
+        if "voice" in case:
+            assert (DATA / "seeded" / case["voice"]).exists()
+        for d in case["defects"]:
+            assert text.count(d["quote"]) == 1, (name, d["id"])
+            assert set(d["lenses"]) <= set(case["lenses"]), (name, d["id"])
+
+
 # -------------------------------------------------------------------------------------------------- CLI
 
 def test_cli_pass_and_fail(tmp_path):
