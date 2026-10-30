@@ -1,0 +1,98 @@
+[
+  {
+    "id": "t1-bib",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "cite-check"
+    ]
+  },
+  {
+    "id": "t2-doi-real",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "cite-check"
+    ]
+  },
+  {
+    "id": "t3-hallucinated",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "cite-check"
+    ]
+  },
+  {
+    "id": "t4-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "cite-check"
+    ]
+  },
+  {
+    "id": "t5-before-submit",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "cite-check"
+    ]
+  },
+  {
+    "id": "t6-one-paper",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": []
+  },
+  {
+    "id": "t7-add-dois",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "cite-check"
+    ]
+  },
+  {
+    "id": "n1-find-papers",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-apa",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-summarise",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-bibtex-gen",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-grammar",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]
