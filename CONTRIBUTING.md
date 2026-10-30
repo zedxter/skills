@@ -139,7 +139,8 @@ differ.
 A weekly workflow (`.github/workflows/liveness.yml`) runs every probe against
 the real sources. It keeps one issue labelled `liveness`:
 - opened or commented on when a source is broken: any exit other than 0, 4 or
-  6, a timeout, a probe that left no result, or a live test that fails;
+  6, a timeout, a probe that left no result, or a live test that fails for any
+  other reason than the script exiting 4 or 6;
 - closed when everything works again.
 
 Exits 4 and 6 are reported as "blocked or unreachable from the runner", not
