@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Trigger evals for the human-writing skill: does each agent load the skill when it should, and only then?
+"""Trigger evals: does each agent load the skill when it should, and only then?
 
     python3 -I run_triggers.py claude OUT_DIR [--model sonnet] [--user-settings]   # --user-settings: load ~/.claude plugins and hooks too
     python3 -I run_triggers.py codex OUT_DIR [--clean]   # --clean: ignore ~/.codex config and plugins
+    python3 -I run_triggers.py claude OUT_DIR --skill telegram-channel   # another skill; prompts from test/evals/<skill>/
+
+Written for human-writing; --skill NAME (default human-writing) tests skills/NAME with test/evals/NAME/prompts.json.
 
 Each prompt runs in a scratch project that has only this skill installed at the project level (Claude Code:
 .claude/skills/, Codex: .agents/skills/) plus tool.py and CHANGELOG.md. Claude Code runs with project settings
@@ -18,7 +21,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SKILL = HERE.parents[2] / "skills" / "human-writing"
+NAME = sys.argv[sys.argv.index("--skill") + 1] if "--skill" in sys.argv else "human-writing"
+SKILL = HERE.parents[2] / "skills" / NAME
+PROMPTS = HERE.parent / NAME / "prompts.json"
 
 
 def project(root: Path, agent: str) -> Path:
@@ -26,7 +31,7 @@ def project(root: Path, agent: str) -> Path:
     if not proj.exists():
         skills = proj / (".claude/skills" if agent == "claude" else ".agents/skills")
         skills.mkdir(parents=True)
-        shutil.copytree(SKILL, skills / "human-writing")
+        shutil.copytree(SKILL, skills / NAME)
         for f in ("tool.py", "CHANGELOG.md"):
             shutil.copy(HERE / f, proj / f)
     return proj
@@ -51,11 +56,11 @@ def loaded(agent: str, events: list[dict]) -> bool:
             for c in e["message"]["content"]:
                 if c.get("type") == "tool_use":
                     inp = json.dumps(c.get("input", {}))
-                    if (c["name"] == "Skill" and "human-writing" in inp) or "human-writing/SKILL.md" in inp:
+                    if (c["name"] == "Skill" and NAME in inp) or f"{NAME}/SKILL.md" in inp:
                         return True
         if agent == "codex":
             item = e.get("item", {})
-            if item.get("type") == "command_execution" and "human-writing/" in item.get("command", ""):
+            if item.get("type") == "command_execution" and f"{NAME}/" in item.get("command", ""):
                 return True
     return False
 
@@ -94,7 +99,7 @@ def main() -> int:
     user = "--user-settings" in sys.argv
     out.mkdir(parents=True, exist_ok=True)
     proj = project(out, agent)
-    cases = json.loads((HERE / "prompts.json").read_text(encoding="utf-8"))
+    cases = json.loads(PROMPTS.read_text(encoding="utf-8"))
     with ThreadPoolExecutor(4) as pool:
         results = list(pool.map(lambda c: run(agent, proj, c, out, model, clean, user), cases))
     (out / f"{agent}-results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")

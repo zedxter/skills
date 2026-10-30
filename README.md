@@ -22,6 +22,7 @@ everywhere.
 | [`youtube-audio`](skills/youtube-audio) | Saves a YouTube video's, playlist's or channel's **audio as a file** with the free, key-less `yt-dlp`: the original stream by default (m4a/opus, no re-encoding) or **mp3**/opus/flac/wav via ffmpeg at a chosen bitrate; embeds title, channel, date, chapters and cover art; cuts a section by timestamps and splits chapters into tracks; `--info` lists chapters and formats. Triggers when the user wants a YouTube link as mp3/audio, a lecture or podcast for offline listening, or audio to transcribe when there are no captions. |
 | [`transcribe-audio`](skills/transcribe-audio) | Transcribes speech in an audio/video **file or URL locally and offline** with `faster-whisper` (no key, no upload, no PyTorch, no ffmpeg install): text, timestamps or SRT like `youtube-transcript`, plus VTT and JSON; downloads YouTube videos and podcast episodes with `yt-dlp`; language auto-detection, `--start/--end`, name hints, `--info` with a time estimate, flat memory on hour-long recordings. Never downloads a model without `--download-model`. Triggers when a video has no captions, or the user has a podcast, lecture, meeting or voice memo to transcribe or subtitle. |
 | [`podcast-search`](skills/podcast-search) | Finds podcasts and episodes **without an API key** via Apple's iTunes Search API (shows, or episodes across all shows by topic or guest) and lists a show's episodes from its own RSS feed: title, date, duration, description, **direct audio URL** and the Podcasting 2.0 transcript link; filters by date, keyword and length; `-f urls` pipes into `transcribe-audio`. Triggers when the user wants a podcast on a topic, a specific interview, a show's latest episodes or podcast audio to transcribe. |
+| [`telegram-channel`](skills/telegram-channel) | Reads a **public Telegram channel without an account**, API ID or phone number through Telegram's own web preview (`t.me/s/<channel>`): text (plain or Markdown), date, views, signature, **media placeholders**, links, forwards and replies; pages back through history, `--after`/`--before` dates, Telegram's in-channel `--search`, `--grep`, one post by link, `--links` for the URLs posted; table, Markdown or JSON. A distinct exit code when Telegram changes the markup. Triggers on a channel name, @handle or t.me link, or when the user wants a channel's latest posts, a digest, or posts about a topic. |
 | [`web-extract`](skills/web-extract) | Fetches a web page or PDF from the user's own machine with a browser-grade TLS fingerprint (`curl_cffi`) and returns its **main content as Markdown, text or JSON** (title, author, date, links, JSON-LD/OpenGraph/tables) via `trafilatura` and `pypdf`; renders JavaScript pages in a **local headless Chromium** (optional Playwright) with click/type/scroll actions and screenshots, tracks changes between fetches, and falls back to the newest **Wayback Machine** snapshot when the page is blocked, gone or unreachable. A free local stand-in for paid scraping APIs. Triggers when the user shares a URL to read, summarise or quote, or when the built-in fetch tool got 403, "Just a moment" or an empty page. |
 | [`web-crawl`](skills/web-crawl) | Crawls a site breadth-first from the user's machine and collects every page's **main content into one Markdown file**, a folder of pages with `index.json`, or JSON/JSONL; `--map` lists the URLs. Bounded by depth, page count and time, include/exclude patterns, same site only, robots.txt honoured, sitemap.xml as seed; each page goes through `web-extract` (PDF text, optional headless rendering). Free stand-in for Firecrawl crawl/map. Triggers when the user wants a whole documentation site, blog or section read, summarised or turned into notes, or asks which pages a site has. |
 | [`web-scrape`](skills/web-scrape) | Scrapes **structured records** into JSON, JSONL, CSV or a Markdown table: one record per repeating element (CSS/XPath `--item`), fields by selector with `@attr` and `\|number`/`\|date`/`\|list` modifiers, or records from schema.org JSON-LD and HTML tables; walks next-page links, opens each record's detail page for more fields, and `--probe` shows a page's repeating blocks. Fetching via `web-extract` (bot-wall detection, optional headless rendering). Free stand-in for Apify actors and Firecrawl extract. Triggers when the user wants a list, catalogue, table or search-result page turned into rows. |
@@ -31,7 +32,7 @@ everywhere.
 
 They chain naturally: search → pick a video by date/views/length → transcript →
 summary (or `transcribe-audio` when there are no captions, and `youtube-audio` for the sound itself);
-`podcast-search` → episode audio URL → `transcribe-audio` does the same for podcasts; the links in a video's `--details` description go to `web-extract`;
+`podcast-search` → episode audio URL → `transcribe-audio` does the same for podcasts; `telegram-channel --links` → `web-extract` reads the articles a channel shares; the links in a video's `--details` description go to `web-extract`;
 `web-crawl --map` shows a site's structure, then `web-crawl --include` collects
 the right section through `web-extract`'s engine.
 `human-writing` uses `web-search` and `web-extract` to research and read sources (every fact goes into its ledger with the URL),
@@ -43,6 +44,19 @@ and `youtube-transcript` or `transcribe-audio` to turn a talk or voice memo into
 and [eric-tramel/slop-guard](https://github.com/eric-tramel/slop-guard) (all MIT), and paraphrases Wikipedia's
 [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) (CC BY-SA). Its human-text test corpus is
 public-domain 18F writing (CC0).
+
+## Source policies
+
+Scripts call free public endpoints from the user's own machine. Those that call an endpoint directly
+(`podcast-search`, `telegram-channel`) identify themselves with a `zedxter-skills-<skill>` User-Agent that links
+to this repository, and they stay polite on purpose:
+
+- **Apple iTunes Search API** (`podcast-search`): about 20 requests a minute per IP; the script throttles
+  itself across runs.
+- **Telegram web preview** (`telegram-channel`): `t.me/s/<channel>` is a public HTML page, not an API.
+  Telegram publishes no terms for reading it automatically, so the script reads public channels only,
+  spaces its requests 1.5 s apart and never downloads media. It cannot see private channels, groups,
+  comments or member lists, and must not be used to try.
 
 ## Requirements
 

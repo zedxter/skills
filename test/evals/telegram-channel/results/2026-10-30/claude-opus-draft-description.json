@@ -1,0 +1,84 @@
+[
+  {
+    "id": "t1-latest",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "telegram-channel"
+    ]
+  },
+  {
+    "id": "t2-link",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "telegram-channel"
+    ]
+  },
+  {
+    "id": "t3-digest-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "telegram-channel"
+    ]
+  },
+  {
+    "id": "t4-topic",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "telegram-channel"
+    ]
+  },
+  {
+    "id": "t5-links",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "telegram-channel"
+    ]
+  },
+  {
+    "id": "t6-date",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "telegram-channel"
+    ]
+  },
+  {
+    "id": "n1-bot-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-howto",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-regex",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-other-site",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]
