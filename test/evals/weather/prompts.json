@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-now",
+    "expect": true,
+    "prompt": "What's the weather like in Lisbon right now?"
+  },
+  {
+    "id": "t2-umbrella",
+    "expect": true,
+    "prompt": "Will I need an umbrella in Seattle tomorrow afternoon?"
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Какая погода будет в Казани на выходных? Нужна ли куртка?"
+  },
+  {
+    "id": "t4-history",
+    "expect": true,
+    "prompt": "What was the weather in Chicago on July 4, 2023? Was it hot?"
+  },
+  {
+    "id": "t5-air",
+    "expect": true,
+    "prompt": "Is the air quality in Beijing bad today? Should I run outside?"
+  },
+  {
+    "id": "t6-trip",
+    "expect": true,
+    "prompt": "I'm going to Reykjavik next week - what temperatures and rain should I expect each day?"
+  },
+  {
+    "id": "t7-coords",
+    "expect": true,
+    "prompt": "Give me the hourly forecast for 46.55,7.98 for the next 12 hours, in Fahrenheit."
+  },
+  {
+    "id": "n1-climate",
+    "expect": false,
+    "prompt": "Explain how climate change affects hurricane intensity, citing the IPCC."
+  },
+  {
+    "id": "n2-api-code",
+    "expect": false,
+    "prompt": "Write a React component that displays a 5-day forecast from props."
+  },
+  {
+    "id": "n3-convert",
+    "expect": false,
+    "prompt": "Convert 25 degrees Celsius to Fahrenheit."
+  },
+  {
+    "id": "n4-wiki",
+    "expect": false,
+    "prompt": "What is the Köppen climate classification? Give a short summary."
+  },
+  {
+    "id": "n5-poem",
+    "expect": false,
+    "prompt": "Write a poem about autumn rain in Kyoto."
+  }
+]

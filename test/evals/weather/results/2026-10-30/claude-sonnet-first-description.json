@@ -1,0 +1,100 @@
+[
+  {
+    "id": "t1-now",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "weather"
+    ]
+  },
+  {
+    "id": "t2-umbrella",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "weather"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "weather"
+    ]
+  },
+  {
+    "id": "t4-history",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "weather"
+    ]
+  },
+  {
+    "id": "t5-air",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "weather"
+    ]
+  },
+  {
+    "id": "t6-trip",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "weather"
+    ]
+  },
+  {
+    "id": "t7-coords",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "weather"
+    ]
+  },
+  {
+    "id": "n1-climate",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-api-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-convert",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-wiki",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-alerts",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]
