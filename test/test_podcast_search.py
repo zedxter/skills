@@ -192,7 +192,7 @@ def test_throttle_holds_across_concurrent_processes(tmp_path):
              for _ in range(24)]
     waits = sorted(int(p.communicate(timeout=60)[0].strip() or 0) for p in procs)
     assert waits.count(0) == pc.ITUNES_PER_MINUTE and all(55 <= w <= 61 for w in waits[pc.ITUNES_PER_MINUTE:])
-    saved = json.loads((tmp_path / "zedxter-skills" / "itunes-calls.json").read_text())
+    saved = json.loads((tmp_path / "utility-belt" / "itunes-calls.json").read_text())
     assert len(saved) == 24  # no lost updates
 
 

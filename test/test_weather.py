@@ -322,7 +322,7 @@ def test_http_failures(server, script, code, text):
 def test_user_agent_retry_and_cut_off(server):
     Server.script = [(429, b"{}", {"Retry-After": "1"}), (200, b'{"ok": 1}', {})]
     assert w.Net(5, lambda m: None).get(server, "t") == {"ok": 1}
-    assert Server.seen[0]["User-Agent"] == w.UA and "github.com/zedxter/skills" in w.UA
+    assert Server.seen[0]["User-Agent"] == w.UA and "github.com/zedxter/utility-belt" in w.UA
     Server.script = [(200, b'{"par', {"Content-Length": "100"}), (200, b'{"ok": 2}', {})]
     assert w.Net(5, lambda m: None).get(server, "t") == {"ok": 2}
 

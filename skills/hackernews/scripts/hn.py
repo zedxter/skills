@@ -39,7 +39,7 @@ from typing import Any
 
 EXIT_OK, EXIT_EMPTY, EXIT_BAD_INPUT, EXIT_RATE, EXIT_NETWORK, EXIT_OTHER = 0, 1, 2, 4, 6, 7
 
-UA = "zedxter-skills-hackernews/1.0 (+https://github.com/zedxter/skills)"
+UA = "utility-belt-hackernews/1.0 (+https://github.com/zedxter/utility-belt)"
 ALGOLIA = "https://hn.algolia.com/api/v1"
 FIREBASE = "https://hacker-news.firebaseio.com/v0"
 HN = "https://news.ycombinator.com"

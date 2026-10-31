@@ -6,7 +6,7 @@ compatibility: Python 3.12+ with uv (preferred) or plain python; the linter uses
 metadata:
   author: zedxter
   version: "1.1.0"
-  source: https://github.com/zedxter/skills
+  source: https://github.com/zedxter/utility-belt
 ---
 
 # Human Writing

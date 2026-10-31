@@ -6,7 +6,7 @@ compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. C
 metadata:
   author: zedxter
   version: "1.0.1"
-  source: https://github.com/zedxter/skills
+  source: https://github.com/zedxter/utility-belt
 ---
 
 # Transcribe Audio

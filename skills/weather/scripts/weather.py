@@ -35,7 +35,7 @@ from typing import Any
 
 EXIT_OK, EXIT_NOT_FOUND, EXIT_BAD_INPUT, EXIT_RATE, EXIT_NETWORK, EXIT_API = 0, 1, 2, 4, 6, 7
 
-UA = "zedxter-skills-weather/1.0 (+https://github.com/zedxter/skills)"
+UA = "utility-belt-weather/1.0 (+https://github.com/zedxter/utility-belt)"
 KEY = os.environ.get("OPEN_METEO_API_KEY")  # a commercial key switches to the customer-* hosts
 HOST = {"forecast": "api.open-meteo.com/v1/forecast", "archive": "archive-api.open-meteo.com/v1/archive",
         "air": "air-quality-api.open-meteo.com/v1/air-quality", "geo": "geocoding-api.open-meteo.com/v1/search"}

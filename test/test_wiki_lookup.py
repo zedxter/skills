@@ -401,7 +401,7 @@ def test_user_agent_follows_policy(server):
     Server.script = [(200, b'{"ok": 1}', {})]
     assert wiki.Net(5, lambda m: None).get(server) == {"ok": 1}
     ua = Server.seen[0]["User-Agent"]
-    assert ua == wiki.UA and "https://github.com/zedxter/skills" in ua and "Mozilla" not in ua
+    assert ua == wiki.UA and "https://github.com/zedxter/utility-belt" in ua and "Mozilla" not in ua
 
 
 @pytest.mark.parametrize("script,code", [

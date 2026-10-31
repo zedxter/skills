@@ -1,4 +1,4 @@
-# skills
+# utility-belt
 
 An open-source collection of [Agent Skills](https://agentskills.io) for AI
 coding agents — Claude Code, Codex, Cursor, Gemini CLI, OpenCode and any other
@@ -64,7 +64,7 @@ licence in `skills/pdf-typeset/fonts/source-sans-3/LICENSE.md`) and uses the fon
 ## Source policies
 
 Scripts call free public endpoints from the user's own machine. Those that call an endpoint directly
-(`podcast-search`, `telegram-channel`, `wiki-lookup`, `weather`, `hackernews`) identify themselves with a `zedxter-skills-<skill>` User-Agent that links
+(`podcast-search`, `telegram-channel`, `wiki-lookup`, `weather`, `hackernews`) identify themselves with a `utility-belt-<skill>` User-Agent that links
 to this repository, and they stay polite on purpose:
 
 - **Apple iTunes Search API** (`podcast-search`): about 20 requests a minute per IP; the script throttles
@@ -134,14 +134,14 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ### With the `skills` CLI (any supported agent)
 
 ```bash
-npx skills add zedxter/skills
+npx skills add zedxter/utility-belt
 ```
 
 Pick the skills and target agents interactively, or install everything for one
 agent non-interactively:
 
 ```bash
-npx skills add zedxter/skills --all -a claude-code
+npx skills add zedxter/utility-belt --all -a claude-code
 ```
 
 ### As Claude Code plugins
@@ -150,8 +150,8 @@ The repository is also a Claude Code plugin marketplace with one plugin per
 skill, so you install only what you need:
 
 ```bash
-claude plugin marketplace add zedxter/skills
-claude plugin install web-search@zedxter-skills
+claude plugin marketplace add zedxter/utility-belt
+claude plugin install web-search@utility-belt
 ```
 
 `web-crawl`, `web-scrape`, `web-browse` and `web-search` install `web-extract`
@@ -163,8 +163,8 @@ Third-party marketplaces don't update on their own unless you turn on
 auto-update for this one in `/plugin`. To pull new versions by hand:
 
 ```bash
-claude plugin marketplace update zedxter-skills
-claude plugin update web-search@zedxter-skills
+claude plugin marketplace update utility-belt
+claude plugin update web-search@utility-belt
 ```
 
 Use one install method per skill. A skill copied into `~/.claude/skills/` and
@@ -174,7 +174,7 @@ descriptions.
 ### With OpenSkills
 
 ```bash
-npx openskills install zedxter/skills
+npx openskills install zedxter/utility-belt
 ```
 
 Then run `npx openskills sync` so the agent's instructions file (`AGENTS.md`,
@@ -189,19 +189,19 @@ repo.
 macOS / Linux — all skills:
 
 ```bash
-git clone https://github.com/zedxter/skills.git
+git clone https://github.com/zedxter/utility-belt.git
 mkdir -p ~/.claude/skills
-for skill in skills/skills/*/; do cp -R "${skill%/}" ~/.claude/skills/; done
+for skill in utility-belt/skills/*/; do cp -R "${skill%/}" ~/.claude/skills/; done
 ```
 
 or a single skill:
 
 ```bash
-cp -R skills/skills/youtube-transcript ~/.claude/skills/
+cp -R utility-belt/skills/youtube-transcript ~/.claude/skills/
 ```
 
 > **Warning:** the source path must **not** end with a trailing slash. On
-> macOS `cp -R skills/skills/youtube-transcript/ ~/.claude/skills/` copies the
+> macOS `cp -R utility-belt/skills/youtube-transcript/ ~/.claude/skills/` copies the
 > folder's *contents* (`SKILL.md`, `scripts/`) straight into `~/.claude/skills/`
 > instead of creating `~/.claude/skills/youtube-transcript/`, and the skill is
 > not found. The loop above strips the slash for that reason.
@@ -209,9 +209,9 @@ cp -R skills/skills/youtube-transcript ~/.claude/skills/
 Windows (PowerShell) — all skills:
 
 ```powershell
-git clone https://github.com/zedxter/skills.git
+git clone https://github.com/zedxter/utility-belt.git
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\skills" | Out-Null
-Get-ChildItem skills\skills -Directory | Copy-Item -Recurse -Destination "$env:USERPROFILE\.claude\skills\"
+Get-ChildItem utility-belt\skills -Directory | Copy-Item -Recurse -Destination "$env:USERPROFILE\.claude\skills\"
 ```
 
 Claude Code picks up new skills on the next session start; `/skills` lists them.

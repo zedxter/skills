@@ -42,7 +42,7 @@ from typing import Any
 
 EXIT_OK, EXIT_NONE, EXIT_BAD_INPUT, EXIT_FETCH, EXIT_RATE, EXIT_SPN, EXIT_NETWORK, EXIT_OTHER = 0, 1, 2, 3, 4, 5, 6, 7
 
-USER_AGENT = "zedxter-skills-wayback/1.0 (+https://github.com/zedxter/skills)"
+USER_AGENT = "utility-belt-wayback/1.0 (+https://github.com/zedxter/utility-belt)"
 WEB = "https://web.archive.org"
 AVAILABILITY = "https://archive.org/wayback/available"
 ARCHIVE_URL = r"https?://web\.archive\.org"  # tests point WEB elsewhere and widen this
@@ -188,7 +188,7 @@ NO_REDIRECT = urllib.request.build_opener(NoRedirect)
 
 def throttle_path() -> Path:
     base = os.environ.get("LOCALAPPDATA") if os.name == "nt" else os.environ.get("XDG_CACHE_HOME")
-    return Path(base or Path.home() / ".cache") / "zedxter-skills" / "wayback-slots"
+    return Path(base or Path.home() / ".cache") / "utility-belt" / "wayback-slots"
 
 
 @contextlib.contextmanager

@@ -287,7 +287,7 @@ def test_user_agent_retry_and_404(server):
     Server.script = [(429, b"", {"Retry-After": "1"}), (200, b"[1]", {}), (404, b"", {})]
     net = hn.Net(5, lambda m: None)
     assert net.get(server) == [1] and net.get(server) is None
-    assert Server.seen[0]["User-Agent"] == hn.UA and "github.com/zedxter/skills" in hn.UA
+    assert Server.seen[0]["User-Agent"] == hn.UA and "github.com/zedxter/utility-belt" in hn.UA
 
 
 def test_help_runs_standalone():

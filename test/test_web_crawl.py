@@ -426,7 +426,7 @@ def test_finds_web_extract_in_plugin_cache(tmp_path, via_env):
 @pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
 def test_plugin_cache_prefers_own_marketplace_and_skips_bad_entries(tmp_path):
     config = tmp_path / "home" / ".claude"
-    _cached_web_extract(config, "zedxter-skills", "v1", "own marketplace")
+    _cached_web_extract(config, "utility-belt", "v1", "own marketplace")
     older = _cached_web_extract(config, "aaa", "v1", "older copy")  # sorts first by name, but is older
     os.utime(older / "extract.py", (time.time() - 100, time.time() - 100))
     other = _cached_web_extract(config, "zzz", "v9", "other marketplace")  # newest, but another marketplace
@@ -434,12 +434,12 @@ def test_plugin_cache_prefers_own_marketplace_and_skips_bad_entries(tmp_path):
     unreadable = _cached_web_extract(config, "zzz-locked", "v9", "unreadable")
     (unreadable / "extract.py").chmod(0)
     os.utime(unreadable / "extract.py", (time.time() + 200, time.time() + 200))
-    orphan = _cached_web_extract(config, "zedxter-skills", "v0", "orphaned version")
+    orphan = _cached_web_extract(config, "utility-belt", "v0", "orphaned version")
     (orphan.parent / ".orphaned_at").write_text("1", encoding="utf-8")
-    broken = config / "plugins" / "cache" / "zedxter-skills" / "web-extract" / "v2" / "scripts"
+    broken = config / "plugins" / "cache" / "utility-belt" / "web-extract" / "v2" / "scripts"
     broken.mkdir(parents=True)
     (broken / "extract.py").symlink_to(tmp_path / "nowhere.py")
-    plugin = config / "plugins" / "cache" / "zedxter-skills" / "web-crawl" / "v1" / "scripts"
+    plugin = config / "plugins" / "cache" / "utility-belt" / "web-crawl" / "v1" / "scripts"
     p = _found(_alone(tmp_path, plugin), tmp_path, {})
     assert p.returncode == 0 and p.stdout.strip() == "own marketplace", p.stderr
     # Run from elsewhere, the newest readable copy in any marketplace wins; broken and unreadable ones are skipped
@@ -452,9 +452,9 @@ def test_plugin_cache_prefers_own_marketplace_and_skips_bad_entries(tmp_path):
 def test_plugin_cache_in_a_relocated_plugins_root(tmp_path):
     """An agent can keep its plugins outside its config folder; the lookup follows it there."""
     root = tmp_path / "plugin-root"
-    _cached_web_extract(root, "zedxter-skills", "v1", "relocated")
+    _cached_web_extract(root, "utility-belt", "v1", "relocated")
     shutil.move(str(root / "plugins" / "cache"), str(root / "cache"))
-    plugin = root / "cache" / "zedxter-skills" / "web-crawl" / "v1" / "scripts"
+    plugin = root / "cache" / "utility-belt" / "web-crawl" / "v1" / "scripts"
     p = _found(_alone(tmp_path, plugin), tmp_path, {})  # own marketplace, found from the script's own path
     assert p.returncode == 0 and p.stdout.strip() == "relocated", p.stderr
     p = _found(_alone(tmp_path, tmp_path / "elsewhere" / "scripts"), tmp_path,
