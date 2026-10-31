@@ -5,12 +5,15 @@
 
 20 [Agent Skills](https://agentskills.io) that let a coding agent search the web, read and scrape pages,
 work with YouTube and podcasts, find and check papers, read Wikipedia, Hacker News and Telegram channels,
-and make PDFs and Anki decks. None of them needs an API key or an account. They help where an agent's
-built-in tools stop: a fetch that hits a bot check, a page that needs JavaScript, a video transcript, a
-reference that has to be checked against Crossref.
+make PDFs and Anki decks, and write and review prose. None of them needs an API key or an account; a few
+accept optional keys ([Limits](#limits-and-safety)). They help where an agent's built-in tools stop: a
+fetch that a plain HTTP client can't get, a page that needs JavaScript, a video transcript, a reference
+that has to be checked against Crossref.
 
 The skills are tested on Claude Code and Codex and should work in Cursor, Gemini CLI, OpenCode and any
-other agent that reads `SKILL.md` and can run shell commands, on macOS, Linux and Windows.
+other agent that reads `SKILL.md` and can run shell commands. The scripts are written for macOS, Linux
+and Windows; CI runs them on Linux. Most skills need network access, so an agent sandbox that blocks it,
+such as Codex's default, has to allow it.
 
 ## Quick start
 
@@ -23,11 +26,13 @@ other agent that reads `SKILL.md` and can run shell commands, on macOS, Linux an
    npx skills add zedxter/utility-belt
    ```
 
-   It asks which skills to install and for which agents. Each installed skill adds its description to
-   every session, so pick the ones you use. If you pick `web-crawl`, `web-scrape` or `web-search`, pick
-   `web-extract` too.
-3. Start a new agent session and ask something like "What's the weather in Berlin tomorrow?". The agent
-   should load the `weather` skill.
+   It asks which skills to install and for which agents, and installs into the current project unless
+   you add `-g`. Each installed skill adds its description to every session, so pick the ones you use.
+   If you pick `web-crawl`, `web-scrape`, `web-search` or `web-browse`, pick `web-extract` too: they call
+   its script.
+3. Start a new agent session from a new terminal, so `uv` is on PATH, and ask something like "What's the
+   weather in Berlin tomorrow?". The agent should load the `weather` skill and answer with a forecast for
+   the place it found. If it answers from memory, name the skill: "use the weather skill".
 
 A few skills also need ffmpeg, a browser or a speech model; [Requirements](#requirements) lists them.
 
@@ -55,7 +60,7 @@ full documentation the agent reads.
 | Skill | What it does |
 |---|---|
 | [`web-search`](skills/web-search) | Web search through DuckDuckGo, Bing, Brave and other engines, or your own SearXNG. `--read` returns what the top pages say. |
-| [`web-extract`](skills/web-extract) | A page or PDF as clean Markdown. It presents a browser's TLS fingerprint, so ordinary pages behind bot checks load; renders JavaScript on request; falls back to a dated Wayback Machine copy. |
+| [`web-extract`](skills/web-extract) | A page or PDF as clean Markdown. A browser-like TLS handshake gets it through to many pages that refuse plain HTTP clients; hard bot walls are reported, not bypassed. Renders JavaScript pages in a local Chromium when needed; falls back to a dated Wayback Machine copy. |
 | [`web-crawl`](skills/web-crawl) | A whole site or section in one Markdown file, a folder of pages, or JSON/JSONL, within depth, page and time limits. Honours robots.txt. `--map` lists the URLs. |
 | [`web-scrape`](skills/web-scrape) | Repeating items (listings, tables, JSON-LD) as JSON, CSV or a Markdown table, across pages and into detail pages. |
 | [`web-browse`](skills/web-browse) | A real Chromium, driven one step at a time: open, click, type, read, screenshot. Logins can persist in a profile folder you choose. |
@@ -110,8 +115,10 @@ full documentation the agent reads.
   uv run --with playwright playwright install chromium-headless-shell
   ```
 
-  `--headful` (a visible window) needs the full build: `playwright install chromium` in the same command.
-  On Linux, if Chromium fails to start, add the system libraries with `playwright install-deps chromium`.
+  `--headful` (a visible window) needs the full build:
+  `uv run --with playwright playwright install chromium`. On Linux, if Chromium fails to start, add its
+  system libraries with `uv run --with playwright playwright install-deps chromium` (asks for sudo;
+  Debian and Ubuntu are supported). If the browser stops starting after an update, run the install again.
 - **A Whisper model** for `transcribe-audio`, downloaded once after the agent asks you. The default
   `small` is 486 MB; `tiny` is 78 MB and `large-v3` 3.1 GB.
 - **`web-extract` next to the other web skills.** `web-crawl`, `web-scrape` and `web-search --read` need
@@ -145,8 +152,9 @@ claude plugin marketplace update utility-belt
 claude plugin update web-search@utility-belt
 ```
 
-The marketplace used to be called `zedxter-skills`. That name still works through GitHub's rename
-redirect, but switch to `utility-belt`; adding it next to the old one installs every skill twice. Note
+The marketplace used to be called `zedxter-skills`, from the repository's old name `zedxter/skills`. It
+keeps working because GitHub redirects that repository, but switch to `utility-belt`; adding it next to
+the old one installs every skill twice. Note
 which plugins you have in `/plugin`, remove the old marketplace (this uninstalls its plugins), then add
 the new one and install them again:
 
@@ -181,23 +189,28 @@ Copy a skill folder into the agent's skills directory (`~` is `%USERPROFILE%` on
 | Agent | Directory |
 |-------|-----------|
 | Claude Code | `~/.claude/skills/` or `<project>/.claude/skills/` |
-| OpenAI Codex | `~/.codex/skills/` |
+| OpenAI Codex | `~/.agents/skills/` or `<project>/.agents/skills/` |
 | Cursor | `<project>/.cursor/skills/` |
 | Gemini CLI | `~/.gemini/skills/` |
 | OpenCode | `~/.config/opencode/skills/` |
 | Generic / agentskills.io | `<project>/.agents/skills/` |
 
-All skills for Claude Code on macOS or Linux. For another agent, use its directory from the table; for a
-`<project>` path, run the commands from the project root.
+To copy all skills for Claude Code on macOS or Linux, clone the repository outside your project and copy
+the folders. For another agent, put its directory from the table in place of `~/.claude/skills` in both
+lines.
 
 ```bash
-git clone https://github.com/zedxter/utility-belt.git
+git clone https://github.com/zedxter/utility-belt.git /tmp/utility-belt
 mkdir -p ~/.claude/skills
-for skill in utility-belt/skills/*/; do cp -R "${skill%/}" ~/.claude/skills/; done
+for skill in /tmp/utility-belt/skills/*/; do cp -R "${skill%/}" ~/.claude/skills/; done
 ```
 
-When you copy a single skill, leave the trailing slash off the source path, or macOS `cp` copies the
-folder's contents instead of the folder.
+One skill at a time works the same way, without a trailing slash on the source, or macOS `cp` copies the
+folder's contents instead of the folder. Copy `web-extract` next to the other web skills.
+
+```bash
+cp -R /tmp/utility-belt/skills/weather ~/.claude/skills/
+```
 
 On Windows (PowerShell):
 
@@ -219,22 +232,31 @@ Start a new agent session to pick up the skills.
   issue open while one is broken.
 - **Trigger evals.** Prompts that should load each skill, and near misses that shouldn't, run on Claude
   Code and Codex ([`test/evals/`](test/evals)).
-- **Exit codes.** Each `SKILL.md` lists its own. Usually 1 means nothing was found and 4 means blocked, so
-  the agent stops instead of retrying. A crash always exits 7, never 1, so a bug can't pass for an empty
-  result.
+- **Exit codes.** Each skill documents its own. Usually 1 means nothing was found and 4 means blocked, so
+  the agent stops instead of retrying. An unexpected error inside a script exits 7, never 1, so a bug
+  can't pass for an empty result. A failure before the script starts, such as `uv` unable to fetch a
+  dependency, returns `uv`'s own code with the reason on stderr.
 
 ## Limits and safety
 
-- **Fetched text is data.** Pages, transcripts and posts can contain instructions aimed at the agent. The
-  skills tell the agent to treat them as untrusted and never follow them. Give `web-browse` its own
-  profile folder, not one signed in to your email or bank.
-- **Sources set the rules.** Scripts that call an API identify themselves with a User-Agent and keep to
-  its published limits; `web-crawl` honours robots.txt. Page fetchers present a browser's TLS fingerprint
-  so ordinary public pages load; following each site's terms is up to you. Keyless search can be
-  rate-limited or break when an engine changes. Per-source limits and licences:
+- **Fetched text is untrusted.** Pages and posts can carry instructions aimed at the agent. The skills
+  that read them tell the agent never to follow such instructions, which lowers the risk of prompt
+  injection but doesn't remove it. Keep permission prompts on for shell commands and file writes, and
+  give `web-browse` its own profile folder, not one signed in to your email or bank.
+- **Fetching etiquette.** The scripts that call a service themselves send a User-Agent that names the
+  skill and links here, and keep to the source's published limits. `web-extract` also makes its TLS
+  handshake look like a browser's (`--impersonate none` turns that off). `web-crawl` honours robots.txt;
+  `web-extract`, `web-scrape` and `web-browse` fetch the URLs they are given without checking it.
+  Following each site's terms is up to you. Per-source limits and licences:
   [docs/sources.md](docs/sources.md).
+- **Unofficial endpoints break.** Search engines, YouTube and Telegram's web preview are not official
+  APIs. They rate-limit, block cloud and VPN addresses, and change without notice; the weekly live run
+  catches it when they do.
+- **Dependencies are not pinned.** `uv` resolves each script's dependencies from PyPI within the declared
+  ranges on first run. There is no lock file.
 - **Optional keys.** `scholar-search` and `cite-check` can also query OpenAlex and Semantic Scholar with
-  your keys, and commercial users of `weather` need an Open-Meteo key.
+  your keys, `wayback` saves pages under higher limits with archive.org keys, and commercial users of
+  `weather` need an Open-Meteo key.
 
 ## Contributing
 
@@ -249,7 +271,8 @@ and the checks to run before a pull request.
 [sergebulaev/linkedin-skills](https://github.com/sergebulaev/linkedin-skills) and
 [eric-tramel/slop-guard](https://github.com/eric-tramel/slop-guard) (all MIT), and draws on Wikipedia's
 [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) (CC BY-SA), paraphrased
-rather than copied. Its test corpus of human writing comes from [18F](https://github.com/18F/guides) (CC0),
+rather than copied. Its test corpus of human writing comes from 18F's
+[blog](https://github.com/18F/18f.gsa.gov) and [guides](https://github.com/18F/guides) (CC0),
 [the Go blog](https://github.com/golang/website) (CC BY 4.0, The Go Authors) and the
 [Rust blog](https://github.com/rust-lang/blog.rust-lang.org) and [RFCs](https://github.com/rust-lang/rfcs)
 (MIT / Apache-2.0, The Rust Project Developers); each file links its source.

@@ -1,8 +1,9 @@
 # Source policies
 
-Scripts call free public endpoints from the user's own machine. Those that call an endpoint directly
-(`podcast-search`, `telegram-channel`, `wiki-lookup`, `weather`, `hackernews`) identify themselves with a
-`utility-belt-<skill>` User-Agent that links to this repository, and they stay polite on purpose:
+Scripts call free public endpoints from the user's own machine. The ones that call a service themselves
+(`cite-check`, `hackernews`, `podcast-search`, `scholar-search`, `telegram-channel`, `wayback`, `weather`,
+`web-extract` and `wiki-lookup`) send a `utility-belt-<skill>` User-Agent that links to this repository,
+and `web-browse` adds `web-browse/1.0` to a headless browser's. They stay polite on purpose:
 
 - **Apple iTunes Search API** (`podcast-search`): about 20 requests a minute per IP; the script throttles
   itself across runs.
