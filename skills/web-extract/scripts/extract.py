@@ -67,6 +67,7 @@ EXIT_OK, EXIT_EMPTY, EXIT_BAD_INPUT, EXIT_HTTP, EXIT_BLOCKED, EXIT_NOT_HTML, EXI
 UA = "utility-belt-web-extract/1.0 (+https://github.com/zedxter/utility-belt)"
 MAX_BODY_BYTES = 10_000_000  # decompressed; below trafilatura's MAX_FILE_SIZE (20 MB)
 MAX_REDIRECTS = 10
+CREDENTIAL_HEADERS = {"authorization", "cookie", "proxy-authorization"}
 MARKER_SCAN_BYTES = 65_536
 MAX_LINKS = 500
 DEFAULT_MAX_CHARS = 60_000
@@ -261,12 +262,40 @@ def redact_url(url: str | None) -> str:
     return urlunsplit((parts.scheme, "***@" + hostport, parts.path, parts.query, parts.fragment))
 
 
+def canonical_host(host: str | None) -> str | None:
+    """The ASCII host libcurl would connect to: percent-decoded and IDNA-encoded (NFKC folds
+    fullwidth and circled digits), lower-cased, without brackets or a trailing dot; None when it
+    cannot be encoded.
+
+    >>> [canonical_host(h) for h in ("①②⑦.0.0.1", "１２７.0.0.1", "127.0.0.%31", "Пример.РФ", "[::1]", "a..b")]
+    ['127.0.0.1', '127.0.0.1', '127.0.0.1', 'xn--e1afmkfd.xn--p1ai', '::1', None]
+    """
+    h = unquote((host or "").strip("[]")).lower().rstrip(".")
+    if h.isascii() and ".." not in h:
+        return h
+    try:
+        return h.encode("idna").decode("ascii").lower()
+    except (UnicodeError, ValueError):
+        return None
+
+
+def with_host(url: str, host: str) -> str:
+    """`url` with its host replaced by `host`, keeping credentials and port."""
+    parts = urlsplit(url)
+    userinfo = parts.netloc.rpartition("@")[0]
+    netloc = (userinfo + "@" if userinfo else "") + (f"[{host}]" if ":" in host else host)
+    if parts.port is not None:
+        netloc += f":{parts.port}"
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+
+
 def is_private_host(host: str | None) -> bool:
     """True for loopback, private, link-local and internal names (never sent to third parties).
 
-    Names are matched by suffix only and never resolved. Shorthand, hex and octal IPv4
-    literals that libcurl also accepts ("127.1", "0x7f.0.0.1", "0177.0.0.1") are
-    canonicalised before the check.
+    Names are matched by suffix only and never resolved. The host is first canonicalised
+    the way libcurl reads it (canonical_host), and shorthand, hex and octal IPv4 literals
+    that libcurl also accepts ("127.1", "0x7f.0.0.1", "0177.0.0.1") are expanded; a host
+    that cannot be canonicalised counts as private.
 
     >>> [is_private_host(h) for h in ("localhost", "127.0.0.1", "10.0.0.5", "[::1]", "box.local", "svc.internal", "intranet")]
     [True, True, True, True, True, True, True]
@@ -274,8 +303,10 @@ def is_private_host(host: str | None) -> bool:
     [True, True, True, True]
     >>> is_private_host("example.com"), is_private_host("cafe.be")
     (False, False)
+    >>> [is_private_host(h) for h in ("①②⑦.0.0.1", "127.0.0.%31")]
+    [True, True]
     """
-    h = (host or "").strip("[]").lower().rstrip(".")
+    h = canonical_host(host)
     if not h:
         return True
     try:
@@ -577,7 +608,7 @@ def classify(status: int, headers: dict[str, str], head: bytes, final_url: str =
 
 def make_session(args: argparse.Namespace) -> Any:
     kwargs: dict[str, Any] = dict(headers={"User-Agent": UA}, timeout=float(args.timeout),
-                                  allow_redirects=True, max_redirects=MAX_REDIRECTS)
+                                  allow_redirects=False)  # fetch() follows redirects itself, checking each hop first
     if args.impersonate != "none":
         kwargs["impersonate"] = args.impersonate
     else:
@@ -585,7 +616,7 @@ def make_session(args: argparse.Namespace) -> Any:
     if args.proxy:
         kwargs["proxy"] = args.proxy
     kwargs["curl_options"] = {
-        CurlOpt.REDIR_PROTOCOLS_STR: b"http,https",  # libcurl's default also follows redirects to ftp:
+        CurlOpt.REDIR_PROTOCOLS_STR: b"http,https",  # backstop: fetch() already refuses other schemes
         # hard libcurl backstop over the largest per-call timeout (Jina, 60 s); the per-attempt
         # wall-clock budget is enforced in fetch(), this only guards against a stuck transfer
         CurlOpt.TIMEOUT_MS: int(max(float(args.timeout), 60.0) * 1000),
@@ -596,16 +627,55 @@ def make_session(args: argparse.Namespace) -> Any:
 def fetch(session: Any, url: str, *, timeout: float, attempts: int = 2, headers: dict[str, str] | None = None) -> Fetched | Diag:
     """One GET with the body cap, redirect bookkeeping, exception mapping and a bounded retry.
 
-    `timeout` is a wall-clock budget per attempt: with stream=True curl_cffi maps it to a
-    connect + low-speed (1 B/s) limit only, so a slowly dripping body is cut here by a
-    monotonic deadline checked after every chunk.
+    Redirects are followed here, not by libcurl: each Location is checked before it is
+    requested, so a public URL can never make this client send a request to a private host
+    or to a non-http(s) scheme.
+
+    `timeout` is a wall-clock budget per attempt, redirects included: with stream=True
+    curl_cffi maps it to a connect + low-speed (1 B/s) limit only, so a slowly dripping
+    body is cut here by a monotonic deadline checked after every chunk.
     """
     host = urlsplit(url).hostname or url
+    guard = not is_private_host(host)  # a public start never leads to local hosts
     for attempt in range(1, attempts + 1):
         diag: Diag | None = None
         try:
             deadline = time.monotonic() + timeout
-            r = session.get(url, stream=True, timeout=timeout, headers=headers)
+            current, hops, hop_headers = url, 0, headers
+            while True:
+                r = session.get(current, stream=True, timeout=max(deadline - time.monotonic(), 1.0),
+                                headers=hop_headers, allow_redirects=False)
+                location = r.headers.get("location") if 300 <= r.status_code < 400 and r.status_code != 304 else None
+                if not location:
+                    break
+                r.close()
+                try:
+                    target = urljoin(current, location.strip())
+                    parts = urlsplit(target)
+                    raw_host, target_host, scheme = (parts.hostname or "").lower(), canonical_host(parts.hostname), parts.scheme.lower()
+                    parts.port  # raises on a bad port
+                except ValueError:
+                    raw_host = target_host = scheme = None
+                if scheme is None or (scheme in ("http", "https") and not target_host):
+                    return Diag(EXIT_NETWORK, "redirects", f"invalid redirect Location {clean_field(location)[:200]!r} fetching {redact_url(url)}")
+                if scheme not in ("http", "https"):
+                    return Diag(EXIT_NETWORK, "redirects", f"redirected to a non-http(s) URL ({scheme}:); refused fetching {redact_url(url)}")
+                if time.monotonic() > deadline:
+                    raise cx.Timeout(f"redirects still going after {timeout:g}s")
+                hops += 1
+                if hops > MAX_REDIRECTS:
+                    return Diag(EXIT_NETWORK, "redirects", f"more than {MAX_REDIRECTS} redirects fetching {redact_url(url)}")
+                if guard and is_private_host(target_host):
+                    return Diag(EXIT_BLOCKED, "redirect_to_private",
+                                f"{host} redirects to private/local host {target_host} ({redact_url(target)}); "
+                                f"not followed — {NO_RETRY_SUFFIX}", r.status_code)
+                if target_host != raw_host and ("%" in raw_host or re.fullmatch(r"[0-9a-fx.:]+", target_host)):
+                    # an IP literal or percent-encoded host goes out exactly as checked; names keep their
+                    # own spelling, because libcurl's IDNA2008 maps ß, ς and joiners differently from Python's
+                    target = with_host(target, target_host)
+                if hop_headers and target_host != canonical_host(host):  # like libcurl: credentials stay with their host
+                    hop_headers = {k: v for k, v in hop_headers.items() if k.lower() not in CREDENTIAL_HEADERS}
+                current = target
             body, truncated = bytearray(), False
             try:
                 for chunk in r.iter_content():
@@ -618,13 +688,8 @@ def fetch(session: Any, url: str, *, timeout: float, attempts: int = 2, headers:
             finally:
                 r.close()
             hdrs = {str(k).lower(): str(v) for k, v in r.headers.items()}
-            final = str(r.url or url)
+            final = str(r.url or current)
             final_host = (urlsplit(final).hostname or "").lower()
-            if not is_private_host(host) and not is_archive_url(url) and is_private_host(final_host):
-                # a public page redirected into localhost / private space: never output that body
-                return Diag(EXIT_BLOCKED, "redirect_to_private",
-                            f"redirected from {host} to private/local host {final_host} ({redact_url(final)}); "
-                            f"body discarded — {NO_RETRY_SUFFIX}", r.status_code)
             f = Fetched(r.status_code, hdrs, final, bytes(body[:MAX_BODY_BYTES]), truncated,
                         final_host != (urlsplit(url).hostname or "").lower(),
                         urlsplit(url).scheme == "https" and urlsplit(final).scheme == "http")
@@ -796,6 +861,12 @@ def run_action(page: Any, step: dict[str, Any], ms: int) -> None:
             page.wait_for_timeout(600)
 
 
+def _not_cancelled(record: logging.LogRecord) -> bool:
+    """Drop asyncio's "Exception in callback … CancelledError" report: Playwright cancels a route
+    handler still in flight when the browser closes, which is expected, not an error."""
+    return not (record.exc_info and record.exc_info[0] is not None and record.exc_info[0].__name__ == "CancelledError")
+
+
 def render_fetch(url: str, args: argparse.Namespace, actions: list[dict[str, Any]]) -> Fetched | Diag:
     """GET through a real Chromium (headless unless --headful): JavaScript runs, --actions are performed,
     the DOM is returned as HTML. Images, media and fonts are not loaded in headless mode.
@@ -806,6 +877,8 @@ def render_fetch(url: str, args: argparse.Namespace, actions: list[dict[str, Any
     pw, why = playwright_api()
     if pw is None:
         return Diag(EXIT_BAD_INPUT, "bad_input", why or PLAYWRIGHT_HINT)
+    if _not_cancelled not in logging.getLogger("asyncio").filters:
+        logging.getLogger("asyncio").addFilter(_not_cancelled)
     timeout = float(args.timeout)
     ms = int(timeout * 1000)
     host = (urlsplit(url).hostname or "").lower()
@@ -821,9 +894,27 @@ def render_fetch(url: str, args: argparse.Namespace, actions: list[dict[str, Any
         except Exception:
             pass
 
+    guard = not is_private_host(host)  # a public page may not make the browser reach local hosts
+
+    def on_request(req: Any) -> None:
+        # Chromium follows redirects without asking the route handler: a hop into a local host
+        # has reached it by now, so the whole render is refused below
+        try:
+            if req.redirected_from is not None and is_private_host(urlsplit(req.url).hostname):
+                main.setdefault("leaked", req.url)
+        except Exception:
+            pass
+
     def on_route(route: Any) -> None:
         try:
-            if route.request.resource_type in RENDER_BLOCKED_RESOURCES:
+            req = route.request
+            if main.get("closing"):
+                route.abort()
+            elif guard and is_private_host(urlsplit(req.url).hostname):
+                if req.is_navigation_request() and req.frame == req.frame.page.main_frame:
+                    main["private"] = req.url
+                route.abort("blockedbyclient")
+            elif not args.headful and req.resource_type in RENDER_BLOCKED_RESOURCES:
                 route.abort()
             else:
                 route.continue_()
@@ -833,12 +924,26 @@ def render_fetch(url: str, args: argparse.Namespace, actions: list[dict[str, Any
     def dom() -> bytes:
         return page.content().encode("utf-8")
 
+    def private_navigation() -> Diag:  # the main frame tried to navigate into a local host and was stopped
+        target = main["private"]
+        return Diag(EXIT_BLOCKED, "redirect_to_private",
+                    f"{host} navigates to private/local host {(urlsplit(target).hostname or '').lower()} "
+                    f"({redact_url(target)}); not followed — {NO_RETRY_SUFFIX}")
+
+    def leaked_redirect(status: int | None) -> Diag:
+        leaked = main["leaked"]
+        return Diag(EXIT_BLOCKED, "redirect_to_private",
+                    f"{host} redirected the browser to private/local host {(urlsplit(leaked).hostname or '').lower()} "
+                    f"({redact_url(leaked)}); body discarded — {NO_RETRY_SUFFIX}", status)
+
     try:
         with pw.sync_playwright() as p:
             launch: dict[str, Any] = {"headless": not args.headful}
             if args.proxy:
                 launch["proxy"] = browser_proxy(args.proxy)
             ctx_opts: dict[str, Any] = {"viewport": {"width": 1280, "height": 900}, "locale": "en-US"}
+            if guard:
+                ctx_opts["service_workers"] = "block"  # a service worker's requests would bypass the route handler
             browser = None
             if args.profile:
                 if not args.headful:  # persistent contexts take user_agent too; read the stock one from a throwaway browser
@@ -858,9 +963,17 @@ def render_fetch(url: str, args: argparse.Namespace, actions: list[dict[str, Any
                     ctx_opts["user_agent"] = f"{stock_ua} {UA}"
                 ctx = browser.new_context(**ctx_opts)
             try:
+                # on the context, not the page, so popups the page opens are covered too
+                if guard or not args.headful:
+                    ctx.route("**/*", on_route)
+                if guard:
+                    ctx.on("request", on_request)
+                    if hasattr(ctx, "route_web_socket"):  # Playwright 1.48+
+                        # a routed socket that is never connected to the server stays a mock: nothing leaves the browser
+                        ctx.route_web_socket(lambda u: is_private_host(urlsplit(u).hostname), lambda ws: None)
+                    else:
+                        note("this Playwright cannot intercept WebSockets (1.48+ can); a page could open one to a local host")
                 page = ctx.new_page()
-                if not args.headful:
-                    page.route("**/*", on_route)
                 page.on("response", on_response)
                 resp = page.goto(url, wait_until="domcontentloaded", timeout=ms)
                 for state, budget in (("load", ms), ("networkidle", int(min(10.0, timeout / 3) * 1000))):
@@ -926,16 +1039,22 @@ def render_fetch(url: str, args: argparse.Namespace, actions: list[dict[str, Any
                     raw_ctype = None
             finally:
                 try:
+                    main["closing"] = True  # from here on on_route aborts everything, so nothing slips out while closing
                     ctx.close()
                 finally:
                     if browser is not None:
                         browser.close()
     except Exception as e:  # Playwright errors, Chromium net:: errors, launch failures
+        if main.get("private"):
+            return private_navigation()
+        if main.get("leaked"):  # e.g. the redirect target refused the connection: still a private-host redirect
+            return leaked_redirect(None)
         return browser_error(e, url, timeout, headful=bool(args.headful))
+    if main.get("private"):  # the page is Chromium's error page now, not the site's
+        return private_navigation()
+    if main.get("leaked"):
+        return leaked_redirect(status)
     final_host = (urlsplit(final).hostname or "").lower()
-    if not is_private_host(host) and not is_archive_url(url) and is_private_host(final_host):
-        return Diag(EXIT_BLOCKED, "redirect_to_private",
-                    f"redirected from {host} to private/local host {final_host} ({redact_url(final)}); body discarded — {NO_RETRY_SUFFIX}", status)
     ctype = headers.get("content-type", "text/html").split(";")[0].strip() or "text/html"
     if raw_ctype is not None:
         headers["content-type"] = raw_ctype  # the server's bytes, with the server's charset

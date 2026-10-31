@@ -26,12 +26,22 @@ live GET (curl_cffi; or Chromium with --render always)
 
 - One HTTP session per run (curl_cffi), reused for every URL and fallback.
   Cookies live in memory for one run and are never stored.
-- Redirects: up to 10 hops, http(s) targets only (libcurl's default would also
-  follow `ftp:`); a redirect to another scheme is refused with exit 6
-  `redirects`. A redirect from a public host into a private/local one is
-  refused with exit 4 `redirect_to_private` (body discarded, no fallback; the
-  private host still receives that one request). `redirected` / `downgraded`
-  warnings mean the final URL left the requested host or dropped TLS.
+- Redirects: up to 10 hops (any 3xx with a `Location` except 304), followed
+  by the script rather than libcurl, so each target is checked before it is
+  requested. Only http(s) targets are followed; a redirect to another scheme,
+  or a `Location` that cannot be parsed, is refused with exit 6 `redirects`.
+  A redirect from a public host into a private/local one is refused with exit
+  4 `redirect_to_private` (not followed, no fallback): the private host never
+  receives a request. The host is checked after percent-decoding and IDNA
+  folding, so `①②⑦.0.0.1` and `127.0.0.%31` count as `127.0.0.1`; an IP
+  literal or percent-encoded host is then requested in that checked form. A
+  host that cannot be folded counts as private. Hosts are matched by name, the same
+  way as for fallbacks, and never resolved, so a public name whose DNS points
+  at a private address is not caught. `Authorization`, `Cookie` and
+  `Proxy-Authorization` headers the script set are dropped when a redirect
+  leaves the requested host (session cookies follow their own domains).
+  `redirected` / `downgraded` warnings mean the final URL left the requested
+  host or dropped TLS.
 - Timeouts: `--timeout` is a wall-clock budget per attempt. The HTTP library
   only bounds connect time and a 1 B/s low-speed window for streamed bodies, so
   the script also checks a monotonic deadline after every chunk; a body that
@@ -178,8 +188,18 @@ body under `cf-mitigated: challenge`. Results depend on IP reputation.
   `connection`, Playwright timeouts → 6 `timeout`, `ERR_TOO_MANY_REDIRECTS` →
   6 `redirects`, `ERR_ABORTED` or Playwright's `Download is starting` (a download) → 5, missing browser or system
   libraries → 2 with the install command, anything else → 7. The same
-  private-host redirect rule as the HTTP path applies (exit 4
-  `redirect_to_private`, body discarded).
+  private-host rule as the HTTP path applies, with one difference. When the
+  page is public, every direct request it or a popup it opens makes to a
+  private/local host (scripts, frames, `fetch`, WebSockets with Playwright
+  1.48+, a script navigating the page) is stopped before it leaves the
+  browser. Service workers are blocked so none can go around that, also under
+  `--headful` and with `--profile`. A main-frame navigation there ends with
+  exit 4 `redirect_to_private`. Chromium follows server redirects without
+  asking the script, though: when the page itself or anything on it is
+  redirected into a private host, that host gets one request, and the whole
+  render is then refused with the same exit 4 (body discarded). This can happen
+  under `--render auto` too, since the browser loads the URL again and the
+  server may answer it differently.
 - Cost: one fresh browser per URL, roughly 1–3 s plus the page's own load time;
   `--render always` on a batch of URLs launches one per URL. For a page-by-page
   session (log in, navigate, read several pages) use the `web-browse` skill.
