@@ -4,6 +4,18 @@ Issues and pull requests are welcome. This page covers the rules every skill
 in this repository follows, and how to check them before you open a pull
 request.
 
+## Repository layout
+
+```
+skills/<name>/          # one skill: SKILL.md, scripts/, references/
+test/                   # pytest suites for the scripts, trigger evals, and ops.py (validation, tests, live probes)
+docs/sources.md         # the limits and licences of every public source the scripts call
+.github/workflows/      # CI on every pull request; a weekly liveness probe of every source
+```
+
+`web-crawl`, `web-scrape`, `web-search --read` and `web-browse read` import
+`web-extract`'s script at run time, so a change to `web-extract` can break them.
+
 ## What a skill is here
 
 One folder under `skills/`:
@@ -128,7 +140,7 @@ Scripts that call a service directly:
 - respect the source's published limits;
 - credit the data as its licence asks.
 
-Each source gets a bullet in the README's "Source policies" section.
+Each source gets a bullet in [docs/sources.md](docs/sources.md).
 
 ## Checking your change
 
@@ -137,6 +149,11 @@ python3 test/ops.py validate             # spec, frontmatter, size, agent neutra
 python3 test/ops.py test <name>          # your skill's offline tests, with exactly the dependencies CI uses
 python3 test/ops.py probe <name>         # your skill against its real source
 ```
+
+`python3 test/ops.py test` with no name runs every suite, one at a time. Browser
+tests skip when Playwright's Chromium is not installed, and speech tests skip
+until the 78 MB `tiny` Whisper model is cached
+(`uv run skills/transcribe-audio/scripts/transcribe.py test/data/jfk.ogg -m tiny --download-model`).
 
 CI (`.github/workflows/ci.yml`) runs `validate` and every offline suite on each
 pull request. A new suite or probe goes into `SUITES` or `PROBES` in
