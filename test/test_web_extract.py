@@ -492,10 +492,11 @@ class FakeSession:
     """Maps requested URL -> FakeResponse (or an exception to raise)."""
 
     def __init__(self, routes):
-        self.routes, self.calls = routes, []
+        self.routes, self.calls, self.headers = routes, [], []
 
     def get(self, url, **kw):
         self.calls.append(url)
+        self.headers.append(kw.get("headers"))
         r = self.routes[url]
         if isinstance(r, Exception):
             raise r
@@ -588,20 +589,88 @@ def test_decode_text_uses_in_document_charset():
     assert "длинный текст" in wx.decode_text(long_cp1251, {"content-type": "text/plain"})
 
 
-def test_fetch_refuses_redirect_into_private_host_and_flags_downgrade():
+def hop(location, status=302):
+    return FakeResponse(status, {"location": location}, None, b"")
+
+
+def test_fetch_refuses_redirect_into_private_host_before_requesting_it():
     secret = b"<html><body><article>" + b"<p>SECRET paragraph with enough words to extract.</p>" * 20 + b"</article></body></html>"
-    s = FakeSession({"https://public.example/go": FakeResponse(200, {"content-type": "text/html"}, "http://127.0.0.1:8000/secret.html", secret)})
+    private = "http://127.0.0.1:8000/secret.html"
+    s = FakeSession({"https://public.example/go": hop("https://public.example/next"),
+                     "https://public.example/next": hop(private, 301),
+                     private: FakeResponse(200, {"content-type": "text/html"}, private, secret)})
     d = wx.fetch(s, "https://public.example/go", timeout=5)
-    assert isinstance(d, wx.Diag) and d.code == 4 and d.kind == "redirect_to_private" and "body discarded" in d.message
+    assert isinstance(d, wx.Diag) and d.code == 4 and d.kind == "redirect_to_private" and "not followed" in d.message
+    assert s.calls == ["https://public.example/go", "https://public.example/next"]  # the private host never saw a request
+    # shorthand IPv4 and internal names are caught the same way
+    for target in ("http://127.1/", "http://0x7f.0.0.1/", "http://router.lan/admin", "http://[::1]:631/",
+                   "http://①②⑦.0.0.1/", "http://１２７.0.0.1/", "http://127.0.0.%31/", "http://LOCALHOST./"):
+        s = FakeSession({"https://public.example/go": hop(target)})
+        d = wx.fetch(s, "https://public.example/go", timeout=5)
+        assert isinstance(d, wx.Diag) and d.kind == "redirect_to_private" and len(s.calls) == 1, target
     # a private host the user named explicitly may redirect within private space
-    s = FakeSession({"http://127.0.0.1:8000/a": FakeResponse(200, {"content-type": "text/html"}, "http://127.0.0.1:8000/b", secret)})
+    s = FakeSession({"http://127.0.0.1:8000/a": hop("/b"),
+                     "http://127.0.0.1:8000/b": FakeResponse(200, {"content-type": "text/html"}, "http://127.0.0.1:8000/b", secret)})
     f = wx.fetch(s, "http://127.0.0.1:8000/a", timeout=5)
-    assert isinstance(f, wx.Fetched) and f.status == 200
-    s = FakeSession({"https://public.example/x": FakeResponse(200, {"content-type": "text/html"}, "http://public.example/x", secret)})
+    assert isinstance(f, wx.Fetched) and f.status == 200 and f.url == "http://127.0.0.1:8000/b" and not f.redirected
+
+
+def test_fetch_follows_public_redirects_and_flags_host_change_and_downgrade():
+    page = b"<html><body><p>moved</p></body></html>"
+    s = FakeSession({"https://a.example/x": hop("https://b.example/y?q=1", 307),
+                     "https://b.example/y?q=1": hop("../z", 308),
+                     "https://b.example/z": FakeResponse(200, {"content-type": "text/html"}, None, page)})
+    f = wx.fetch(s, "https://a.example/x", timeout=5)
+    assert isinstance(f, wx.Fetched) and f.url == "https://b.example/z" and f.redirected and not f.downgraded and f.body == page
+    s = FakeSession({"https://public.example/x": hop("http://public.example/x", 301),
+                     "http://public.example/x": FakeResponse(200, {"content-type": "text/html"}, None, page)})
     f = wx.fetch(s, "https://public.example/x", timeout=5)
     assert isinstance(f, wx.Fetched) and f.downgraded and not f.redirected
     r = wx.new_result("https://public.example/x")
     assert wx.handle_body(f, r, ns(), "live") is None and "downgraded" in r["warnings"]
+    # a 3xx without Location is the final answer, not a hop
+    s = FakeSession({"https://a.example/304": FakeResponse(304, {}, None, b"")})
+    f = wx.fetch(s, "https://a.example/304", timeout=5)
+    assert isinstance(f, wx.Fetched) and f.status == 304 and s.calls == ["https://a.example/304"]
+
+
+def test_fetch_requests_the_canonical_host_and_keeps_credentials_with_their_host():
+    page = b"<html><body><p>moved</p></body></html>"
+    s = FakeSession({"https://a.example/x": hop("https://Пример.рф/y", 300),
+                     "https://Пример.рф/y": FakeResponse(200, {"content-type": "text/html"}, None, page)})
+    f = wx.fetch(s, "https://a.example/x", timeout=5, headers={"Accept": "text/html", "Authorization": "Bearer SECRET"})
+    assert isinstance(f, wx.Fetched) and f.status == 200 and s.calls[-1] == "https://Пример.рф/y"
+    assert s.headers == [{"Accept": "text/html", "Authorization": "Bearer SECRET"}, {"Accept": "text/html"}]
+    assert wx.with_host("http://u:p@old.example:8080/a?b#c", "::1") == "http://u:p@[::1]:8080/a?b#c"
+    # a name keeps its own spelling: Python's IDNA2003 would turn straße.de into another domain, strasse.de
+    s = FakeSession({"https://a.example/x": hop("https://straße.de/y"),
+                     "https://straße.de/y": FakeResponse(200, {"content-type": "text/html"}, None, page)})
+    f = wx.fetch(s, "https://a.example/x", timeout=5)
+    assert isinstance(f, wx.Fetched) and s.calls[-1] == "https://straße.de/y"
+    # a percent-encoded or IP-literal host goes out in the form that was checked
+    s = FakeSession({"https://a.example/x": hop("http://93.184.216.%33/y"),
+                     "http://93.184.216.3/y": FakeResponse(200, {"content-type": "text/html"}, None, page)})
+    f = wx.fetch(s, "https://a.example/x", timeout=5)
+    assert isinstance(f, wx.Fetched) and s.calls[-1] == "http://93.184.216.3/y"
+
+
+@pytest.mark.parametrize("location", ["http://[::1/x", "http://a.example:99999/", "http://a..b/"])
+def test_fetch_maps_a_malformed_location_to_exit6(location):
+    s = FakeSession({"https://a.example/go": hop(location)})
+    d = wx.fetch(s, "https://a.example/go", timeout=5)
+    assert isinstance(d, wx.Diag) and d.code == 6 and d.kind == "redirects" and "invalid redirect Location" in d.message
+    assert s.calls == ["https://a.example/go"]
+
+
+def test_fetch_refuses_other_schemes_and_redirect_loops_without_requesting_more():
+    s = FakeSession({"https://a.example/go": hop("ftp://a.example/file")})
+    d = wx.fetch(s, "https://a.example/go", timeout=5)
+    assert isinstance(d, wx.Diag) and d.code == 6 and d.kind == "redirects" and "non-http(s) URL (ftp:)" in d.message
+    assert s.calls == ["https://a.example/go"]
+    s = FakeSession({f"https://a.example/{i}": hop(f"/{i + 1}") for i in range(20)})
+    d = wx.fetch(s, "https://a.example/0", timeout=5)
+    assert isinstance(d, wx.Diag) and d.code == 6 and d.kind == "redirects" and f"more than {wx.MAX_REDIRECTS}" in d.message
+    assert len(s.calls) == wx.MAX_REDIRECTS + 1
 
 
 def _cdx_body(*rows):
@@ -1153,8 +1222,19 @@ LOCAL_PAGES = {"/shell": ("text/html", SHELL_FILLED), "/heavy": ("text/html", SC
                "/data.json": ("application/json", b'{"a": 1, "items": [1, 2, 3]}\n')}
 
 
+LOCAL_HITS: list[str] = []  # every path the loopback server was asked for
+LOCAL_REDIRECTS: dict[str, str] = {}  # path -> Location, "{port}" filled with the server's own port
+
+
 class _Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        LOCAL_HITS.append(self.path)
+        if self.path in LOCAL_REDIRECTS:
+            self.send_response(302)
+            self.send_header("Location", LOCAL_REDIRECTS[self.path].format(port=self.server.server_address[1]))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         ctype, body = LOCAL_PAGES.get(self.path, ("text/plain", b"missing"))
         self.send_response(200 if self.path in LOCAL_PAGES else 404)
         self.send_header("Content-Type", ctype)
@@ -1246,3 +1326,86 @@ def test_crash_exits_7_not_1():
     assert p.returncode == 7, p.stderr
     assert p.stderr.count("error:") == 1 and "unexpected RuntimeError: boom" in p.stderr
     assert "second line" not in p.stderr and "Traceback" not in p.stderr
+
+
+# A public page must not make the browser reach local hosts. The loopback server stands in for
+# both: 127.0.0.1 plays the public site and "localhost" the private one.
+ARTICLE = b"".join(b"<p>Paragraph %d about the public page that tries to reach a local service.</p>" % i for i in range(30))
+LOCAL_PAGES["/probe"] = ("text/html", b"<html><body><article>" + ARTICLE + b"</article><script>"
+                         b"fetch('http://localhost:' + location.port + '/xhr').catch(() => {});"
+                         b"const f = document.createElement('iframe'); f.src = 'http://localhost:' + location.port + '/frame';"
+                         b"document.body.appendChild(f);"
+                         b"try { new WebSocket('ws://localhost:' + location.port + '/ws'); } catch (e) {}</script></body></html>")
+LOCAL_PAGES["/jump"] = ("text/html", b"<html><body><script>location.href = 'http://localhost:' + location.port + '/jumped';</script></body></html>")
+LOCAL_REDIRECTS["/to-local"] = "http://localhost:{port}/landed"
+
+
+@pytest.fixture
+def localhost_is_private(monkeypatch):
+    monkeypatch.setattr(wx, "is_private_host", lambda h: (h or "").strip("[]").lower() == "localhost")
+    LOCAL_HITS.clear()
+
+
+def test_http_redirect_to_a_private_host_is_never_requested(local, localhost_is_private):
+    args = ns(render="off")
+    r = wx.process(wx.make_session(args), f"{local}/to-local", args)
+    assert not r["ok"] and r["error"]["kind"] == "redirect_to_private" and r["error"]["code"] == 4
+    assert LOCAL_HITS == ["/to-local"]
+
+
+@local_browser
+def test_render_blocks_requests_from_a_public_page_to_private_hosts(local, localhost_is_private):
+    args = ns(render="always", timeout=10.0)
+    r = wx.process(wx.make_session(args), f"{local}/probe", args)
+    assert r["ok"] and r["source"] == "browser" and "Paragraph 29" in r["content"]
+    assert "/probe" in LOCAL_HITS and not {"/xhr", "/frame", "/ws"} & set(LOCAL_HITS)
+
+
+@local_browser
+def test_render_refuses_a_main_frame_jump_to_a_private_host(local, localhost_is_private):
+    args = ns(render="always", timeout=10.0)
+    r = wx.process(wx.make_session(args), f"{local}/jump", args)
+    assert "/jumped" not in LOCAL_HITS
+    assert not r["ok"] and r["error"]["kind"] == "redirect_to_private" and "not followed" in r["error"]["message"]
+
+
+@local_browser
+def test_render_server_redirect_to_a_private_host_is_refused_after_the_fact(local, localhost_is_private):
+    """Chromium follows server redirects without consulting the route handler: the private host
+    gets the request, but its body is discarded (documented in REFERENCE.md)."""
+    args = ns(render="always", timeout=10.0)
+    r = wx.process(wx.make_session(args), f"{local}/to-local", args)
+    assert not r["ok"] and r["error"]["kind"] == "redirect_to_private" and "body discarded" in r["error"]["message"]
+    assert "/landed" in LOCAL_HITS  # the documented leak; a fix would change this line on purpose
+
+
+LOCAL_REDIRECTS["/to-closed"] = "http://localhost:1/nothing-listens"
+
+
+@local_browser
+def test_render_redirect_to_a_closed_private_port_is_still_exit4(local, localhost_is_private):
+    args = ns(render="always", timeout=10.0)
+    r = wx.process(wx.make_session(args), f"{local}/to-closed", args)
+    assert not r["ok"] and r["error"]["kind"] == "redirect_to_private" and r["error"]["code"] == 4
+
+
+LOCAL_PAGES["/sub-redirect"] = ("text/html", b"<html><body><article>" + ARTICLE + b"</article>"
+                                b"<script>fetch('/to-local').catch(() => {});</script></body></html>")
+LOCAL_PAGES["/popup"] = ("text/html", b"<html><body><article>" + ARTICLE + b"</article>"
+                         b"<script>window.open('http://localhost:' + location.port + '/popped');</script></body></html>")
+
+
+@local_browser
+def test_render_refuses_the_page_when_a_subresource_redirects_into_a_private_host(local, localhost_is_private):
+    args = ns(render="always", timeout=10.0)
+    r = wx.process(wx.make_session(args), f"{local}/sub-redirect", args)
+    assert not r["ok"] and r["error"]["kind"] == "redirect_to_private" and "/landed" in r["error"]["message"]
+
+
+@local_browser
+def test_render_blocks_popups_to_private_hosts(local, localhost_is_private, capfd):
+    args = ns(render="always", timeout=10.0)
+    r = wx.process(wx.make_session(args), f"{local}/popup", args)
+    assert r["ok"] and "/popped" not in LOCAL_HITS
+    assert "Traceback" not in capfd.readouterr().err
+

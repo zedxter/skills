@@ -5,7 +5,7 @@ license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows (curl_cffi ships binary wheels for x86_64 and arm64). Needs outbound HTTPS to the target site and to web.archive.org for the fallback. JavaScript rendering needs the optional Playwright package and a one-time Chromium headless-shell download (~100 MB); it is optional. --headful needs the full Chromium build (`playwright install chromium`). Never solves CAPTCHAs or bot challenges; --headful lets a human pass them.
 metadata:
   author: zedxter
-  version: "1.1.0"
+  version: "1.1.1"
   source: https://github.com/zedxter/utility-belt
 ---
 
@@ -305,7 +305,7 @@ the process exits with the first failing URL's code.
 | 1 | 2xx fetched but no main content: JavaScript shell (and no browser installed, or the render was empty too), empty or whitespace-only body (incl. 204/205), a 200 that looked like a challenge, or a PDF without a text layer (scanned). Metadata is still filled when present. | `nothing_extracted`, `js_shell`, `challenge_suspected` | Do not repeat the command unchanged. Install the browser and rerun with `--with playwright` (the `note:` says if it was missing); `--raw` (or `--links` on an article page) for a data URL; `--wayback` for a suspected consent page; `--jina` (with consent). Scanned PDF: `--raw -o FILE` and an OCR/document tool. |
 | 2 | Bad input or environment: not an http(s) URL, credentials in a URL, conflicting flags (`--render always` with `--wayback`, browser flags with `--render off`), bad `--actions` JSON, `--render-wait` outside 0–120, `--raw -o` or `--screenshot` with several URLs, `--wayback` with a private/local or archive.org host, unsupported `--impersonate`, unwritable `-o`, missing dependency, `--render always` without Playwright or its browser. | `bad_input` (argument errors print no JSON) | Fix the argument; `python -m pip install curl_cffi trafilatura lxml_html_clean pypdf`, or use `uv run`; for the browser: `uv run --with playwright playwright install chromium-headless-shell` (headless), or `playwright install chromium` for `--headful` (full browser). |
 | 3 | HTTP error that is not a bot wall: 401, 404/410, other 4xx, 5xx after one retry; or `--wayback` found no usable snapshot. Archive already tried (except 401). | `unauthorized`, `not_found`, `http_error`, `server_error`, `no_snapshot` | Report it. 404/410: gone (the `note:` says whether an archived copy existed). 401: needs the user's login. 5xx: one manual retry later. Never loop. |
-| 4 | Blocked: Cloudflare challenge, Anubis (202), 429 rate limit, other bot checks, a bare 403, or a redirect from a public host into a private/local one (body discarded). Archive already tried; retrying from this client is hopeless. | `cloudflare_challenge`, `anubis_challenge`, `bot_check`, `rate_limited`, `forbidden`, `redirect_to_private` | **Stop retrying.** Offer the archived copy if any, `--jina` (third party, ask first), `--impersonate firefox` once, or the user's browser. A 429 with a small `retry_after` may be retried once after waiting. |
+| 4 | Blocked: Cloudflare challenge, Anubis (202), 429 rate limit, other bot checks, a bare 403, or a redirect from a public host into a private/local one (not followed). Archive already tried; retrying from this client is hopeless. | `cloudflare_challenge`, `anubis_challenge`, `bot_check`, `rate_limited`, `forbidden`, `redirect_to_private` | **Stop retrying.** Offer the archived copy if any, `--jina` (third party, ask first), `--impersonate firefox` once, or the user's browser. A 429 with a small `retry_after` may be retried once after waiting. |
 | 5 | Content is neither HTML nor a readable PDF: image, office document, archive, binary, a password-protected or corrupt PDF, a PDF over the 10 MB body cap; with `--render always`, a navigation that turned into a download (`Download is starting`). No fallback. | `non_html`, `too_large` | Image: nothing to extract. Office/encrypted PDF: `--raw -o FILE` and a document tool. Other binary: `--raw -o FILE` only if the bytes are needed. Download: fetch without `--render`. `too_large`: download the PDF with another tool. |
 | 6 | Network: DNS failure, timeout (per attempt; in the browser: page load), connection refused/reset, TLS certificate error, too many redirects or a redirect to a non-http(s) URL (refused). With `--wayback`: archive.org unreachable or answering 429/502/503/504. | `dns`, `timeout`, `connection`, `tls`, `redirects` | Check connectivity and the URL; `--timeout 60`; `--proxy`; one retry later is reasonable, a loop is not. |
 | 7 | Unexpected library or extraction error. | `other` | Report the message; file an issue with the URL. |
@@ -374,8 +374,9 @@ the process exits with the first failing URL's code.
   about a second): a few minutes per URL at worst, never unbounded.
 - Not a crawler: one URL = one request plus bounded retries and fallbacks;
   robots.txt is not fetched. Not a service: it fetches whatever URL it is given
-  (fallbacks skipped for private hosts, redirects into them refused, but a
-  private host the user names is still requested).
+  (fallbacks skipped for private hosts; over HTTP a public URL never leads to
+  a private one, in the browser a redirect may reach one but its page is
+  refused; a private host the user names is still requested).
 
 ## Chaining
 
