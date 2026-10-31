@@ -391,7 +391,7 @@ def test_arxiv_spacing_holds_across_runs(tmp_path, monkeypatch):
     first = sc.machine_slot("export.arxiv.org", 3.1)
     second = sc.machine_slot("export.arxiv.org", 3.1)  # another run, a moment later
     assert second - first == pytest.approx(3.1, abs=0.01)
-    assert sc.slot_path("export.arxiv.org").parent == tmp_path / "zedxter-skills"
+    assert sc.slot_path("export.arxiv.org").parent == tmp_path / "utility-belt"
 
 
 class Zotero(http.server.BaseHTTPRequestHandler):

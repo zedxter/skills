@@ -6,7 +6,7 @@ compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows (c
 metadata:
   author: zedxter
   version: "1.1.0"
-  source: https://github.com/zedxter/skills
+  source: https://github.com/zedxter/utility-belt
 ---
 
 # Web Extract

@@ -122,7 +122,7 @@ rejects these packages and a few other copyleft ones in a script's dependencies.
 
 Scripts that call a service directly:
 - identify themselves with
-  `User-Agent: zedxter-skills-<skill>/1.0 (+https://github.com/zedxter/skills)`,
+  `User-Agent: utility-belt-<skill>/1.0 (+https://github.com/zedxter/utility-belt)`,
   never a browser's (`web-extract` presents a browser's TLS fingerprint on
   purpose, to read ordinary public pages);
 - respect the source's published limits;

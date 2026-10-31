@@ -51,7 +51,7 @@ except ImportError as e:
     sys.stderr.write(f"error: missing dependency {e.name}; run with `uv run cite_check.py ...`\n")
     sys.exit(EXIT_BAD_INPUT)
 
-UA_BASE = "zedxter-skills-cite-check/1.0 (+https://github.com/zedxter/skills{contact})"
+UA_BASE = "utility-belt-cite-check/1.0 (+https://github.com/zedxter/utility-belt{contact})"
 DOI_ORG = "https://doi.org"
 CROSSREF = "https://api.crossref.org"
 ARXIV = "https://export.arxiv.org/api/query"
@@ -630,7 +630,7 @@ def arxiv_search(net: Net, title: str) -> list[dict[str, Any]]:
 
 
 def by_pmid(net: Net, pmid: str) -> dict[str, Any] | None:
-    params = {"db": "pubmed", "retmode": "json", "tool": "zedxter-skills", "id": pmid,
+    params = {"db": "pubmed", "retmode": "json", "tool": "utility-belt", "id": pmid,
               **({"email": net.email} if net.email else {})}
     d = net.json(f"{EUTILS}/esummary.fcgi?{urllib.parse.urlencode(params)}")
     try:

@@ -44,7 +44,7 @@ except ImportError:
     sys.stderr.write("error: missing dependency feedparser; run with `uv run podcast.py …` or `pip install feedparser`\n")
     sys.exit(EXIT_BAD_INPUT)
 
-USER_AGENT = "zedxter-skills-podcast-search/1.0 (+https://github.com/zedxter/skills)"
+USER_AGENT = "utility-belt-podcast-search/1.0 (+https://github.com/zedxter/utility-belt)"
 ITUNES = "https://itunes.apple.com"
 ITUNES_PER_MINUTE = 18  # Apple allows ~20 calls/min per IP and answers 403 beyond; stay under it across runs
 MAX_FEED_BYTES = 40_000_000
@@ -149,7 +149,7 @@ def is_url(value: str) -> bool:
 
 def throttle_file() -> Path:
     base = os.environ.get("LOCALAPPDATA") if os.name == "nt" else os.environ.get("XDG_CACHE_HOME")
-    return Path(base or Path.home() / ".cache") / "zedxter-skills" / "itunes-calls.json"
+    return Path(base or Path.home() / ".cache") / "utility-belt" / "itunes-calls.json"
 
 
 @contextlib.contextmanager

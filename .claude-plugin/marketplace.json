@@ -1,5 +1,5 @@
 {
-  "name": "zedxter-skills",
+  "name": "utility-belt",
   "description": "Open-source Agent Skills that need no API keys: web search, extraction, crawling, scraping and browsing; YouTube, podcasts and local transcription; papers, citations, Wikipedia, Hacker News, Telegram, weather; writing, PDFs and Anki decks. One plugin per skill.",
   "owner": {
     "name": "zedxter",
@@ -14,8 +14,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/anki-deck",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/anki-deck",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -26,8 +26,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/cite-check",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/cite-check",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -38,8 +38,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/hackernews",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/hackernews",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -50,8 +50,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/human-writing",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/human-writing",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -62,8 +62,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/pdf-typeset",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/pdf-typeset",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -74,8 +74,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/podcast-search",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/podcast-search",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -86,8 +86,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/scholar-search",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/scholar-search",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -98,8 +98,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/telegram-channel",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/telegram-channel",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -110,8 +110,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/transcribe-audio",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/transcribe-audio",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -122,8 +122,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/wayback",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/wayback",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -134,8 +134,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/weather",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/weather",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -146,8 +146,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-browse",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/web-browse",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT",
       "dependencies": [
         "web-extract"
@@ -161,8 +161,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-crawl",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/web-crawl",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT",
       "dependencies": [
         "web-extract"
@@ -176,8 +176,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-extract",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/web-extract",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -188,8 +188,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-scrape",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/web-scrape",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT",
       "dependencies": [
         "web-extract"
@@ -203,8 +203,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-search",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/web-search",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT",
       "dependencies": [
         "web-extract"
@@ -218,8 +218,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/wiki-lookup",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/wiki-lookup",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -230,8 +230,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/youtube-audio",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/youtube-audio",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -242,8 +242,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/youtube-search",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/youtube-search",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     },
     {
@@ -254,8 +254,8 @@
       "author": {
         "name": "zedxter"
       },
-      "homepage": "https://github.com/zedxter/skills/tree/main/skills/youtube-transcript",
-      "repository": "https://github.com/zedxter/skills",
+      "homepage": "https://github.com/zedxter/utility-belt/tree/main/skills/youtube-transcript",
+      "repository": "https://github.com/zedxter/utility-belt",
       "license": "MIT"
     }
   ]

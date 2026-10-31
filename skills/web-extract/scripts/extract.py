@@ -64,7 +64,7 @@ except ImportError as e:  # also raised when pip < 23.3 skipped the lxml[html_cl
 
 EXIT_OK, EXIT_EMPTY, EXIT_BAD_INPUT, EXIT_HTTP, EXIT_BLOCKED, EXIT_NOT_HTML, EXIT_NETWORK, EXIT_OTHER = range(8)
 
-UA = "zedxter-skills-web-extract/1.0 (+https://github.com/zedxter/skills)"
+UA = "utility-belt-web-extract/1.0 (+https://github.com/zedxter/utility-belt)"
 MAX_BODY_BYTES = 10_000_000  # decompressed; below trafilatura's MAX_FILE_SIZE (20 MB)
 MAX_REDIRECTS = 10
 MARKER_SCAN_BYTES = 65_536

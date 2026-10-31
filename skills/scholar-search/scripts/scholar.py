@@ -42,7 +42,7 @@ from typing import Any
 
 EXIT_OK, EXIT_EMPTY, EXIT_BAD_INPUT, EXIT_RATE, EXIT_NETWORK, EXIT_SOURCE = 0, 1, 2, 4, 6, 7
 
-UA_BASE = "zedxter-skills-scholar-search/1.0 (+https://github.com/zedxter/skills{contact})"
+UA_BASE = "utility-belt-scholar-search/1.0 (+https://github.com/zedxter/utility-belt{contact})"
 DOI_ORG = "https://doi.org"
 CROSSREF = "https://api.crossref.org"
 ARXIV = "https://export.arxiv.org/api/query"
@@ -178,7 +178,7 @@ LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
 
 def slot_path(host: str) -> Path:
     base = os.environ.get("LOCALAPPDATA") if os.name == "nt" else os.environ.get("XDG_CACHE_HOME")
-    return Path(base or Path.home() / ".cache") / "zedxter-skills" / f"scholar-{host}-slot"
+    return Path(base or Path.home() / ".cache") / "utility-belt" / f"scholar-{host}-slot"
 
 
 @contextlib.contextmanager
@@ -610,7 +610,7 @@ def pubmed_records(root: ET.Element, order: list[str]) -> list[dict[str, Any]]:
 
 
 def eutils_params(net: Net, **kw: Any) -> str:
-    return urllib.parse.urlencode({**kw, "tool": "zedxter-skills", **({"email": net.email} if net.email else {})})
+    return urllib.parse.urlencode({**kw, "tool": "utility-belt", **({"email": net.email} if net.email else {})})
 
 
 def search_pubmed(net: Net, q: str, o: argparse.Namespace) -> list[dict[str, Any]]:

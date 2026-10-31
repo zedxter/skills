@@ -6,7 +6,7 @@ compatibility: Python 3.12+ with uv (preferred) or pip (genanki 0.13.1, markdown
 metadata:
   author: zedxter
   version: "1.0.0"
-  source: https://github.com/zedxter/skills
+  source: https://github.com/zedxter/utility-belt
 ---
 
 # Anki Deck

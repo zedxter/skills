@@ -44,7 +44,7 @@ except ImportError:
     sys.stderr.write("error: missing dependency beautifulsoup4; run with `uv run channel.py …` or `pip install beautifulsoup4`\n")
     sys.exit(EXIT_BAD_INPUT)
 
-USER_AGENT = "zedxter-skills-telegram-channel/1.0 (+https://github.com/zedxter/skills)"
+USER_AGENT = "utility-belt-telegram-channel/1.0 (+https://github.com/zedxter/utility-belt)"
 BASE = "https://t.me"
 PAGE_DELAY = 1.5  # seconds between page requests; the preview has no published limit, so stay polite
 MAX_PAGE_BYTES = 5_000_000

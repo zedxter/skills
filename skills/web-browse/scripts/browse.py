@@ -52,7 +52,7 @@ MAX_SNAPSHOT = 150
 MAX_REQUEST = 4 << 20          # bytes of one JSON request line
 PRE_AUTH_TIMEOUT = 5.0         # seconds a client gets to send its request line
 STOP_GRACE = 15.0              # seconds `stop`/idle exit waits for a clean shutdown before killing the process
-UA_TOKEN = "web-browse/1.0 (+https://github.com/zedxter/skills)"
+UA_TOKEN = "web-browse/1.0 (+https://github.com/zedxter/utility-belt)"
 INTERACTIVE = ("a, button, input, select, textarea, summary, label, [role=button], [role=link], [role=tab], "
                "[role=menuitem], [role=option], [onclick]")
 UNRESPONSIVE = "page is unresponsive (a script on it is busy)"
