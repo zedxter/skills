@@ -1,0 +1,104 @@
+[
+  {
+    "id": "t1-topic",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "t2-guest-mp3",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "t4-latest",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "t5-to-transcribe",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "t6-long",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "t7-transcript",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "n1-transcribe-file",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "n2-start-podcast",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-youtube",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "n4-audiobooks",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

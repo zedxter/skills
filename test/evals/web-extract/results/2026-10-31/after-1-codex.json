@@ -1,0 +1,109 @@
+[
+  {
+    "id": "t1-summarise",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-extract",
+      "human-writing"
+    ]
+  },
+  {
+    "id": "t2-403",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-extract"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-extract"
+    ]
+  },
+  {
+    "id": "t4-dead-link",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t5-table",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-extract"
+    ]
+  },
+  {
+    "id": "t6-changed",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-extract",
+      "wayback"
+    ]
+  },
+  {
+    "id": "t7-pdf",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-extract"
+    ]
+  },
+  {
+    "id": "n1-crawl",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-crawl",
+      "human-writing"
+    ]
+  },
+  {
+    "id": "n2-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-search"
+    ]
+  },
+  {
+    "id": "n3-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-login",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "n5-explain",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

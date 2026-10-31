@@ -1,18 +1,20 @@
 [
   {
-    "id": "t1-version",
-    "expect": true,
-    "loaded": false,
-    "ok": false,
-    "skills": []
-  },
-  {
-    "id": "t2-compare",
+    "id": "t1-click",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-search"
+      "web-browse"
+    ]
+  },
+  {
+    "id": "t2-login",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
     ]
   },
   {
@@ -21,80 +23,86 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-search"
+      "web-browse"
     ]
   },
   {
-    "id": "t4-fallback",
+    "id": "t4-spa",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-search"
+      "web-browse"
     ]
   },
   {
-    "id": "t5-factcheck",
+    "id": "t5-site-search",
     "expect": true,
-    "loaded": false,
-    "ok": false,
-    "skills": []
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
   },
   {
-    "id": "t6-news",
+    "id": "t6-screenshot",
     "expect": true,
-    "loaded": false,
-    "ok": false,
-    "skills": []
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
   },
   {
-    "id": "t7-docs",
+    "id": "t7-wizard",
     "expect": true,
-    "loaded": false,
-    "ok": false,
-    "skills": []
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
   },
   {
-    "id": "n1-read-url",
+    "id": "n1-read",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
+      "web-extract",
       "human-writing"
     ]
   },
   {
-    "id": "n2-youtube",
-    "expect": false,
-    "loaded": false,
-    "ok": true,
-    "skills": [
-      "youtube-search"
-    ]
-  },
-  {
-    "id": "n3-grep",
+    "id": "n2-code",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": []
   },
   {
-    "id": "n4-hn",
+    "id": "n3-search",
     "expect": false,
     "loaded": false,
     "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-chrome",
+    "expect": false,
+    "loaded": true,
+    "ok": false,
     "skills": [
-      "hackernews"
+      "computer-use",
+      "web-browse"
     ]
   },
   {
-    "id": "n5-explain",
+    "id": "n5-scrape",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "human-writing"
+      "web-scrape"
     ]
   }
 ]

@@ -29,18 +29,20 @@ Leave out `--all-skills` to install only this skill. Add `--skills-dir DIR` to t
 
 ## Results from 2026-10-31
 
-In `results/2026-10-31/`, one run per prompt. The new description adds a "Not for …" sentence naming the neighbouring skills, and Russian trigger phrases.
+In `results/2026-10-31/`, one run per prompt per row. The new description adds a "Not for …" sentence naming the neighbouring skills and Russian trigger phrases.
 
 | Run | Claude Sonnet | Codex |
 |---|---|---|
 | Only this skill, old description | 11/12 | 11/12 |
-| All 20 skills, old description | 12/12 | 12/12 |
-| All 20 skills, new description | 12/12 | 11/12 |
+| All 20 skills, old description, run 1 | 12/12 | 12/12 |
+| All 20 skills, old description, run 2 | 12/12 | 11/12 |
+| All 20 skills, new description, run 1 | 12/12 | 12/12 |
+| All 20 skills, new description, run 2 | 12/12 | 12/12 |
 
-With only one skill installed, a near miss has nowhere better to go, so the whole-collection runs are the fairer test of the description. There is one run per prompt, so a difference of one or two prompts between runs is within run-to-run noise: across the ten skills tested on this date, the new descriptions scored 110/120 on both agents with the whole collection installed, against 114 (Claude) and 113 (Codex) for the old ones. The new wording follows CONTRIBUTING.md; it did not measurably change routing once the neighbouring skills were installed.
+With only one skill installed, a near miss has nowhere better to go, so the whole-collection runs are the fairer test of the description. The two runs of the same description show how much a score moves by chance. Across the ten skills tested on this date, with the whole collection installed, the old descriptions scored 114 and 111 of 120 on Claude Sonnet and 113 and 110 on Codex; the new ones scored 110 and 113 on Claude Sonnet and 113 and 111 on Codex. Two runs of the same description differ by as much as old and new do, so these runs don't show the new wording changing routing either way.
 
 ### Misses
 
 - isolated, Claude Sonnet: `n1-has-captions` loaded it
 - isolated, Codex: `n1-has-captions` loaded it
-- all-after, Codex: `n2-convert` loaded it
+- before-2, Codex: `n2-convert` loaded it

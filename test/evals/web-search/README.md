@@ -29,17 +29,19 @@ Leave out `--all-skills` to install only this skill. Add `--skills-dir DIR` to t
 
 ## Results from 2026-10-31
 
-In `results/2026-10-31/`, one run per prompt. The new description adds a "Not for …" sentence naming the neighbouring skills, and Russian trigger phrases.
+In `results/2026-10-31/`, one run per prompt per row. The new description adds a "Not for …" sentence naming the neighbouring skills and Russian trigger phrases.
 
 | Run | Claude Sonnet | Codex |
 |---|---|---|
 | Only this skill, old description | 7/12 | 8/12 |
-| All 20 skills, old description | 8/12 | 8/12 |
-| All 20 skills, new description | 6/12 | 8/12 |
+| All 20 skills, old description, run 1 | 8/12 | 8/12 |
+| All 20 skills, old description, run 2 | 6/12 | 8/12 |
+| All 20 skills, new description, run 1 | 6/12 | 8/12 |
+| All 20 skills, new description, run 2 | 7/12 | 8/12 |
 
-With only one skill installed, a near miss has nowhere better to go, so the whole-collection runs are the fairer test of the description. There is one run per prompt, so a difference of one or two prompts between runs is within run-to-run noise: across the ten skills tested on this date, the new descriptions scored 110/120 on both agents with the whole collection installed, against 114 (Claude) and 113 (Codex) for the old ones. The new wording follows CONTRIBUTING.md; it did not measurably change routing once the neighbouring skills were installed.
+With only one skill installed, a near miss has nowhere better to go, so the whole-collection runs are the fairer test of the description. The two runs of the same description show how much a score moves by chance. Across the ten skills tested on this date, with the whole collection installed, the old descriptions scored 114 and 111 of 120 on Claude Sonnet and 113 and 110 on Codex; the new ones scored 110 and 113 on Claude Sonnet and 113 and 111 on Codex. Two runs of the same description differ by as much as old and new do, so these runs don't show the new wording changing routing either way.
 
-Most misses on the plain look-up prompts (t1, t2, t5, t6, t7) are the agent using its own built-in web search instead, which both Claude Code and Codex have. The description sends the agent here when that tool is missing or thin, so this is the intended split, not a routing bug. The Russian prompt (t3) loaded the skill in five runs out of six. With only this skill installed, Codex also used it for the YouTube and Hacker News near misses; with the whole collection installed those went to youtube-search and hackernews.
+Most misses on the plain look-up prompts (t1, t2, t5, t6, t7) are the agent using its own built-in web search, which Claude Code and Codex both have and prefer for simple look-ups. The description sends the agent here when that tool is missing or thin, so these prompts mostly measure that preference. On the Russian prompt (t3), Codex with the old description read this SKILL.md and then searched with its built-in tool anyway; with the new one it went straight to the built-in tool, so the two runs that count as misses changed nothing the user saw. With only this skill installed, Codex also used it for the YouTube and Hacker News near misses; with the whole collection installed those went to youtube-search and hackernews.
 
 ### Misses
 
@@ -52,21 +54,40 @@ Most misses on the plain look-up prompts (t1, t2, t5, t6, t7) are the agent usin
 - isolated, Codex: `t7-docs` did not load it (no skill)
 - isolated, Codex: `n2-youtube` loaded it
 - isolated, Codex: `n4-hn` loaded it
-- all-before, Claude Sonnet: `t1-version` did not load it (no skill)
-- all-before, Claude Sonnet: `t5-factcheck` did not load it (no skill)
-- all-before, Claude Sonnet: `t6-news` did not load it (no skill)
-- all-before, Claude Sonnet: `t7-docs` did not load it (no skill)
-- all-before, Codex: `t1-version` did not load it (no skill)
-- all-before, Codex: `t5-factcheck` did not load it (human-writing)
-- all-before, Codex: `t6-news` did not load it (no skill)
-- all-before, Codex: `t7-docs` did not load it (no skill)
-- all-after, Claude Sonnet: `t1-version` did not load it (no skill)
-- all-after, Claude Sonnet: `t2-compare` did not load it (no skill)
-- all-after, Claude Sonnet: `t3-ru` did not load it (no skill)
-- all-after, Claude Sonnet: `t5-factcheck` did not load it (no skill)
-- all-after, Claude Sonnet: `t6-news` did not load it (no skill)
-- all-after, Claude Sonnet: `t7-docs` did not load it (no skill)
-- all-after, Codex: `t1-version` did not load it (no skill)
-- all-after, Codex: `t5-factcheck` did not load it (no skill)
-- all-after, Codex: `t6-news` did not load it (no skill)
-- all-after, Codex: `t7-docs` did not load it (no skill)
+- before-1, Claude Sonnet: `t1-version` did not load it (no skill)
+- before-1, Claude Sonnet: `t5-factcheck` did not load it (no skill)
+- before-1, Claude Sonnet: `t6-news` did not load it (no skill)
+- before-1, Claude Sonnet: `t7-docs` did not load it (no skill)
+- before-1, Codex: `t1-version` did not load it (no skill)
+- before-1, Codex: `t5-factcheck` did not load it (human-writing)
+- before-1, Codex: `t6-news` did not load it (no skill)
+- before-1, Codex: `t7-docs` did not load it (no skill)
+- before-2, Claude Sonnet: `t1-version` did not load it (no skill)
+- before-2, Claude Sonnet: `t2-compare` did not load it (no skill)
+- before-2, Claude Sonnet: `t3-ru` did not load it (no skill)
+- before-2, Claude Sonnet: `t5-factcheck` did not load it (no skill)
+- before-2, Claude Sonnet: `t6-news` did not load it (no skill)
+- before-2, Claude Sonnet: `t7-docs` did not load it (no skill)
+- before-2, Codex: `t1-version` did not load it (no skill)
+- before-2, Codex: `t5-factcheck` did not load it (no skill)
+- before-2, Codex: `t6-news` did not load it (no skill)
+- before-2, Codex: `t7-docs` did not load it (no skill)
+- after-1, Claude Sonnet: `t1-version` did not load it (no skill)
+- after-1, Claude Sonnet: `t2-compare` did not load it (no skill)
+- after-1, Claude Sonnet: `t3-ru` did not load it (no skill)
+- after-1, Claude Sonnet: `t5-factcheck` did not load it (no skill)
+- after-1, Claude Sonnet: `t6-news` did not load it (no skill)
+- after-1, Claude Sonnet: `t7-docs` did not load it (no skill)
+- after-1, Codex: `t1-version` did not load it (no skill)
+- after-1, Codex: `t3-ru` did not load it (no skill)
+- after-1, Codex: `t5-factcheck` did not load it (human-writing)
+- after-1, Codex: `t7-docs` did not load it (no skill)
+- after-2, Claude Sonnet: `t1-version` did not load it (no skill)
+- after-2, Claude Sonnet: `t2-compare` did not load it (no skill)
+- after-2, Claude Sonnet: `t5-factcheck` did not load it (no skill)
+- after-2, Claude Sonnet: `t6-news` did not load it (no skill)
+- after-2, Claude Sonnet: `t7-docs` did not load it (no skill)
+- after-2, Codex: `t1-version` did not load it (no skill)
+- after-2, Codex: `t3-ru` did not load it (no skill)
+- after-2, Codex: `t5-factcheck` did not load it (no skill)
+- after-2, Codex: `t7-docs` did not load it (no skill)

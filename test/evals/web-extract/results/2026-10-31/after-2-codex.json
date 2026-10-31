@@ -5,7 +5,8 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-extract"
+      "web-extract",
+      "human-writing"
     ]
   },
   {
@@ -38,19 +39,21 @@
   {
     "id": "t5-table",
     "expect": true,
-    "loaded": false,
-    "ok": false,
+    "loaded": true,
+    "ok": true,
     "skills": [
-      "wiki-lookup"
+      "web-extract"
     ]
   },
   {
     "id": "t6-changed",
     "expect": true,
-    "loaded": false,
-    "ok": false,
+    "loaded": true,
+    "ok": true,
     "skills": [
-      "wayback"
+      "web-extract",
+      "wayback",
+      "web-extract"
     ]
   },
   {
@@ -68,7 +71,8 @@
     "loaded": false,
     "ok": true,
     "skills": [
-      "web-crawl"
+      "web-crawl",
+      "human-writing"
     ]
   },
   {
@@ -76,7 +80,9 @@
     "expect": false,
     "loaded": false,
     "ok": true,
-    "skills": []
+    "skills": [
+      "web-search"
+    ]
   },
   {
     "id": "n3-code",

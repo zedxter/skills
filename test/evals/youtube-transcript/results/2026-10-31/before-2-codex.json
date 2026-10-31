@@ -5,17 +5,16 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-extract",
-      "human-writing"
+      "youtube-transcript"
     ]
   },
   {
-    "id": "t2-403",
+    "id": "t2-srt",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-extract"
+      "youtube-transcript"
     ]
   },
   {
@@ -24,85 +23,82 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-extract"
+      "youtube-transcript"
     ]
   },
   {
-    "id": "t4-dead-link",
-    "expect": true,
-    "loaded": false,
-    "ok": false,
-    "skills": [
-      "wayback"
-    ]
-  },
-  {
-    "id": "t5-table",
+    "id": "t4-takeaways",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-extract"
+      "youtube-transcript",
+      "human-writing"
     ]
   },
   {
-    "id": "t6-changed",
-    "expect": true,
-    "loaded": false,
-    "ok": false,
-    "skills": [
-      "wayback"
-    ]
-  },
-  {
-    "id": "t7-pdf",
+    "id": "t5-quotes",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-extract",
-      "human-writing"
+      "youtube-transcript"
     ]
   },
   {
-    "id": "n1-crawl",
+    "id": "t6-translate",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "t7-question",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "n1-search",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "web-crawl",
-      "human-writing"
+      "youtube-search"
     ]
   },
   {
-    "id": "n2-search",
+    "id": "n2-mp3",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "web-search"
+      "youtube-audio"
     ]
   },
   {
-    "id": "n3-code",
+    "id": "n3-voice-memo",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "human-writing"
+      "transcribe-audio"
     ]
   },
   {
-    "id": "n4-login",
+    "id": "n4-own-captions",
     "expect": false,
     "loaded": false,
     "ok": true,
-    "skills": [
-      "web-browse"
-    ]
+    "skills": []
   },
   {
-    "id": "n5-explain",
+    "id": "n5-api-code",
     "expect": false,
     "loaded": false,
     "ok": true,

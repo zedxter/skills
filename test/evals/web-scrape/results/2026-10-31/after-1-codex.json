@@ -1,20 +1,20 @@
 [
   {
-    "id": "t1-topic",
+    "id": "t1-products",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "podcast-search"
+      "web-scrape"
     ]
   },
   {
-    "id": "t2-guest-mp3",
+    "id": "t2-table",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "podcast-search"
+      "web-scrape"
     ]
   },
   {
@@ -23,85 +23,87 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "podcast-search"
+      "web-scrape"
     ]
   },
   {
-    "id": "t4-latest",
+    "id": "t4-pagination",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "podcast-search"
+      "web-scrape"
     ]
   },
   {
-    "id": "t5-to-transcribe",
+    "id": "t5-detail",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "podcast-search"
+      "web-scrape"
     ]
   },
   {
-    "id": "t6-long",
+    "id": "t6-json",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "podcast-search"
+      "web-scrape"
     ]
   },
   {
-    "id": "t7-transcript",
+    "id": "t7-jsonld",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "podcast-search"
+      "web-scrape"
     ]
   },
   {
-    "id": "n1-transcribe-file",
+    "id": "n1-article",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "transcribe-audio"
-    ]
-  },
-  {
-    "id": "n2-start-podcast",
-    "expect": false,
-    "loaded": true,
-    "ok": false,
-    "skills": [
-      "podcast-search",
+      "web-extract",
       "human-writing"
     ]
   },
   {
-    "id": "n3-youtube",
+    "id": "n2-code",
+    "expect": false,
+    "loaded": true,
+    "ok": false,
+    "skills": [
+      "web-scrape"
+    ]
+  },
+  {
+    "id": "n3-crawl",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "youtube-search"
+      "web-crawl"
     ]
   },
   {
-    "id": "n4-audiobooks",
+    "id": "n4-local-csv",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": []
   },
   {
-    "id": "n5-code",
+    "id": "n5-legal",
     "expect": false,
     "loaded": false,
     "ok": true,
-    "skills": []
+    "skills": [
+      "human-writing"
+    ]
   }
 ]

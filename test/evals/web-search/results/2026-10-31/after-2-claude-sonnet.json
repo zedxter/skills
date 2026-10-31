@@ -16,9 +16,11 @@
   {
     "id": "t3-ru",
     "expect": true,
-    "loaded": false,
-    "ok": false,
-    "skills": []
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-search"
+    ]
   },
   {
     "id": "t4-fallback",
@@ -55,9 +57,7 @@
     "expect": false,
     "loaded": false,
     "ok": true,
-    "skills": [
-      "web-extract"
-    ]
+    "skills": []
   },
   {
     "id": "n2-youtube",

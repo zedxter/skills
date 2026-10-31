@@ -1,0 +1,107 @@
+[
+  {
+    "id": "t1-click",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "t2-login",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "t4-spa",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "t5-site-search",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "t6-screenshot",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "t7-wizard",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "n1-read",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-extract",
+      "human-writing"
+    ]
+  },
+  {
+    "id": "n2-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-chrome",
+    "expect": false,
+    "loaded": true,
+    "ok": false,
+    "skills": [
+      "web-browse"
+    ]
+  },
+  {
+    "id": "n5-scrape",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-scrape"
+    ]
+  }
+]

@@ -29,27 +29,35 @@ Leave out `--all-skills` to install only this skill. Add `--skills-dir DIR` to t
 
 ## Results from 2026-10-31
 
-In `results/2026-10-31/`, one run per prompt. The new description adds a "Not for …" sentence naming the neighbouring skills, and Russian trigger phrases.
+In `results/2026-10-31/`, one run per prompt per row. The new description adds a "Not for …" sentence naming the neighbouring skills and Russian trigger phrases, and shortens the feature list to stay under 1,024 characters.
 
 | Run | Claude Sonnet | Codex |
 |---|---|---|
 | Only this skill, old description | 11/12 | 11/12 |
-| All 20 skills, old description | 10/12 | 11/12 |
-| All 20 skills, new description | 9/12 | 10/12 |
+| All 20 skills, old description, run 1 | 10/12 | 11/12 |
+| All 20 skills, old description, run 2 | 10/12 | 10/12 |
+| All 20 skills, new description, run 1 | 9/12 | 11/12 |
+| All 20 skills, new description, run 2 | 10/12 | 11/12 |
 
-With only one skill installed, a near miss has nowhere better to go, so the whole-collection runs are the fairer test of the description. There is one run per prompt, so a difference of one or two prompts between runs is within run-to-run noise: across the ten skills tested on this date, the new descriptions scored 110/120 on both agents with the whole collection installed, against 114 (Claude) and 113 (Codex) for the old ones. The new wording follows CONTRIBUTING.md; it did not measurably change routing once the neighbouring skills were installed.
+With only one skill installed, a near miss has nowhere better to go, so the whole-collection runs are the fairer test of the description. The two runs of the same description show how much a score moves by chance. Across the ten skills tested on this date, with the whole collection installed, the old descriptions scored 114 and 111 of 120 on Claude Sonnet and 113 and 110 on Codex; the new ones scored 110 and 113 on Claude Sonnet and 113 and 111 on Codex. Two runs of the same description differ by as much as old and new do, so these runs don't show the new wording changing routing either way.
 
-With the whole collection installed, the dead-link prompt (t4) went to wayback, the Wikipedia table (t5) to wiki-lookup and the has-it-changed prompt (t6) to wayback. wayback and wiki-lookup own those tasks too, so these misses are overlaps between neighbouring skills rather than wrong routing.
+With the whole collection installed, the dead-link prompt (t4) went to wayback in every run, and the has-it-changed prompt (t6) went there in every Claude run, while Codex usually read both skills. wayback's description owns dead links and past versions, and the new web-extract description now hands past versions to it, so t4 and t6 test an overlap between the two skills more than web-extract's routing. The Wikipedia table (t5) goes to wiki-lookup first; the run counts as a pass when the agent then reads this skill, as wiki-lookup's own instructions tell it to for tables.
 
 ### Misses
 
 - isolated, Claude Sonnet: `n1-crawl` loaded it
 - isolated, Codex: `n1-crawl` loaded it
-- all-before, Claude Sonnet: `t4-dead-link` did not load it (wayback)
-- all-before, Claude Sonnet: `t6-changed` did not load it (wayback)
-- all-before, Codex: `t4-dead-link` did not load it (wayback)
-- all-after, Claude Sonnet: `t4-dead-link` did not load it (wayback)
-- all-after, Claude Sonnet: `t5-table` did not load it (wiki-lookup)
-- all-after, Claude Sonnet: `t6-changed` did not load it (wayback)
-- all-after, Codex: `t4-dead-link` did not load it (wayback)
-- all-after, Codex: `t6-changed` did not load it (wayback)
+- before-1, Claude Sonnet: `t4-dead-link` did not load it (wayback)
+- before-1, Claude Sonnet: `t6-changed` did not load it (wayback)
+- before-1, Codex: `t4-dead-link` did not load it (wayback)
+- before-2, Claude Sonnet: `t4-dead-link` did not load it (wayback)
+- before-2, Claude Sonnet: `t6-changed` did not load it (wayback)
+- before-2, Codex: `t4-dead-link` did not load it (wayback)
+- before-2, Codex: `t6-changed` did not load it (wayback)
+- after-1, Claude Sonnet: `t4-dead-link` did not load it (wayback)
+- after-1, Claude Sonnet: `t5-table` did not load it (wiki-lookup)
+- after-1, Claude Sonnet: `t6-changed` did not load it (wayback)
+- after-1, Codex: `t4-dead-link` did not load it (wayback)
+- after-2, Claude Sonnet: `t4-dead-link` did not load it (wayback)
+- after-2, Claude Sonnet: `t6-changed` did not load it (wayback)
+- after-2, Codex: `t4-dead-link` did not load it (wayback)

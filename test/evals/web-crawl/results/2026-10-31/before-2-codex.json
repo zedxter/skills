@@ -1,20 +1,20 @@
 [
   {
-    "id": "t1-meeting",
+    "id": "t1-docs-offline",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
-    "id": "t2-subtitles",
+    "id": "t2-map",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
@@ -23,88 +23,84 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
-    "id": "t4-no-captions",
+    "id": "t4-depth",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "youtube-audio",
-      "transcribe-audio",
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
-    "id": "t5-podcast-url",
+    "id": "t5-section",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
-    "id": "t6-section",
+    "id": "t6-kb",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
-    "id": "t7-translate",
+    "id": "t7-blog",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
-    "id": "n1-has-captions",
+    "id": "n1-one-page",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "youtube-transcript"
+      "web-extract"
     ]
   },
   {
-    "id": "n2-convert",
+    "id": "n2-scrape",
     "expect": false,
     "loaded": true,
     "ok": false,
     "skills": [
-      "transcribe-audio"
+      "web-crawl"
     ]
   },
   {
-    "id": "n3-podcast-search",
-    "expect": false,
-    "loaded": false,
-    "ok": true,
-    "skills": [
-      "podcast-search"
-    ]
-  },
-  {
-    "id": "n4-record-code",
+    "id": "n3-code",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": []
   },
   {
-    "id": "n5-text",
+    "id": "n4-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-wayback",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "human-writing"
+      "wayback"
     ]
   }
 ]

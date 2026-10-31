@@ -1,20 +1,18 @@
 [
   {
-    "id": "t1-products",
+    "id": "t1-version",
     "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-scrape"
-    ]
+    "loaded": false,
+    "ok": false,
+    "skills": []
   },
   {
-    "id": "t2-table",
+    "id": "t2-compare",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-scrape"
+      "web-search"
     ]
   },
   {
@@ -23,77 +21,74 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-scrape"
+      "web-search"
     ]
   },
   {
-    "id": "t4-pagination",
+    "id": "t4-fallback",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-scrape"
+      "web-search"
     ]
   },
   {
-    "id": "t5-detail",
+    "id": "t5-factcheck",
     "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-scrape"
-    ]
-  },
-  {
-    "id": "t6-json",
-    "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-scrape"
-    ]
-  },
-  {
-    "id": "t7-jsonld",
-    "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-scrape"
-    ]
-  },
-  {
-    "id": "n1-article",
-    "expect": false,
     "loaded": false,
-    "ok": true,
-    "skills": [
-      "web-extract"
-    ]
+    "ok": false,
+    "skills": []
   },
   {
-    "id": "n2-code",
+    "id": "t6-news",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": []
+  },
+  {
+    "id": "t7-docs",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": []
+  },
+  {
+    "id": "n1-read-url",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": []
   },
   {
-    "id": "n3-crawl",
+    "id": "n2-youtube",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "n3-grep",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": []
   },
   {
-    "id": "n4-local-csv",
+    "id": "n4-hn",
     "expect": false,
     "loaded": false,
     "ok": true,
-    "skills": []
+    "skills": [
+      "hackernews",
+      "human-writing"
+    ]
   },
   {
-    "id": "n5-legal",
+    "id": "n5-explain",
     "expect": false,
     "loaded": false,
     "ok": true,

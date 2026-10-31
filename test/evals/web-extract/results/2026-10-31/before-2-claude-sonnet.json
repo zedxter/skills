@@ -1,20 +1,20 @@
 [
   {
-    "id": "t1-docs-offline",
+    "id": "t1-summarise",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-crawl"
+      "web-extract"
     ]
   },
   {
-    "id": "t2-map",
+    "id": "t2-403",
     "expect": true,
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-crawl"
+      "web-extract"
     ]
   },
   {
@@ -23,66 +23,60 @@
     "loaded": true,
     "ok": true,
     "skills": [
-      "web-crawl"
+      "web-extract"
     ]
   },
   {
-    "id": "t4-depth",
+    "id": "t4-dead-link",
     "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-crawl",
-      "human-writing"
-    ]
-  },
-  {
-    "id": "t5-section",
-    "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-crawl"
-    ]
-  },
-  {
-    "id": "t6-kb",
-    "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-crawl"
-    ]
-  },
-  {
-    "id": "t7-blog",
-    "expect": true,
-    "loaded": true,
-    "ok": true,
-    "skills": [
-      "web-crawl",
-      "human-writing"
-    ]
-  },
-  {
-    "id": "n1-one-page",
-    "expect": false,
     "loaded": false,
+    "ok": false,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t5-table",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "wiki-lookup"
+    ]
+  },
+  {
+    "id": "t6-changed",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": [
+      "wayback"
+    ]
+  },
+  {
+    "id": "t7-pdf",
+    "expect": true,
+    "loaded": true,
     "ok": true,
     "skills": [
       "web-extract"
     ]
   },
   {
-    "id": "n2-scrape",
+    "id": "n1-crawl",
     "expect": false,
-    "loaded": true,
-    "ok": false,
+    "loaded": false,
+    "ok": true,
     "skills": [
-      "web-crawl",
-      "web-scrape",
-      "web-scrape"
+      "web-crawl"
     ]
+  },
+  {
+    "id": "n2-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
   },
   {
     "id": "n3-code",
@@ -92,21 +86,19 @@
     "skills": []
   },
   {
-    "id": "n4-search",
+    "id": "n4-login",
     "expect": false,
     "loaded": false,
     "ok": true,
     "skills": [
-      "web-search"
+      "web-browse"
     ]
   },
   {
-    "id": "n5-wayback",
+    "id": "n5-explain",
     "expect": false,
     "loaded": false,
     "ok": true,
-    "skills": [
-      "wayback"
-    ]
+    "skills": []
   }
 ]
