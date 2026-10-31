@@ -207,6 +207,25 @@ def pid_alive(pid: Any) -> bool:
         return False
     return True
 
+def plugin_versions(plugin_dir: Path) -> list[Path]:
+    """web-extract's extract.py in each installed version of a cached plugin, newest first.
+
+    Versions the agent has marked for removal are skipped, and unreadable or vanishing entries are ignored."""
+    found = []
+    try:
+        versions = list(plugin_dir.iterdir())
+    except OSError:
+        return []
+    for ver in versions:
+        script = ver / "scripts" / "extract.py"
+        try:
+            if (ver / ".orphaned_at").exists() or not script.is_file():
+                continue
+            found.append((script.stat().st_mtime, str(script)))
+        except OSError:
+            continue
+    return [Path(p) for _, p in sorted(found, reverse=True)]
+
 
 def load_web_extract() -> Any | None:
     if os.environ.get("WEB_BROWSE_NO_EXTRACT", "").strip() not in ("", "0"):
@@ -214,18 +233,29 @@ def load_web_extract() -> Any | None:
     here = Path(__file__).resolve()
     candidates = [Path(os.environ["WEB_EXTRACT_SCRIPT"])] if os.environ.get("WEB_EXTRACT_SCRIPT") else []
     candidates += [here.parent.parent.parent / "web-extract" / "scripts" / "extract.py", here.parent / "extract.py"]
+    # Installed as a plugin (<cache>/<marketplace>/<plugin>/<version>/scripts/): the same marketplace's web-extract.
+    if len(here.parents) > 5 and here.parents[4].name == "cache" and here.parents[5].name == "plugins":
+        candidates += plugin_versions(here.parents[3] / "web-extract")
     # The skill folders agents install into: the agentskills.io layout first, then agents' own folders.
     for root in (Path.cwd() / ".agents" / "skills", Path.home() / ".agents" / "skills",
                  Path.home() / ".claude" / "skills", Path.cwd() / ".claude" / "skills",  # agent-dirs
                  Path.home() / ".codex" / "skills", Path.home() / ".gemini" / "skills",  # agent-dirs
                  Path.home() / ".config" / "opencode" / "skills"):  # agent-dirs
         candidates.append(root / "web-extract" / "scripts" / "extract.py")
-    # An agent's plugin cache (<cache>/<marketplace>/web-extract/<version>/), newest install first.
+    # Any marketplace in an agent's plugin cache (<cache>/<marketplace>/web-extract/<version>/), newest first.
     plugin_cache = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude") / "plugins" / "cache"  # agent-dirs
-    candidates += sorted(plugin_cache.glob("*/web-extract/*/scripts/extract.py"),
-                         key=lambda p: p.stat().st_mtime, reverse=True)
+    try:
+        markets = sorted(plugin_cache.iterdir())
+    except OSError:
+        markets = []
+    for market in markets:
+        candidates += plugin_versions(market / "web-extract")
     for path in candidates:
-        if path.is_file():
+        try:
+            found = path.is_file()
+        except OSError:  # an unreadable folder on the way is just another place it isn't
+            found = False
+        if found:
             try:
                 spec = importlib.util.spec_from_file_location("web_extract", path)
                 mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]

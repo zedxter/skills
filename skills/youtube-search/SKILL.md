@@ -1,6 +1,6 @@
 ---
 name: youtube-search
-description: Search YouTube without an API key and get results with publish date, view count, duration, channel and URL, sortable and filterable by date, views, duration and channel. Use when the user asks to find YouTube videos on a topic, the newest or most-watched videos about something, a talk/tutorial/interview/review on YouTube, videos from a particular channel, or needs a video to transcribe or summarise but has no link yet ("найди на YouTube"). Not for a video the user already linked (youtube-transcript for what is said, youtube-audio for the sound), podcasts (podcast-search) or general web search.
+description: Search YouTube without an API key and get results with publish date, view count, duration, channel and URL, sortable and filterable by date, views, duration and channel. Use when the user asks to find YouTube videos on a topic, the newest or most-watched videos about something, a talk/tutorial/interview/review on YouTube, videos from a particular channel, or needs a video to transcribe or summarise but has no link yet ("найди на YouTube"). Not for a video the user already linked (youtube-transcript for what is said, youtube-audio for the sound), podcasts (podcast-search) or general web search (web-search).
 license: MIT
 compatibility: Python 3.12+ with uv (preferred) or pip; macOS, Linux, Windows. Needs network access to youtube.com. Works from most IPs; the optional --details mode is blocked on cloud/datacenter IPs.
 metadata:

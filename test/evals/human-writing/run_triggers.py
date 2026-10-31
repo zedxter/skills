@@ -30,6 +30,8 @@ SKILLS = Path(sys.argv[sys.argv.index("--skills-dir") + 1]) if "--skills-dir" in
 SKILL = SKILLS / NAME
 ALL = "--all-skills" in sys.argv
 PROMPTS = HERE.parent / NAME / "prompts.json"
+# Reading this skill's SKILL.md or running one of its scripts; the lookbehind keeps "web-search" out of "x-web-search".
+USED = re.compile(rf"(?<![\w-]){re.escape(NAME)}/(?:SKILL\.md|scripts/)")
 
 
 def project(root: Path, agent: str) -> Path:
@@ -62,12 +64,14 @@ def loaded(agent: str, events: list[dict]) -> bool:
         if agent == "claude" and e.get("type") == "assistant":
             for c in e["message"]["content"]:
                 if c.get("type") == "tool_use":
-                    inp = json.dumps(c.get("input", {}))
-                    if (c["name"] == "Skill" and NAME in inp) or f"{NAME}/SKILL.md" in inp:
+                    inp = c.get("input", {})
+                    if c["name"] == "Skill" and str(inp.get("skill", "")).split(":")[-1] == NAME:
+                        return True
+                    if c["name"] != "Skill" and USED.search(json.dumps(inp)):
                         return True
         if agent == "codex":
             item = e.get("item", {})
-            if item.get("type") == "command_execution" and f"{NAME}/" in item.get("command", ""):
+            if item.get("type") == "command_execution" and USED.search(item.get("command", "")):
                 return True
     return False
 
@@ -104,6 +108,8 @@ def main() -> int:
     model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
     clean = "--clean" in sys.argv
     user = "--user-settings" in sys.argv
+    if not (SKILL / "SKILL.md").is_file():
+        sys.exit(f"error: no skill at {SKILL}")
     out.mkdir(parents=True, exist_ok=True)
     proj = project(out, agent)
     cases = json.loads(PROMPTS.read_text(encoding="utf-8"))

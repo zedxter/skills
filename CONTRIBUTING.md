@@ -158,5 +158,5 @@ as broken, because some sources (YouTube, Telegram) refuse datacenter IPs.
 `test/evals/<name>/prompts.json` lists prompts that must load the skill and
 near misses that must not. `test/evals/human-writing/run_triggers.py` runs
 them on Claude Code and Codex. Run them with `--all-skills` too: with only
-one skill installed, a near miss has nowhere better to go. Record the results and what changed in
-`test/evals/<name>/README.md`.
+one skill installed, a near miss has nowhere better to go. Record the
+results and what changed in `test/evals/<name>/README.md`.

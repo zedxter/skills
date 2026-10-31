@@ -210,6 +210,33 @@ def matrix(workflow: str, key: str) -> list[str]:
     return re.findall(r"- (\S+)", m[2]) if m else []
 
 
+def check_marketplace() -> list[str]:
+    """.claude-plugin/marketplace.json lists every skill once, as ./skills/<name>, with web-extract as a dependency
+    exactly where the skill's scripts load it."""
+    where = ".claude-plugin/marketplace.json"
+    try:
+        market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        plugins = market["plugins"]
+        names = [e["name"] for e in plugins]
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        return [f"{where}: unreadable ({type(e).__name__}: {e}); it needs a plugins list of objects with a name"]
+    problems = [f"{where}: plugin {n} is listed more than once" for n in sorted({n for n in names if names.count(n) > 1})]
+    skills = {d.name for d in SKILLS.iterdir() if (d / "SKILL.md").is_file()}
+    if set(names) != skills:
+        problems.append(f"{where}: plugins {sorted(set(names) ^ skills)} differ from the skill folders; "
+                        "keep one plugin per skill")
+    for e in plugins:
+        name = e["name"]
+        if e.get("source") != f"./skills/{name}":
+            problems.append(f"{where}: plugin {name} has source {e.get('source')!r}, not './skills/{name}'")
+        loads = any("def load_web_extract(" in f.read_text(encoding="utf-8")
+                    for f in (SKILLS / name / "scripts").glob("*.py")) if name in skills else False
+        if loads != ("web-extract" in (e.get("dependencies") or [])):
+            problems.append(f"{where}: plugin {name} " + ("loads web-extract but does not list it in dependencies"
+                                                           if loads else "lists web-extract but never loads it"))
+    return problems
+
+
 def check_repo() -> list[str]:
     """The workflows run every suite and probe listed here, and every test file has a suite."""
     problems = []
@@ -218,16 +245,7 @@ def check_repo() -> list[str]:
         if sorted(have) != sorted(want):
             problems.append(f".github/workflows/{workflow}: the {key} matrix {sorted(set(want) ^ set(have))} differs from "
                             "test/ops.py; keep them the same")
-    market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
-    entries = {e["name"]: e for e in market["plugins"]}
-    skills = {d.name for d in SKILLS.iterdir() if (d / "SKILL.md").is_file()}
-    if set(entries) != skills:
-        problems.append(f".claude-plugin/marketplace.json: plugins {sorted(set(entries) ^ skills)} differ from the skill "
-                        "folders; keep one plugin per skill")
-    for name, e in sorted(entries.items()):
-        if e.get("source") != f"./skills/{name}":
-            problems.append(f".claude-plugin/marketplace.json: plugin {name} has source {e.get('source')!r}, "
-                            f"not './skills/{name}'")
+    problems += check_marketplace()
     for f in sorted((ROOT / "test").glob("test_*.py")):
         name = f.stem[5:].replace("_", "-")
         if name not in SUITES:

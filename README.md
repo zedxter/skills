@@ -156,7 +156,20 @@ claude plugin install web-search@zedxter-skills
 
 `web-crawl`, `web-scrape`, `web-browse` and `web-search` install `web-extract`
 with them. Inside a session, `/plugin` lists the catalogue. A plugin's skill
-runs as `/<plugin>:<skill>`, for example `/web-search:web-search`.
+runs as `/<plugin>:<skill>`, for example `/web-search:web-search`, or as
+`/web-search` while no other command has that name.
+
+Third-party marketplaces don't update on their own unless you turn on
+auto-update for this one in `/plugin`. To pull new versions by hand:
+
+```bash
+claude plugin marketplace update zedxter-skills
+claude plugin update web-search@zedxter-skills
+```
+
+Use one install method per skill. A skill copied into `~/.claude/skills/` and
+the same skill as a plugin both load, and the agent sees two near-identical
+descriptions.
 
 ### With OpenSkills
 
