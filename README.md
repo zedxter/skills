@@ -171,6 +171,17 @@ Use one install method per skill. A skill copied into `~/.claude/skills/` and
 the same skill as a plugin both load, and the agent sees two near-identical
 descriptions.
 
+The marketplace used to be called `zedxter-skills`. If you added it under that
+name, it keeps updating, but adding `utility-belt` next to it installs every
+skill twice. To switch, remove the old one (this uninstalls its plugins), then
+add the new one and install the plugins again:
+
+```bash
+claude plugin marketplace remove zedxter-skills
+claude plugin marketplace add zedxter/utility-belt
+claude plugin install web-search@utility-belt
+```
+
 ### With OpenSkills
 
 ```bash
