@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-click",
+    "expect": true,
+    "prompt": "Open https://news.ycombinator.com, click 'More' twice and tell me the titles on the third page."
+  },
+  {
+    "id": "t2-login",
+    "expect": true,
+    "prompt": "Log in to my staging admin at https://staging.example.test with the test account and check whether the user list shows emails."
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Открой https://httpbin.org/forms/post, заполни форму тестовыми данными, отправь и скажи, что покажет страница после отправки."
+  },
+  {
+    "id": "t4-spa",
+    "expect": true,
+    "prompt": "This single-page app only shows data after you pick a date in its calendar: https://example.com/app. Pick tomorrow and tell me what appears."
+  },
+  {
+    "id": "t5-site-search",
+    "expect": true,
+    "prompt": "Search for 'standing desk' on https://www.ikea.com/de/en/ and open the first result. What's the price?"
+  },
+  {
+    "id": "t6-screenshot",
+    "expect": true,
+    "prompt": "Take a screenshot of https://tailwindcss.com after clicking the Docs link."
+  },
+  {
+    "id": "t7-wizard",
+    "expect": true,
+    "prompt": "Click through the setup wizard at http://localhost:3000 and tell me at which step it breaks."
+  },
+  {
+    "id": "n1-read",
+    "expect": false,
+    "prompt": "Read this article https://simonwillison.net/2024/Dec/31/llms-in-2024/ and summarise it."
+  },
+  {
+    "id": "n2-code",
+    "expect": false,
+    "prompt": "Write Playwright tests for my login page."
+  },
+  {
+    "id": "n3-search",
+    "expect": false,
+    "prompt": "Search the web for the best browser automation tools."
+  },
+  {
+    "id": "n4-chrome",
+    "expect": false,
+    "prompt": "Why is my Chrome using so much memory?"
+  },
+  {
+    "id": "n5-scrape",
+    "expect": false,
+    "prompt": "Get all books with prices from https://books.toscrape.com into a CSV."
+  }
+]

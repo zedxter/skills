@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-docs-offline",
+    "expect": true,
+    "prompt": "Download the whole uv documentation site (docs.astral.sh/uv) into one Markdown file I can read offline."
+  },
+  {
+    "id": "t2-map",
+    "expect": true,
+    "prompt": "What pages does https://fastapi.tiangolo.com have? Map the site."
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Собери все статьи из раздела https://jvns.ca/categories/ в один файл и сделай по ним конспект."
+  },
+  {
+    "id": "t4-depth",
+    "expect": true,
+    "prompt": "Crawl https://htmx.org/docs/ two levels deep and summarise the main concepts."
+  },
+  {
+    "id": "t5-section",
+    "expect": true,
+    "prompt": "Read every page of the Pydantic migration guide under https://docs.pydantic.dev/latest/migration/ and list the breaking changes."
+  },
+  {
+    "id": "t6-kb",
+    "expect": true,
+    "prompt": "Turn the whole help centre at https://help.example.com into searchable notes."
+  },
+  {
+    "id": "t7-blog",
+    "expect": true,
+    "prompt": "Go through all the posts on https://danluu.com and tell me which topics come up most."
+  },
+  {
+    "id": "n1-one-page",
+    "expect": false,
+    "prompt": "Summarise this one page: https://docs.astral.sh/uv/getting-started/installation/"
+  },
+  {
+    "id": "n2-scrape",
+    "expect": false,
+    "prompt": "Get all product names and prices from https://books.toscrape.com into a CSV."
+  },
+  {
+    "id": "n3-code",
+    "expect": false,
+    "prompt": "Write a web crawler in Go with a worker pool."
+  },
+  {
+    "id": "n4-search",
+    "expect": false,
+    "prompt": "Search the web for Python packaging tutorials."
+  },
+  {
+    "id": "n5-wayback",
+    "expect": false,
+    "prompt": "What did https://example.com look like in 2015?"
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-meeting",
+    "expect": true,
+    "prompt": "Transcribe meeting.m4a in this folder."
+  },
+  {
+    "id": "t2-subtitles",
+    "expect": true,
+    "prompt": "Make English subtitles (.srt) for lecture.mp4."
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Расшифруй голосовое сообщение voice.ogg и сделай краткое содержание."
+  },
+  {
+    "id": "t4-no-captions",
+    "expect": true,
+    "prompt": "This YouTube video has no captions: https://www.youtube.com/watch?v=8pTEmbeENF4. What does the speaker say?"
+  },
+  {
+    "id": "t5-podcast-url",
+    "expect": true,
+    "prompt": "Transcribe this podcast episode: https://traffic.megaphone.fm/GLT1412515089.mp3"
+  },
+  {
+    "id": "t6-section",
+    "expect": true,
+    "prompt": "What is said in interview.wav between 10:00 and 25:00? Give me timestamped lines."
+  },
+  {
+    "id": "t7-translate",
+    "expect": true,
+    "prompt": "Translate the Spanish speech in clase.mp3 into English text."
+  },
+  {
+    "id": "n1-has-captions",
+    "expect": false,
+    "prompt": "Get the transcript of https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  },
+  {
+    "id": "n2-convert",
+    "expect": false,
+    "prompt": "Convert lecture.mp4 to mp3."
+  },
+  {
+    "id": "n3-podcast-search",
+    "expect": false,
+    "prompt": "Find a podcast about the history of Unix."
+  },
+  {
+    "id": "n4-record-code",
+    "expect": false,
+    "prompt": "Write a Python script that records audio from the microphone."
+  },
+  {
+    "id": "n5-text",
+    "expect": false,
+    "prompt": "Summarise notes.txt in this folder."
+  }
+]

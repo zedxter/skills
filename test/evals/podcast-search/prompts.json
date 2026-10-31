@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-topic",
+    "expect": true,
+    "prompt": "Find a podcast about the history of computing."
+  },
+  {
+    "id": "t2-guest-mp3",
+    "expect": true,
+    "prompt": "Which episode of the Lex Fridman Podcast has Andrej Karpathy? Give me the mp3 link."
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Найди подкаст про личные финансы на русском и покажи последние выпуски."
+  },
+  {
+    "id": "t4-latest",
+    "expect": true,
+    "prompt": "What are the latest five episodes of The Changelog?"
+  },
+  {
+    "id": "t5-to-transcribe",
+    "expect": true,
+    "prompt": "Find the episode where Kelsey Hightower talks about serverless. I want to transcribe it."
+  },
+  {
+    "id": "t6-long",
+    "expect": true,
+    "prompt": "Show me episodes of Dan Carlin's Hardcore History longer than four hours."
+  },
+  {
+    "id": "t7-transcript",
+    "expect": true,
+    "prompt": "Is there a transcript available for the latest episode of Software Engineering Daily?"
+  },
+  {
+    "id": "n1-transcribe-file",
+    "expect": false,
+    "prompt": "Transcribe episode.mp3 in this folder."
+  },
+  {
+    "id": "n2-start-podcast",
+    "expect": false,
+    "prompt": "How do I start my own podcast and get it listed on Apple Podcasts?"
+  },
+  {
+    "id": "n3-youtube",
+    "expect": false,
+    "prompt": "Find YouTube videos about the history of computing."
+  },
+  {
+    "id": "n4-audiobooks",
+    "expect": false,
+    "prompt": "Recommend a few good audiobooks about Roman history."
+  },
+  {
+    "id": "n5-code",
+    "expect": false,
+    "prompt": "Write an RSS feed parser in Python."
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-most-watched",
+    "expect": true,
+    "prompt": "Find the most-watched YouTube talks about Rust async from the last year."
+  },
+  {
+    "id": "t2-recent",
+    "expect": true,
+    "prompt": "Any new YouTube videos this week reviewing the Framework Laptop 16?"
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Найди на YouTube лекции про теорию категорий для программистов, подлиннее."
+  },
+  {
+    "id": "t4-channel",
+    "expect": true,
+    "prompt": "What has the YouTube channel @3blue1brown posted recently?"
+  },
+  {
+    "id": "t5-to-summarise",
+    "expect": true,
+    "prompt": "I want a good YouTube tutorial on Kubernetes networking to summarise. Find one."
+  },
+  {
+    "id": "t6-interviews",
+    "expect": true,
+    "prompt": "Find interviews with Andrej Karpathy on YouTube, newest first."
+  },
+  {
+    "id": "t7-short",
+    "expect": true,
+    "prompt": "Search YouTube for sourdough starter videos under 10 minutes."
+  },
+  {
+    "id": "n1-summarise-link",
+    "expect": false,
+    "prompt": "Summarise this video: https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  },
+  {
+    "id": "n2-mp3",
+    "expect": false,
+    "prompt": "Convert https://youtu.be/dQw4w9WgXcQ to mp3."
+  },
+  {
+    "id": "n3-podcast",
+    "expect": false,
+    "prompt": "Find a podcast episode about the history of Unix."
+  },
+  {
+    "id": "n4-embed",
+    "expect": false,
+    "prompt": "How do I embed a YouTube video in my React app?"
+  },
+  {
+    "id": "n5-web-news",
+    "expect": false,
+    "prompt": "Search the web for news about YouTube's new monetisation policy."
+  }
+]

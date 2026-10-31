@@ -14,7 +14,8 @@ One folder under `skills/`:
 Each new skill also needs:
 - a test file `test/test_<name>.py`;
 - trigger evals in `test/evals/<name>/`;
-- a row in the README's skill table.
+- a row in the README's skill table;
+- an entry in `.claude-plugin/marketplace.json` (one Claude Code plugin per skill).
 
 ### `SKILL.md`
 
@@ -156,5 +157,6 @@ as broken, because some sources (YouTube, Telegram) refuse datacenter IPs.
 
 `test/evals/<name>/prompts.json` lists prompts that must load the skill and
 near misses that must not. `test/evals/human-writing/run_triggers.py` runs
-them on Claude Code and Codex. Record the results and what changed in
-`test/evals/<name>/README.md`.
+them on Claude Code and Codex. Run them with `--all-skills` too: with only
+one skill installed, a near miss has nowhere better to go. Record the
+results and what changed in `test/evals/<name>/README.md`.

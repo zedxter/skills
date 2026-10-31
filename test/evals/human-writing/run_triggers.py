@@ -4,13 +4,17 @@
     python3 -I run_triggers.py claude OUT_DIR [--model sonnet] [--user-settings]   # --user-settings: load ~/.claude plugins and hooks too
     python3 -I run_triggers.py codex OUT_DIR [--clean]   # --clean: ignore ~/.codex config and plugins
     python3 -I run_triggers.py claude OUT_DIR --skill telegram-channel   # another skill; prompts from test/evals/<skill>/
+    python3 -I run_triggers.py codex OUT_DIR --skill web-search --all-skills   # install the whole collection
+    python3 -I run_triggers.py codex OUT_DIR --skill web-search --all-skills --skills-dir OLD/skills   # another copy
 
 Written for human-writing; --skill NAME (default human-writing) tests skills/NAME with test/evals/NAME/prompts.json.
 
 Each prompt runs in a scratch project that has only this skill installed at the project level (Claude Code:
-.claude/skills/, Codex: .agents/skills/) plus tool.py and CHANGELOG.md. Claude Code runs with project settings
+.claude/skills/, Codex: .agents/skills/) plus tool.py and CHANGELOG.md. With --all-skills every skill of the
+collection is installed, so a near miss can go to the neighbouring skill it belongs to; a run still counts as
+"loaded" only when this skill is loaded. Claude Code runs with project settings
 only and read-only tools; Codex runs in its read-only sandbox. A run counts as "loaded" when the agent invokes
-the skill or reads its SKILL.md. Costs real tokens: about 20 short agent runs per agent.
+the skill, reads its SKILL.md or runs one of its scripts. Costs real tokens: about 20 short agent runs per agent.
 """
 import json
 import re
@@ -22,8 +26,12 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 NAME = sys.argv[sys.argv.index("--skill") + 1] if "--skill" in sys.argv else "human-writing"
-SKILL = HERE.parents[2] / "skills" / NAME
+SKILLS = Path(sys.argv[sys.argv.index("--skills-dir") + 1]) if "--skills-dir" in sys.argv else HERE.parents[2] / "skills"
+SKILL = SKILLS / NAME
+ALL = "--all-skills" in sys.argv
 PROMPTS = HERE.parent / NAME / "prompts.json"
+# Reading this skill's SKILL.md or running one of its scripts; the lookbehind keeps "web-search" out of "x-web-search".
+USED = re.compile(rf"(?<![\w-]){re.escape(NAME)}/(?:SKILL\.md|scripts/)")
 
 
 def project(root: Path, agent: str) -> Path:
@@ -31,7 +39,8 @@ def project(root: Path, agent: str) -> Path:
     if not proj.exists():
         skills = proj / (".claude/skills" if agent == "claude" else ".agents/skills")
         skills.mkdir(parents=True)
-        shutil.copytree(SKILL, skills / NAME)
+        for src in sorted(d for d in SKILLS.iterdir() if (d / "SKILL.md").is_file()) if ALL else [SKILL]:
+            shutil.copytree(src, skills / src.name)
         for f in ("tool.py", "CHANGELOG.md"):
             shutil.copy(HERE / f, proj / f)
     return proj
@@ -55,12 +64,14 @@ def loaded(agent: str, events: list[dict]) -> bool:
         if agent == "claude" and e.get("type") == "assistant":
             for c in e["message"]["content"]:
                 if c.get("type") == "tool_use":
-                    inp = json.dumps(c.get("input", {}))
-                    if (c["name"] == "Skill" and NAME in inp) or f"{NAME}/SKILL.md" in inp:
+                    inp = c.get("input", {})
+                    if c["name"] == "Skill" and str(inp.get("skill", "")).split(":")[-1] == NAME:
+                        return True
+                    if c["name"] != "Skill" and USED.search(json.dumps(inp)):
                         return True
         if agent == "codex":
             item = e.get("item", {})
-            if item.get("type") == "command_execution" and f"{NAME}/" in item.get("command", ""):
+            if item.get("type") == "command_execution" and USED.search(item.get("command", "")):
                 return True
     return False
 
@@ -97,6 +108,8 @@ def main() -> int:
     model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
     clean = "--clean" in sys.argv
     user = "--user-settings" in sys.argv
+    if not (SKILL / "SKILL.md").is_file():
+        sys.exit(f"error: no skill at {SKILL}")
     out.mkdir(parents=True, exist_ok=True)
     proj = project(out, agent)
     cases = json.loads(PROMPTS.read_text(encoding="utf-8"))

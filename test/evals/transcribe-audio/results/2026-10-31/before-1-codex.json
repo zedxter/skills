@@ -1,0 +1,108 @@
+[
+  {
+    "id": "t1-meeting",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "t2-subtitles",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "t4-no-captions",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-audio",
+      "transcribe-audio",
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "t5-podcast-url",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "t6-section",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "t7-translate",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "transcribe-audio"
+    ]
+  },
+  {
+    "id": "n1-has-captions",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "n2-convert",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-podcast-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "n4-record-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-text",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "human-writing"
+    ]
+  }
+]

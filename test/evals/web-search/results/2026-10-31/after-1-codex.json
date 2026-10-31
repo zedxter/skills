@@ -1,0 +1,100 @@
+[
+  {
+    "id": "t1-version",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": []
+  },
+  {
+    "id": "t2-compare",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-search"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": []
+  },
+  {
+    "id": "t4-fallback",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-search"
+    ]
+  },
+  {
+    "id": "t5-factcheck",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": [
+      "human-writing"
+    ]
+  },
+  {
+    "id": "t6-news",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-search"
+    ]
+  },
+  {
+    "id": "t7-docs",
+    "expect": true,
+    "loaded": false,
+    "ok": false,
+    "skills": []
+  },
+  {
+    "id": "n1-read-url",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "human-writing"
+    ]
+  },
+  {
+    "id": "n2-youtube",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "n3-grep",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-hn",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "hackernews"
+    ]
+  },
+  {
+    "id": "n5-explain",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

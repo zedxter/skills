@@ -390,6 +390,91 @@ def test_bad_arguments_exit2():
     assert run("https://example.com/", "--max-pages", "0")[0] == 2
 
 
+def _cached_web_extract(root: Path, market: str, version: str, marker: str) -> Path:
+    scripts = root / "plugins" / "cache" / market / "web-extract" / version / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "extract.py").write_text(f"FOUND = {marker!r}\n", encoding="utf-8")
+    return scripts
+
+
+def _found(script: Path, tmp_path: Path, env_extra: dict[str, str]) -> subprocess.CompletedProcess:
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("WEB_EXTRACT_SCRIPT", "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_PLUGIN_CACHE_DIR",
+                        "CLAUDE_CODE_PLUGIN_SEED_DIR")}
+    env.update({"HOME": str(tmp_path / "home"), "USERPROFILE": str(tmp_path / "home"), **env_extra})
+    code = f"import runpy; m = runpy.run_path({str(script)!r}); print(m['load_web_extract']().FOUND)"
+    return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", env=env, cwd=tmp_path, timeout=60)
+
+
+def _alone(tmp_path: Path, where: Path) -> Path:
+    where.mkdir(parents=True)
+    (where / "crawl.py").write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+    return where / "crawl.py"
+
+
+@pytest.mark.parametrize("via_env", [False, True])
+def test_finds_web_extract_in_plugin_cache(tmp_path, via_env):
+    """Installed as a plugin, the skill has no sibling web-extract; it is found in the plugin cache instead."""
+    config = tmp_path / "config" if via_env else tmp_path / "home" / ".claude"
+    _cached_web_extract(config, "market", "abc123", "plugin cache")
+    script = _alone(tmp_path, tmp_path / "web-crawl" / "scripts")
+    p = _found(script, tmp_path, {"CLAUDE_CONFIG_DIR": str(config)} if via_env else {})
+    assert p.returncode == 0 and p.stdout.strip() == "plugin cache", p.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+def test_plugin_cache_prefers_own_marketplace_and_skips_bad_entries(tmp_path):
+    config = tmp_path / "home" / ".claude"
+    _cached_web_extract(config, "zedxter-skills", "v1", "own marketplace")
+    older = _cached_web_extract(config, "aaa", "v1", "older copy")  # sorts first by name, but is older
+    os.utime(older / "extract.py", (time.time() - 100, time.time() - 100))
+    other = _cached_web_extract(config, "zzz", "v9", "other marketplace")  # newest, but another marketplace
+    os.utime(other / "extract.py", (time.time() + 100, time.time() + 100))
+    unreadable = _cached_web_extract(config, "zzz-locked", "v9", "unreadable")
+    (unreadable / "extract.py").chmod(0)
+    os.utime(unreadable / "extract.py", (time.time() + 200, time.time() + 200))
+    orphan = _cached_web_extract(config, "zedxter-skills", "v0", "orphaned version")
+    (orphan.parent / ".orphaned_at").write_text("1", encoding="utf-8")
+    broken = config / "plugins" / "cache" / "zedxter-skills" / "web-extract" / "v2" / "scripts"
+    broken.mkdir(parents=True)
+    (broken / "extract.py").symlink_to(tmp_path / "nowhere.py")
+    plugin = config / "plugins" / "cache" / "zedxter-skills" / "web-crawl" / "v1" / "scripts"
+    p = _found(_alone(tmp_path, plugin), tmp_path, {})
+    assert p.returncode == 0 and p.stdout.strip() == "own marketplace", p.stderr
+    # Run from elsewhere, the newest readable copy in any marketplace wins; broken and unreadable ones are skipped
+    # (as root every file is readable, so the locked copy would win).
+    p = _found(_alone(tmp_path, tmp_path / "elsewhere" / "scripts"), tmp_path, {})
+    want = "unreadable" if hasattr(os, "geteuid") and os.geteuid() == 0 else "other marketplace"
+    assert p.returncode == 0 and p.stdout.strip() == want, p.stderr
+
+
+def test_plugin_cache_in_a_relocated_plugins_root(tmp_path):
+    """An agent can keep its plugins outside its config folder; the lookup follows it there."""
+    root = tmp_path / "plugin-root"
+    _cached_web_extract(root, "zedxter-skills", "v1", "relocated")
+    shutil.move(str(root / "plugins" / "cache"), str(root / "cache"))
+    plugin = root / "cache" / "zedxter-skills" / "web-crawl" / "v1" / "scripts"
+    p = _found(_alone(tmp_path, plugin), tmp_path, {})  # own marketplace, found from the script's own path
+    assert p.returncode == 0 and p.stdout.strip() == "relocated", p.stderr
+    p = _found(_alone(tmp_path, tmp_path / "elsewhere" / "scripts"), tmp_path,
+               {"CLAUDE_CODE_PLUGIN_CACHE_DIR": str(root)})
+    assert p.returncode == 0 and p.stdout.strip() == "relocated", p.stderr
+
+
+def test_web_extract_lookup_is_the_same_in_every_web_skill():
+    """web-crawl, web-scrape, web-browse and web-search carry the same plugin-cache lookup."""
+    import re
+    blocks, scans = set(), set()
+    for name, script in [("web-crawl", "crawl.py"), ("web-scrape", "scrape.py"), ("web-browse", "browse.py"),
+                         ("web-search", "search.py")]:
+        src = (ROOT / "skills" / name / "scripts" / script).read_text(encoding="utf-8")
+        blocks.add(re.search(r"^def plugin_versions\(.*?^    return \[Path\(p\).*?$", src, re.S | re.M)[0])
+        scans.add(re.search(r"^    # Installed as a plugin.*?^    # The skill folders", src, re.S | re.M)[0]
+                  + re.search(r"^    # Every marketplace.*?^    candidates \+= plugin_versions\(\*cached\)$", src,
+                              re.S | re.M)[0])
+    assert len(blocks) == 1 and len(scans) == 1
+
 def test_crash_exits_7_not_1():
     """An unexpected exception in main() exits 7 with one error line, never 1, which has its own meaning."""
     code = ("import argparse, runpy, sys\n"

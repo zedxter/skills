@@ -1,0 +1,108 @@
+[
+  {
+    "id": "t1-most-watched",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "t2-recent",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "t4-channel",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "t5-to-summarise",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "t6-interviews",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "t7-short",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-search"
+    ]
+  },
+  {
+    "id": "n1-summarise-link",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "n2-mp3",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "youtube-audio"
+    ]
+  },
+  {
+    "id": "n3-podcast",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "podcast-search"
+    ]
+  },
+  {
+    "id": "n4-embed",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-web-news",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-search"
+    ]
+  }
+]

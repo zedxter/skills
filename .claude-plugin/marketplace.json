@@ -1,0 +1,262 @@
+{
+  "name": "zedxter-skills",
+  "description": "Open-source Agent Skills that need no API keys: web search, extraction, crawling, scraping and browsing; YouTube, podcasts and local transcription; papers, citations, Wikipedia, Hacker News, Telegram, weather; writing, PDFs and Anki decks. One plugin per skill.",
+  "owner": {
+    "name": "zedxter",
+    "url": "https://github.com/zedxter"
+  },
+  "plugins": [
+    {
+      "name": "anki-deck",
+      "source": "./skills/anki-deck",
+      "description": "Anki flashcard decks (.apkg) from Markdown, CSV or JSON, rebuildable without duplicate cards.",
+      "category": "productivity",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/anki-deck",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "cite-check",
+      "source": "./skills/cite-check",
+      "description": "Checks references and DOIs against doi.org, Crossref, arXiv and PubMed; flags made-up citations.",
+      "category": "research",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/cite-check",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "hackernews",
+      "source": "./skills/hackernews",
+      "description": "Hacker News search, front page, Show/Ask HN and full comment threads through the official APIs.",
+      "category": "research",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/hackernews",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "human-writing",
+      "source": "./skills/human-writing",
+      "description": "Writes and reviews English articles, posts and docs: facts ledger, AI-tell linter, reviewer panel.",
+      "category": "productivity",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/human-writing",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "pdf-typeset",
+      "source": "./skills/pdf-typeset",
+      "description": "Markdown or JSON to checked, professional PDFs with Typst: reports, letters, invoices, CVs, slides.",
+      "category": "productivity",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/pdf-typeset",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "podcast-search",
+      "source": "./skills/podcast-search",
+      "description": "Finds podcasts and episodes through Apple's public search and the show's RSS feed, with audio URLs.",
+      "category": "media",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/podcast-search",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "scholar-search",
+      "source": "./skills/scholar-search",
+      "description": "Finds real papers across arXiv, Crossref, Europe PMC, PubMed and bioRxiv, with citations and BibTeX.",
+      "category": "research",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/scholar-search",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "telegram-channel",
+      "source": "./skills/telegram-channel",
+      "description": "Reads public Telegram channels without an account: posts, dates, views, links, search.",
+      "category": "research",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/telegram-channel",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "transcribe-audio",
+      "source": "./skills/transcribe-audio",
+      "description": "Transcribes audio or video locally with faster-whisper: text, timestamps, SRT, VTT; no upload.",
+      "category": "media",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/transcribe-audio",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "wayback",
+      "source": "./skills/wayback",
+      "description": "Wayback Machine: whether a URL was archived, captures by date, what a page said, Save Page Now.",
+      "category": "web",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/wayback",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "weather",
+      "source": "./skills/weather",
+      "description": "Forecast, past weather back to 1940 and air quality for any place, from Open-Meteo.",
+      "category": "research",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/weather",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "web-browse",
+      "source": "./skills/web-browse",
+      "description": "Drives a real local Chromium step by step: open, click, type, read, screenshot, keep logins.",
+      "category": "web",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-browse",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT",
+      "dependencies": [
+        "web-extract"
+      ]
+    },
+    {
+      "name": "web-crawl",
+      "source": "./skills/web-crawl",
+      "description": "Crawls a site into one Markdown file or JSONL, or maps its URLs; honours robots.txt.",
+      "category": "web",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-crawl",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT",
+      "dependencies": [
+        "web-extract"
+      ]
+    },
+    {
+      "name": "web-extract",
+      "source": "./skills/web-extract",
+      "description": "Reads a web page or PDF as clean Markdown with a browser-grade TLS fingerprint and a Wayback fallback.",
+      "category": "web",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-extract",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "web-scrape",
+      "source": "./skills/web-scrape",
+      "description": "Scrapes repeating records, tables and JSON-LD into CSV, JSON or JSONL, with pagination.",
+      "category": "web",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-scrape",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT",
+      "dependencies": [
+        "web-extract"
+      ]
+    },
+    {
+      "name": "web-search",
+      "source": "./skills/web-search",
+      "description": "Web search without an API key through DuckDuckGo, Bing, Brave and others, or your own SearXNG.",
+      "category": "web",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/web-search",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT",
+      "dependencies": [
+        "web-extract"
+      ]
+    },
+    {
+      "name": "wiki-lookup",
+      "source": "./skills/wiki-lookup",
+      "description": "Wikipedia in any language and Wikidata facts, with revision ids for citing.",
+      "category": "research",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/wiki-lookup",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "youtube-audio",
+      "source": "./skills/youtube-audio",
+      "description": "Saves YouTube audio as m4a or mp3 with chapters and cover art; cuts sections, splits tracks.",
+      "category": "media",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/youtube-audio",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "youtube-search",
+      "source": "./skills/youtube-search",
+      "description": "Searches YouTube without an API key, with dates, views and durations; sort and filter.",
+      "category": "media",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/youtube-search",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    },
+    {
+      "name": "youtube-transcript",
+      "source": "./skills/youtube-transcript",
+      "description": "YouTube transcripts as text, timestamps, SRT or JSON, for summaries, notes and quotes.",
+      "category": "media",
+      "author": {
+        "name": "zedxter"
+      },
+      "homepage": "https://github.com/zedxter/skills/tree/main/skills/youtube-transcript",
+      "repository": "https://github.com/zedxter/skills",
+      "license": "MIT"
+    }
+  ]
+}

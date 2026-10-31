@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-summarise",
+    "expect": true,
+    "prompt": "Summarise this article for me: https://simonwillison.net/2024/Dec/31/llms-in-2024/"
+  },
+  {
+    "id": "t2-403",
+    "expect": true,
+    "prompt": "My fetch tool got a 403 on https://www.npmjs.com/package/zod. Can you read the page anyway?"
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Вытащи текст из этой статьи и перескажи коротко: https://habr.com/ru/articles/800000/"
+  },
+  {
+    "id": "t4-dead-link",
+    "expect": true,
+    "prompt": "This link is dead now: http://example.org/old/docs/page.html. Can you get me what it used to say?"
+  },
+  {
+    "id": "t5-table",
+    "expect": true,
+    "prompt": "Extract the table of versions and release dates from https://en.wikipedia.org/wiki/History_of_Python"
+  },
+  {
+    "id": "t6-changed",
+    "expect": true,
+    "prompt": "Has https://openai.com/policies/usage-policies changed since I last checked it?"
+  },
+  {
+    "id": "t7-pdf",
+    "expect": true,
+    "prompt": "Read this PDF and give me the key points: https://arxiv.org/pdf/1706.03762"
+  },
+  {
+    "id": "n1-crawl",
+    "expect": false,
+    "prompt": "Crawl the whole docs site at https://docs.astral.sh/uv/ and make me notes on every page."
+  },
+  {
+    "id": "n2-search",
+    "expect": false,
+    "prompt": "Search the web for the best Python HTTP client libraries."
+  },
+  {
+    "id": "n3-code",
+    "expect": false,
+    "prompt": "Write a Python script that downloads a web page with requests and parses it with BeautifulSoup."
+  },
+  {
+    "id": "n4-login",
+    "expect": false,
+    "prompt": "Log in to my account on example.com and check my order status."
+  },
+  {
+    "id": "n5-explain",
+    "expect": false,
+    "prompt": "What does HTTP status 403 mean?"
+  }
+]

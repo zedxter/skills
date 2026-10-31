@@ -1,0 +1,100 @@
+[
+  {
+    "id": "t1-summarise",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "t2-srt",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "t4-takeaways",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "t5-quotes",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "t6-translate",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "t7-question",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "youtube-transcript"
+    ]
+  },
+  {
+    "id": "n1-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n2-mp3",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n3-voice-memo",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-own-captions",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n5-api-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  }
+]

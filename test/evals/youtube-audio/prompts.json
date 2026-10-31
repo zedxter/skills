@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-mp3",
+    "expect": true,
+    "prompt": "Convert https://youtu.be/dQw4w9WgXcQ to mp3."
+  },
+  {
+    "id": "t2-offline",
+    "expect": true,
+    "prompt": "Download just the audio of this lecture so I can listen offline: https://www.youtube.com/watch?v=zjkBMFhNj_g"
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Скачай звук из этого видео в m4a: https://www.youtube.com/watch?v=aircAruvnKk"
+  },
+  {
+    "id": "t4-section",
+    "expect": true,
+    "prompt": "Rip 12:30 to 45:00 of https://www.youtube.com/watch?v=8pTEmbeENF4 as an mp3."
+  },
+  {
+    "id": "t5-chapters",
+    "expect": true,
+    "prompt": "This mix has chapters. Split its audio into separate tracks: https://www.youtube.com/watch?v=jfKfPfyJRdk"
+  },
+  {
+    "id": "t6-info",
+    "expect": true,
+    "prompt": "What audio formats and chapters does https://youtu.be/kCc8FmEb1nY have? Don't download anything."
+  },
+  {
+    "id": "t7-playlist",
+    "expect": true,
+    "prompt": "Save the whole playlist https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi as audio files."
+  },
+  {
+    "id": "n1-summarise",
+    "expect": false,
+    "prompt": "Summarise https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  },
+  {
+    "id": "n2-search",
+    "expect": false,
+    "prompt": "Find YouTube videos with lo-fi music for studying."
+  },
+  {
+    "id": "n3-local-convert",
+    "expect": false,
+    "prompt": "Convert song.wav in this folder to mp3."
+  },
+  {
+    "id": "n4-podcast-mp3",
+    "expect": false,
+    "prompt": "Give me the mp3 link of the latest Lex Fridman podcast episode."
+  },
+  {
+    "id": "n5-audacity",
+    "expect": false,
+    "prompt": "How do I normalise audio levels in Audacity?"
+  }
+]

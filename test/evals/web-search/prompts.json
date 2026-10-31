@@ -1,0 +1,62 @@
+[
+  {
+    "id": "t1-version",
+    "expect": true,
+    "prompt": "What's the current stable version of PostgreSQL and when was it released? Look it up."
+  },
+  {
+    "id": "t2-compare",
+    "expect": true,
+    "prompt": "Find three recent articles comparing Bun and Deno performance."
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "prompt": "Найди в интернете, что писали про AI Act ЕС за последнюю неделю."
+  },
+  {
+    "id": "t4-fallback",
+    "expect": true,
+    "prompt": "My built-in web search is rate-limited. Search for the official docs page about Python's asyncio TaskGroup."
+  },
+  {
+    "id": "t5-factcheck",
+    "expect": true,
+    "prompt": "Check this claim against a few sources: 'Honey never spoils.'"
+  },
+  {
+    "id": "t6-news",
+    "expect": true,
+    "prompt": "Search the news for outages reported at Cloudflare this month."
+  },
+  {
+    "id": "t7-docs",
+    "expect": true,
+    "prompt": "Look up who maintains the uv package manager and give me a link to its documentation."
+  },
+  {
+    "id": "n1-read-url",
+    "expect": false,
+    "prompt": "Summarise this article: https://simonwillison.net/2024/Dec/31/llms-in-2024/"
+  },
+  {
+    "id": "n2-youtube",
+    "expect": false,
+    "prompt": "Find YouTube videos about Rust async."
+  },
+  {
+    "id": "n3-grep",
+    "expect": false,
+    "prompt": "Search this repository for TODO comments."
+  },
+  {
+    "id": "n4-hn",
+    "expect": false,
+    "prompt": "What does Hacker News think about Zig?"
+  },
+  {
+    "id": "n5-explain",
+    "expect": false,
+    "prompt": "Explain what a B-tree is, with a small example."
+  }
+]

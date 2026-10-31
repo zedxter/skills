@@ -1,0 +1,111 @@
+[
+  {
+    "id": "t1-docs-offline",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-crawl"
+    ]
+  },
+  {
+    "id": "t2-map",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-crawl"
+    ]
+  },
+  {
+    "id": "t3-ru",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-crawl"
+    ]
+  },
+  {
+    "id": "t4-depth",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-crawl"
+    ]
+  },
+  {
+    "id": "t5-section",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-crawl"
+    ]
+  },
+  {
+    "id": "t6-kb",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-crawl"
+    ]
+  },
+  {
+    "id": "t7-blog",
+    "expect": true,
+    "loaded": true,
+    "ok": true,
+    "skills": [
+      "web-crawl",
+      "human-writing"
+    ]
+  },
+  {
+    "id": "n1-one-page",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-extract"
+    ]
+  },
+  {
+    "id": "n2-scrape",
+    "expect": false,
+    "loaded": true,
+    "ok": false,
+    "skills": [
+      "web-crawl",
+      "web-scrape",
+      "web-scrape"
+    ]
+  },
+  {
+    "id": "n3-code",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": []
+  },
+  {
+    "id": "n4-search",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "web-search"
+    ]
+  },
+  {
+    "id": "n5-wayback",
+    "expect": false,
+    "loaded": false,
+    "ok": true,
+    "skills": [
+      "wayback"
+    ]
+  }
+]
