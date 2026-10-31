@@ -14,7 +14,7 @@ Each prompt runs in a scratch project that has only this skill installed at the 
 collection is installed, so a near miss can go to the neighbouring skill it belongs to; a run still counts as
 "loaded" only when this skill is loaded. Claude Code runs with project settings
 only and read-only tools; Codex runs in its read-only sandbox. A run counts as "loaded" when the agent invokes
-the skill or reads its SKILL.md. Costs real tokens: about 20 short agent runs per agent.
+the skill, reads its SKILL.md or runs one of its scripts. Costs real tokens: about 20 short agent runs per agent.
 """
 import json
 import re

@@ -41,7 +41,7 @@ In `results/2026-10-31/`, one run per prompt per row. The new description adds a
 
 With only one skill installed, a near miss has nowhere better to go, so the whole-collection runs are the fairer test of the description. The two runs of the same description show how much a score moves by chance. Across the ten skills tested on this date, with the whole collection installed, the old descriptions scored 114 and 111 of 120 on Claude Sonnet and 113 and 110 on Codex; the new ones scored 110 and 113 on Claude Sonnet and 113 and 111 on Codex. Two runs of the same description differ by as much as old and new do, so these runs don't show the new wording changing routing either way.
 
-Codex's misses on the scrape near miss (n2) are runs where it read both web-crawl and web-scrape before choosing web-scrape.
+On the scrape near miss (n2), Codex read both web-crawl and web-scrape before choosing web-scrape in the two new-description runs; in the single-skill run and in old-description run 2 it read only web-crawl.
 
 ### Misses
 

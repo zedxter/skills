@@ -56,23 +56,25 @@ MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", 
 WORD_DATE_RES = [re.compile(r"\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b"),  # March 14, 1879
                  re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\.?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\b")]  # 14 March 1879
 
-def plugin_versions(plugin_dir: Path) -> list[Path]:
-    """web-extract's extract.py in each installed version of a cached plugin, newest first.
+
+def plugin_versions(*plugin_dirs: Path) -> list[Path]:
+    """web-extract's extract.py in each installed version of the given cached plugins, newest first.
 
     Versions the agent has marked for removal are skipped, and unreadable or vanishing entries are ignored."""
     found = []
-    try:
-        versions = list(plugin_dir.iterdir())
-    except OSError:
-        return []
-    for ver in versions:
-        script = ver / "scripts" / "extract.py"
+    for plugin_dir in plugin_dirs:
         try:
-            if (ver / ".orphaned_at").exists() or not script.is_file():
-                continue
-            found.append((script.stat().st_mtime, str(script)))
+            versions = list(plugin_dir.iterdir())
         except OSError:
             continue
+        for ver in versions:
+            script = ver / "scripts" / "extract.py"
+            try:
+                if (ver / ".orphaned_at").exists() or not script.is_file():
+                    continue
+                found.append((script.stat().st_mtime, str(script)))
+            except OSError:
+                continue
     return [Path(p) for _, p in sorted(found, reverse=True)]
 
 
@@ -81,7 +83,7 @@ def load_web_extract() -> Any:
     candidates = [Path(os.environ["WEB_EXTRACT_SCRIPT"])] if os.environ.get("WEB_EXTRACT_SCRIPT") else []
     candidates += [here.parent.parent.parent / "web-extract" / "scripts" / "extract.py", here.parent / "extract.py"]
     # Installed as a plugin (<cache>/<marketplace>/<plugin>/<version>/scripts/): the same marketplace's web-extract.
-    if len(here.parents) > 5 and here.parents[4].name == "cache" and here.parents[5].name == "plugins":
+    if len(here.parents) > 4 and here.parents[4].name == "cache":
         candidates += plugin_versions(here.parents[3] / "web-extract")
     # The skill folders agents install into: the agentskills.io layout first, then agents' own folders.
     for root in (Path.cwd() / ".agents" / "skills", Path.home() / ".agents" / "skills",
@@ -89,14 +91,17 @@ def load_web_extract() -> Any:
                  Path.home() / ".codex" / "skills", Path.home() / ".gemini" / "skills",  # agent-dirs
                  Path.home() / ".config" / "opencode" / "skills"):  # agent-dirs
         candidates.append(root / "web-extract" / "scripts" / "extract.py")
-    # Any marketplace in an agent's plugin cache (<cache>/<marketplace>/web-extract/<version>/), newest first.
-    plugin_cache = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude") / "plugins" / "cache"  # agent-dirs
-    try:
-        markets = sorted(plugin_cache.iterdir())
-    except OSError:
-        markets = []
-    for market in markets:
-        candidates += plugin_versions(market / "web-extract")
+    # Every marketplace in an agent's plugin caches (<root>/cache/<marketplace>/web-extract/<version>/), newest first.
+    roots = [Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude") / "plugins"]  # agent-dirs
+    roots += [Path(d) for d in [os.environ.get("CLAUDE_CODE_PLUGIN_CACHE_DIR", ""),  # agent-dirs
+                                *os.environ.get("CLAUDE_CODE_PLUGIN_SEED_DIR", "").split(os.pathsep)] if d]  # agent-dirs
+    cached = []
+    for root in roots:
+        try:
+            cached += [market / "web-extract" for market in (root / "cache").iterdir()]
+        except OSError:
+            continue
+    candidates += plugin_versions(*cached)
     for path in candidates:
         try:
             found = path.is_file()
@@ -106,7 +111,11 @@ def load_web_extract() -> Any:
             spec = importlib.util.spec_from_file_location("web_extract", path)
             mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
             sys.modules["web_extract"] = mod
-            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+            try:
+                spec.loader.exec_module(mod)  # type: ignore[union-attr]
+            except OSError:  # unreadable copy: try the next one
+                sys.modules.pop("web_extract", None)
+                continue
             return mod
     sys.stderr.write("error: the web-extract skill was not found (looked next to this skill and in the usual agent skill folders); "
                      "install it from the same repository or set WEB_EXTRACT_SCRIPT=/path/to/extract.py\n")

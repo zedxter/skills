@@ -218,6 +218,8 @@ def check_marketplace() -> list[str]:
         market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
         plugins = market["plugins"]
         names = [e["name"] for e in plugins]
+        if not isinstance(plugins, list) or not all(isinstance(n, str) for n in names):
+            raise TypeError("plugins must be a list of objects with a string name")
     except (OSError, ValueError, KeyError, TypeError) as e:
         return [f"{where}: unreadable ({type(e).__name__}: {e}); it needs a plugins list of objects with a name"]
     problems = [f"{where}: plugin {n} is listed more than once" for n in sorted({n for n in names if names.count(n) > 1})]
@@ -231,7 +233,14 @@ def check_marketplace() -> list[str]:
             problems.append(f"{where}: plugin {name} has source {e.get('source')!r}, not './skills/{name}'")
         loads = any("def load_web_extract(" in f.read_text(encoding="utf-8")
                     for f in (SKILLS / name / "scripts").glob("*.py")) if name in skills else False
-        if loads != ("web-extract" in (e.get("dependencies") or [])):
+        deps = e.get("dependencies") or []
+        if not isinstance(deps, list):
+            problems.append(f"{where}: plugin {name} has dependencies {deps!r}; it must be a list")
+            deps = []
+        # A dependency is "name", "name@marketplace" or {"name": ...}.
+        dep_names = {d.split("@")[0] if isinstance(d, str) else d.get("name") if isinstance(d, dict) else None
+                     for d in deps}
+        if loads != ("web-extract" in dep_names):
             problems.append(f"{where}: plugin {name} " + ("loads web-extract but does not list it in dependencies"
                                                            if loads else "lists web-extract but never loads it"))
     return problems
